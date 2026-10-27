@@ -306,7 +306,9 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
     /// with that member, and the handler always keeps enough back to stop cleanly with GroupDeferred, the
     /// rest waiting for catchUp: when the next slot cannot be funded, or when a member runs out of gas in a
     /// slot the handler had to cut short. A member that runs out of a full slot is Deferred alone. Members
-    /// pay their own gas from their tank; one with nothing to do pays only the overhead.
+    /// pay their own gas from their tank. One with nothing to do is billed silently: a trader member only
+    /// the overhead (its no-op stops at the allowlist or one position read), a theme member the gas its sync
+    /// measured (a quiet rebalance still reads every leg; the hub does not fund a creator's rebalances).
     function onSourceEvent(
         bytes32 sourceId,
         uint32 group,
@@ -364,8 +366,8 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
                     : abi.encodeCall(this.syncFollowerFromEvent, (sourceId, follower, pool, size))
             );
             if (ok) {
-                if (abi.decode(ret, (bool))) spent = start - gasleft();
-                else reported = false; // nothing to do: the overhead only, silently
+                reported = abi.decode(ret, (bool));
+                if (reported || theme) spent = start - gasleft();
             } else {
                 bytes memory err = ret;
                 bool oog =

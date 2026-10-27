@@ -999,9 +999,10 @@ contract HubThemeTest is Base {
         assertFalse(done);
     }
 
-    // The registry refuses a rebalance that changes nothing, or that comes too soon; a rebalance that leaves
-    // a member's book inside the drift band costs it only the fixed overhead, silently.
-    function test_theme_quietRebalance_billsOverheadOnly() public {
+    // The registry refuses a rebalance that changes nothing, or that comes too soon. A rebalance that leaves
+    // a member's book inside the drift band still bills it the gas its sync measured, silently (R28): the
+    // theme's followers pay for a creator's quiet rebalances, not the hub.
+    function test_theme_quietRebalance_billsMeasuredGasSilently() public {
         address a = _f(1);
         address b = _f(2);
         _followTheme(a, _policy(100e18));
@@ -1023,14 +1024,21 @@ contract HubThemeTest is Base {
 
         uint256 ta = hub.tankOf(a);
         uint256 tb = hub.tankOf(b);
+        uint256 total = hub.totalTanks();
         vm.recordLogs();
         _fire(0, ev);
         Vm.Log[] memory logs = vm.getRecordedLogs();
         assertEq(_fills(logs, btc, a) + _fills(logs, eth, a) + _fills(logs, btc, b) + _fills(logs, eth, b), 0);
         assertEq(_hubLogs(logs), 0, "no TankCharged, no Copied");
-        uint256 overhead = hub.CHARGE_OVERHEAD_GAS() * 6 gwei;
-        assertEq(hub.tankOf(a), ta - overhead);
-        assertEq(hub.tankOf(b), tb - overhead);
+        uint256 overhead = hub.CHARGE_OVERHEAD_GAS();
+        (,, uint64 themeCap,,) = hub.gasParams();
+        uint256 paidA = ta - hub.tankOf(a);
+        uint256 paidB = tb - hub.tankOf(b);
+        assertEq(paidA % 6 gwei, 0);
+        assertGt(paidA / 6 gwei, overhead + 20_000, "the measured reads, not the overhead alone");
+        assertGt(paidB / 6 gwei, overhead + 20_000, "the measured reads, not the overhead alone");
+        assertLe(paidA / 6 gwei, overhead + themeCap);
+        assertEq(hub.totalTanks(), total - paidA - paidB);
         (uint32 v, bool done) = hub.themeSyncOf(a);
         assertEq(v, 2);
         assertTrue(done);

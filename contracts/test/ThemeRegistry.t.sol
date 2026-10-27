@@ -67,6 +67,32 @@ contract ThemeRegistryTest is Base {
         reg.createTheme("n", "", legs);
     }
 
+    // R27: every leg carries at least MIN_LEG_WEIGHT_BPS either way, at create and at rebalance, so a
+    // creator cannot park followers in dust legs that only ever reduce.
+    function test_rejects_weightBelowMinimum() public {
+        assertEq(reg.MIN_LEG_WEIGHT_BPS(), 500);
+        Leg[] memory legs = _two();
+        legs[1].weightBps = -499;
+        vm.expectRevert(ThemeRegistry.WeightTooSmall.selector);
+        reg.createTheme("n", "", legs);
+        legs[1].weightBps = 499;
+        vm.expectRevert(ThemeRegistry.WeightTooSmall.selector);
+        reg.createTheme("n", "", legs);
+        legs[1].weightBps = -500;
+        reg.createTheme("n", "", legs);
+        legs[1].weightBps = 500;
+        reg.createTheme("n", "", legs);
+
+        vm.prank(alice);
+        uint256 id = reg.createTheme("n", "", _two());
+        vm.warp(block.timestamp + reg.MIN_REBALANCE_INTERVAL());
+        legs = _two();
+        legs[0].weightBps = 1;
+        vm.prank(alice);
+        vm.expectRevert(ThemeRegistry.WeightTooSmall.selector);
+        reg.rebalance(id, legs);
+    }
+
     function test_rejects_noLegs() public {
         vm.expectRevert(ThemeRegistry.NoLegs.selector);
         reg.createTheme("n", "", new Leg[](0));

@@ -7,13 +7,16 @@ import {IMarginBank} from "./interfaces/IDreamPerps.sol";
 /// Creator-owned weight vectors over perp markets the margin bank registered. Followers mirror a theme;
 /// subscribers watch ThemeRebalanced (indexed themeId) to resync. Every follower pays to re-check its
 /// book on a rebalance, so a rebalance must change the legs and comes at most once per
-/// MIN_REBALANCE_INTERVAL.
+/// MIN_REBALANCE_INTERVAL. Every leg weighs at least MIN_LEG_WEIGHT_BPS either way: a follower whose
+/// allocation sizes the smallest leg below its venue minimum gets the whole set held back (the
+/// basket opens all legs or none), so the app shows that minimum allocation before following.
 contract ThemeRegistry {
     error NotCreator();
     error UnknownTheme();
     error NoLegs();
     error TooManyLegs();
     error ZeroWeight();
+    error WeightTooSmall();
     error DuplicatePool();
     error GrossTooHigh();
     error ForeignPool();
@@ -25,6 +28,9 @@ contract ThemeRegistry {
 
     uint256 public constant MAX_LEGS = 8;
     uint256 public constant MAX_GROSS_BPS = 30_000;
+    /// @dev Smallest |weightBps| of a leg, so a creator cannot shrink a leg to dust that followers can
+    /// only ever reduce.
+    uint256 public constant MIN_LEG_WEIGHT_BPS = 500;
     /// @dev Seconds between a theme's creation or rebalance and its next rebalance.
     uint256 public constant MIN_REBALANCE_INTERVAL = 60;
     bytes32 public constant THEME_REBALANCED_TOPIC = keccak256("ThemeRebalanced(uint256,uint32)");
@@ -132,7 +138,9 @@ contract ThemeRegistry {
             int32 w = legs[i].weightBps;
             if (w == 0) revert ZeroWeight();
             int256 w256 = w;
-            gross += uint256(w256 > 0 ? w256 : -w256);
+            uint256 abs = uint256(w256 > 0 ? w256 : -w256);
+            if (abs < MIN_LEG_WEIGHT_BPS) revert WeightTooSmall();
+            gross += abs;
             address pool = legs[i].pool;
             for (uint256 j; j < i; ++j) {
                 if (legs[j].pool == pool) revert DuplicatePool();

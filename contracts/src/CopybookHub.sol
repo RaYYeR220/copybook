@@ -16,8 +16,8 @@ import {IMarginBank, IPerpPool, IRiskGate} from "./interfaces/IDreamPerps.sol";
 
 /// @title CopybookHub
 /// @notice The operator followers link on dreamDEX. Keeps each follower's perp positions in sync with
-/// one source under the follower's Policy. Reductions are never gated; increases are fill-or-kill inside
-/// the follower's price band and pass every policy gate first.
+/// one source under the follower's Policy. In the markets a follow manages, reductions are never gated;
+/// increases are fill-or-kill priced inside the follower's band and pass every policy gate first.
 contract CopybookHub is Ownable2Step, ReentrancyGuard {
     error AlreadyFollowing();
     error NotFollowing();
@@ -32,10 +32,12 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
     error InvalidGroupSize();
     error NotRelay();
     error BadEvent();
+    error StillBelowFloor();
 
     event Followed(address indexed follower, bytes32 indexed sourceId, SourceKind kind, uint256 ref);
     event Unfollowed(address indexed follower, bytes32 indexed sourceId, bool flattened);
     event PolicyUpdated(address indexed follower);
+    event Resumed(address indexed follower);
     event Copied(
         address indexed follower,
         bytes32 indexed sourceId,
@@ -85,7 +87,6 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
     /// @dev Bounds per-follower loops (flatten, total cap) that run inside a shared group handler.
     uint256 public constant MAX_JOIN_POOLS = 32;
     bytes32 public constant POSITION_UPDATED_TOPIC = 0xf7816a375f0ca01053ed213b57908bff79f578810301d50971a5f685529b82de;
-    bytes32 public constant THEME_REBALANCED_TOPIC = keccak256("ThemeRebalanced(uint256,uint32)");
 
     address internal constant REACTIVITY = address(0x0100);
     uint8 internal constant FOK = 1;
@@ -133,8 +134,10 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
 
     // ---------------------------------------------------------------- follower lifecycle
 
-    /// @notice Follow a source. `joinPools` empty: every market is allowed and nothing is opened now.
-    /// Non-empty: only those markets are allowed, and the source's current positions there are copied.
+    /// @notice Follow a source. `joinPools` non-empty: the hub manages only those markets and copies the
+    /// source's current positions there now; every other market of the follower is never touched.
+    /// Empty (`allowAll`): the hub manages every market the source trades, including any position the
+    /// follower already holds there, and nothing is opened until the source moves.
     function follow(SourceKind kind, uint256 ref, Policy calldata p, address[] calldata joinPools)
         external
         payable
@@ -192,6 +195,18 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
         emit PolicyUpdated(msg.sender);
     }
 
+    /// @notice Lifts a stop. Allowed when the floor is off or equity is back at or above it.
+    function resume() external {
+        Follow storage f = _active(msg.sender);
+        uint256 floor = f.policy.equityFloor;
+        if (floor != 0) {
+            (int256 equity,,,) = bank.getAccountHealth(msg.sender);
+            if (equity < int256(floor)) revert StillBelowFloor();
+        }
+        f.paused = false;
+        emit Resumed(msg.sender);
+    }
+
     function fundTank() external payable {
         tankOf[msg.sender] += msg.value;
         totalTanks += msg.value;
@@ -227,21 +242,25 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
         _stop(follower, f, equity);
     }
 
-    /// @notice Entry point for a group's relay. Each member is synced on the pool named by the event.
+    /// @notice Entry point for a group's relay. The event only names the pool; the size is the trader's
+    /// live position, so a delayed or reordered event can never open what the trader no longer holds.
     function onSourceEvent(
         bytes32 sourceId,
         uint32 group,
         address emitter,
         bytes32[] calldata topics,
-        bytes calldata data
-    ) external nonReentrant {
+        bytes calldata /* data */
+    )
+        external
+        nonReentrant
+    {
         if (msg.sender != relayOf[sourceId][group]) revert NotRelay();
         if (
             emitter != address(bank) || topics.length < 3 || topics[0] != POSITION_UPDATED_TOPIC
                 || sourceIdOf(SourceKind.Trader, uint256(topics[1])) != sourceId
         ) revert BadEvent();
         address pool = address(uint160(uint256(topics[2])));
-        (int128 size,,,) = abi.decode(data, (int128, uint128, int256, int256));
+        int256 size = _size(address(uint160(uint256(topics[1]))), pool);
 
         address[] storage members = _members[sourceId][group];
         for (uint256 i; i < members.length; ++i) {
@@ -303,7 +322,7 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
         bool isTrader = kind == SourceKind.Trader;
 
         ISomniaReactivityPrecompile.SubscriptionData memory d;
-        d.eventTopics[0] = isTrader ? POSITION_UPDATED_TOPIC : THEME_REBALANCED_TOPIC;
+        d.eventTopics[0] = isTrader ? POSITION_UPDATED_TOPIC : themes.THEME_REBALANCED_TOPIC();
         // trader: the address left-padded; theme: the theme id
         d.eventTopics[1] = bytes32(ref);
         d.emitter = isTrader ? address(bank) : address(themes);
@@ -329,6 +348,8 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
 
     /// @dev Moves one pool of one follower toward `target`. Never reverts on venue failure.
     function _sync(address follower, Follow storage f, address pool, int256 target) internal {
+        // Outside an allowlist the hub never acts: any position there is the follower's own.
+        if (!f.allowAll && !_allowed[follower][_epoch[follower]][pool]) return;
         int256 cur = _size(follower, pool);
         if (cur == target) return;
         bytes32 sourceId = f.sourceId;
@@ -344,8 +365,9 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
             if (!full) reduceQty = PolicyLib.toLots(reduceQty, m.lot);
             if (full || (reduceQty != 0 && reduceQty >= m.minQty)) {
                 price = PolicyLib.bandPrice(m.mark, PolicyLib.exitBand(f.policy.bandBps), reduceIsBid, m.tick);
-                _place(follower, sourceId, pool, reduceIsBid, price, reduceQty, IOC);
+                bool sent = _place(follower, sourceId, pool, reduceIsBid, price, reduceQty, IOC);
                 mid = _size(follower, pool);
+                if (sent && mid == cur) emit Refused(follower, sourceId, pool, Reason.BandUnfilled, "");
             }
         }
 
@@ -395,15 +417,15 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
             return (0, false, r == Reason.EquityFloor, equity);
         }
 
-        price = PolicyLib.bandPrice(m.mark, f.policy.bandBps, isBid, m.tick);
+        price = PolicyLib.bandPriceInward(m.mark, f.policy.bandBps, isBid, m.tick);
         if (!_place(follower, f.sourceId, pool, isBid, price, qty, FOK)) return (0, false, false, equity);
         int256 got = _size(follower, pool);
         int256 short = isBid ? expected - got : got - expected;
         if (short >= int256(m.lot)) emit Refused(follower, f.sourceId, pool, Reason.BandUnfilled, "");
     }
 
-    /// @dev Increase gates in order. EquityFloor also returns the equity read for the stop;
-    /// an unreadable account health refuses the increase without stopping.
+    /// @dev Increase gates in order (the allowlist is enforced earlier, in _sync). EquityFloor also returns
+    /// the equity read for the stop; an unreadable account health refuses the increase without stopping.
     function _gate(address follower, Follow storage f, address pool, uint256 newNotional)
         internal
         view
@@ -411,7 +433,6 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
     {
         Policy storage p = f.policy;
         if (f.paused) return (Reason.Paused, 0);
-        if (!f.allowAll && !_allowed[follower][_epoch[follower]][pool]) return (Reason.MarketNotAllowed, 0);
         if (p.equityFloor != 0) {
             try bank.getAccountHealth(follower) returns (int256 e, uint256, uint256, uint256) {
                 equity = e;
@@ -450,7 +471,12 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
             } catch {
                 return false;
             }
-            uint256 oneBase = IPerpPool(other).getOneBase();
+            uint256 oneBase;
+            try IPerpPool(other).getOneBase() returns (uint256 x) {
+                oneBase = x;
+            } catch {
+                return false;
+            }
             if (mark == 0 || oneBase == 0) return false;
             sum += PolicyLib.notional(size, mark, oneBase);
         }
@@ -474,21 +500,33 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
         }
     }
 
-    /// @dev Reads mark and book parameters. A reverting or zero read is reported and skips the pool.
+    /// @dev Reads mark and book parameters. A reverting or zero read is reported (with the revert data)
+    /// and skips the pool.
     function _market(address follower, bytes32 sourceId, address pool) internal returns (bool, Market memory m) {
-        try IPerpPool(pool).getMarkPrice() returns (uint256 mark) {
-            m.mark = mark;
-        } catch (bytes memory err) {
-            emit Refused(follower, sourceId, pool, Reason.VenueRejected, err);
-            return (false, m);
+        bytes memory err;
+        try IPerpPool(pool).getMarkPrice() returns (uint256 x) {
+            m.mark = x;
+        } catch (bytes memory e) {
+            err = e;
         }
-        IPerpPool.OBParams memory ob = IPerpPool(pool).getOrderBookParameters();
-        m.tick = ob.tickSize;
-        m.lot = ob.lotSize;
-        m.minQty = ob.minQuantity;
-        m.oneBase = IPerpPool(pool).getOneBase();
+        if (m.mark != 0) {
+            try IPerpPool(pool).getOrderBookParameters() returns (IPerpPool.OBParams memory ob) {
+                m.tick = ob.tickSize;
+                m.lot = ob.lotSize;
+                m.minQty = ob.minQuantity;
+            } catch (bytes memory e) {
+                err = e;
+            }
+        }
+        if (m.tick != 0) {
+            try IPerpPool(pool).getOneBase() returns (uint256 x) {
+                m.oneBase = x;
+            } catch (bytes memory e) {
+                err = e;
+            }
+        }
         if (m.mark == 0 || m.tick == 0 || m.lot == 0 || m.oneBase == 0) {
-            emit Refused(follower, sourceId, pool, Reason.VenueRejected, "");
+            emit Refused(follower, sourceId, pool, Reason.VenueRejected, err);
             return (false, m);
         }
         return (true, m);

@@ -3,8 +3,10 @@ pragma solidity 0.8.30;
 
 import {Vm} from "forge-std/Vm.sol";
 import {StdStorage, stdStorage} from "forge-std/StdStorage.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {Base} from "./Base.t.sol";
 import {MockPerpPool} from "./mocks/MockPerpPool.sol";
+import {MockReactivity} from "./mocks/MockReactivity.sol";
 import {CopybookHub} from "../src/CopybookHub.sol";
 import {GroupRelay} from "../src/GroupRelay.sol";
 import {ThemeRegistry} from "../src/ThemeRegistry.sol";
@@ -29,6 +31,34 @@ contract FlagGate is IRiskGate {
     function allowIncrease(bytes32) external view returns (bool) {
         require(!broken, "gate down");
         return allow;
+    }
+}
+
+/// Tries to withdraw its tank a second time from inside the first payout.
+contract TankReentrant {
+    CopybookHub internal immutable hub;
+    bytes public innerError;
+    bool public reentered;
+
+    constructor(CopybookHub hub_) {
+        hub = hub_;
+    }
+
+    function fund() external payable {
+        hub.fundTank{value: msg.value}();
+    }
+
+    function withdraw(uint256 amount) external {
+        hub.withdrawTank(amount);
+    }
+
+    receive() external payable {
+        if (msg.sender != address(hub) || reentered || innerError.length != 0) return;
+        try hub.withdrawTank(msg.value) {
+            reentered = true;
+        } catch (bytes memory err) {
+            innerError = err;
+        }
     }
 }
 
@@ -114,8 +144,23 @@ contract HubFollowTest is Base {
         int256 d = target - _size(pool, account);
         if (d == 0) return;
         bool bid = d > 0;
-        uint256 price = bid ? pool.mark() * 11 / 10 : pool.mark() * 9 / 10;
+        uint256 price = (bid ? pool.mark() * 11 / 10 : pool.mark() * 9 / 10) / pool.tick() * pool.tick();
         pool.placeOrderFor(account, bid, 0, price, uint256(bid ? d : -d), type(uint64).max, 2, 0, address(0), 0);
+    }
+
+    /// The last MarginBank PositionUpdated log for `pool` in `logs`.
+    function _positionEvent(Vm.Log[] memory logs, MockPerpPool pool) internal view returns (Vm.Log memory ev) {
+        for (uint256 i; i < logs.length; ++i) {
+            if (
+                logs[i].emitter == address(bank) && logs[i].topics[0] == POSITION_UPDATED
+                    && logs[i].topics[2] == bytes32(uint256(uint160(address(pool))))
+            ) ev = logs[i];
+        }
+        require(ev.emitter == address(bank), "no PositionUpdated");
+    }
+
+    function _fire(Vm.Log memory ev) internal {
+        reactivity.fire(hub.subscriptionOf(sid, 0), ev.emitter, ev.topics, ev.data);
     }
 
     function _traderTo(MockPerpPool pool, int256 target) internal {
@@ -306,10 +351,34 @@ contract HubFollowTest is Base {
         assertEq(synced.length, 1);
         assertEq(synced[0], address(eth));
 
-        vm.expectEmit(true, true, true, true, address(hub));
-        emit CopybookHub.Refused(follower, sid, address(btc), Reason.MarketNotAllowed, "");
+        // btc is outside the new allowlist: the hub does not touch it at all
+        vm.recordLogs();
         hub.catchUp(follower, _one(btc));
+        assertEq(_hubLogs(vm.getRecordedLogs()), 0);
         assertEq(_size(btc, follower), 50_000);
+    }
+
+    // Regression (review I1): a position the follower kept in a pool its new follow does not allow
+    // must not be closed by a stranger through catchUp or by a source event.
+    function test_strangerCannotTouchNonAllowlistedPool() public {
+        _traderTo(btc, 50_000);
+        _follow(follower, _policy(), _one(btc));
+        vm.prank(follower);
+        hub.unfollow(false);
+        assertEq(_size(btc, follower), 50_000);
+
+        _traderTo(eth, -2e16);
+        _follow(follower, _policy(), _one(eth)); // allowlist = ETH only
+        vm.recordLogs();
+        _traderTo(btc, 0);
+        Vm.Log memory ev = _positionEvent(vm.getRecordedLogs(), btc);
+
+        vm.recordLogs();
+        vm.prank(stranger);
+        hub.catchUp(follower, _one(btc));
+        _fire(ev);
+        assertEq(_hubLogs(vm.getRecordedLogs()), 0);
+        assertEq(_size(btc, follower), 50_000, "kept position untouched");
     }
 
     function test_tank_fundAndWithdraw() public {
@@ -668,14 +737,14 @@ contract HubFollowTest is Base {
         _follow(follower, _policy(), _one(btc));
         assertEq(_size(btc, follower), 50_000);
 
-        // the source adds; eth is outside the follower's allowlist
+        // the source adds; eth is outside the follower's allowlist and is left alone
         _traderTo(btc, 80_000);
+        vm.recordLogs();
         vm.expectEmit(true, true, true, true, address(hub));
         emit CopybookHub.Copied(follower, sid, address(btc), 50_000, 80_000, BTC_BUY, false);
-        vm.expectEmit(true, true, true, true, address(hub));
-        emit CopybookHub.Refused(follower, sid, address(eth), Reason.MarketNotAllowed, "");
         vm.prank(stranger);
         hub.catchUp(follower, _two(btc, eth));
+        assertEq(_hubLogs(vm.getRecordedLogs()), 1);
         assertEq(_size(btc, follower), 80_000);
         assertEq(_size(eth, follower), 0);
 
@@ -767,5 +836,214 @@ contract HubFollowTest is Base {
         vm.prank(relay);
         vm.expectRevert(CopybookHub.BadEvent.selector);
         hub.onSourceEvent(sid, 0, address(bank), topics, data);
+
+        // wrong event signature
+        topics[1] = bytes32(uint256(uint160(trader)));
+        topics[0] = keccak256("Other(address,address)");
+        vm.prank(relay);
+        vm.expectRevert(CopybookHub.BadEvent.selector);
+        hub.onSourceEvent(sid, 0, address(bank), topics, data);
+
+        // too few topics to name a pool
+        bytes32[] memory short = new bytes32[](2);
+        short[0] = POSITION_UPDATED;
+        short[1] = bytes32(uint256(uint160(trader)));
+        vm.prank(relay);
+        vm.expectRevert(CopybookHub.BadEvent.selector);
+        hub.onSourceEvent(sid, 0, address(bank), short, data);
+    }
+
+    // Regression (review I2): the event only names the pool; the size comes from the trader's live position.
+    function test_staleEventUsesLiveTraderSize() public {
+        _follow(follower, _policy(), _none());
+        vm.recordLogs();
+        _traderTo(btc, 50_000);
+        Vm.Log memory ev = _positionEvent(vm.getRecordedLogs(), btc);
+        _traderTo(btc, 0); // the trader is out again before the first handler runs
+
+        vm.recordLogs();
+        _fire(ev);
+        assertEq(_hubLogs(vm.getRecordedLogs()), 0);
+        assertEq(_size(btc, follower), 0, "no position opened against a flat source");
+    }
+
+    function test_reactive_reducesWhilePausedWithEmptyTank() public {
+        Policy memory p = _policy();
+        p.equityFloor = 50e18;
+        bank.setEquity(follower, 100e18);
+        _traderTo(btc, 50_000);
+        _follow(follower, p, _one(btc));
+
+        // the stop's exit fails, so the follow is paused with the position still open
+        btc.setRevertFor(follower, abi.encodeWithSignature("Busy()"));
+        bank.setEquity(follower, 10e18);
+        hub.poke(follower);
+        assertTrue(_paused(follower));
+        btc.setRevertFor(follower, "");
+        vm.prank(follower);
+        hub.withdrawTank(0.5 ether);
+
+        vm.recordLogs();
+        _traderTo(btc, 0);
+        Vm.Log memory ev = _positionEvent(vm.getRecordedLogs(), btc);
+        vm.expectEmit(true, true, true, true, address(hub));
+        emit CopybookHub.Copied(follower, sid, address(btc), 50_000, 0, BTC_EXIT_SELL, false);
+        _fire(ev);
+        assertEq(_size(btc, follower), 0);
+    }
+
+    // ---------- price band rounding ----------
+
+    function test_increaseRoundsInsideBand_offTick() public {
+        uint256 m = 80_000_070_000_000_000_000_000; // mark off the 1e17 tick
+        btc.setMark(m);
+        _traderTo(btc, 50_000);
+
+        // bid limit: mark * 1.005 = 80_400.07035 floors to 80_400.0, never above
+        vm.expectEmit(true, true, true, true, address(hub));
+        emit CopybookHub.Copied(follower, sid, address(btc), 0, 50_000, 80_400e18, false);
+        _follow(follower, _policy(), _one(btc));
+        assertLe(uint256(80_400e18) * 1e4, m * (1e4 + 50));
+
+        // ask limit on the flip: mark * 0.995 = 79_600.06965 ceils to 79_600.1, never below
+        uint256 ask = 79_600_100_000_000_000_000_000;
+        _traderTo(btc, -50_000);
+        vm.expectEmit(true, true, true, true, address(hub));
+        emit CopybookHub.Copied(follower, sid, address(btc), 50_000, -50_000, ask, false);
+        hub.catchUp(follower, _one(btc));
+        assertGe(ask * 1e4, m * (1e4 - 50));
+    }
+
+    // ---------- resume ----------
+
+    function test_resume_requiresEquityAtFloor() public {
+        Policy memory p = _policy();
+        p.equityFloor = 50e18;
+        bank.setEquity(follower, 100e18);
+        _traderTo(btc, 50_000);
+        _follow(follower, p, _one(btc));
+        bank.setEquity(follower, 40e18);
+        hub.poke(follower);
+        assertTrue(_paused(follower));
+        assertEq(_size(btc, follower), 0);
+
+        vm.prank(follower);
+        vm.expectRevert(CopybookHub.StillBelowFloor.selector);
+        hub.resume();
+        assertTrue(_paused(follower));
+
+        bank.setEquity(follower, 50e18);
+        vm.expectEmit(true, false, false, true, address(hub));
+        emit CopybookHub.Resumed(follower);
+        vm.prank(follower);
+        hub.resume();
+        assertFalse(_paused(follower));
+
+        hub.catchUp(follower, _one(btc));
+        assertEq(_size(btc, follower), 50_000);
+
+        vm.prank(stranger);
+        vm.expectRevert(CopybookHub.NotFollowing.selector);
+        hub.resume();
+    }
+
+    function test_resume_floorDisabled() public {
+        Policy memory p = _policy();
+        p.equityFloor = 50e18;
+        bank.setEquity(follower, 100e18);
+        _follow(follower, p, _none());
+        bank.setEquity(follower, -1);
+        hub.poke(follower);
+        assertTrue(_paused(follower));
+
+        p.equityFloor = 0;
+        vm.prank(follower);
+        hub.updatePolicy(p);
+        assertTrue(_paused(follower));
+
+        vm.expectEmit(true, false, false, true, address(hub));
+        emit CopybookHub.Resumed(follower);
+        vm.prank(follower);
+        hub.resume();
+        assertFalse(_paused(follower));
+    }
+
+    // ---------- venue robustness ----------
+
+    function test_unreadableBookParams_refusedNotReverted() public {
+        _traderTo(btc, 50_000);
+        _follow(follower, _policy(), _one(btc));
+        bytes memory err = abi.encodeWithSignature("Halted()");
+
+        vm.mockCallRevert(address(btc), abi.encodeWithSignature("getOrderBookParameters()"), err);
+        vm.expectEmit(true, true, true, true, address(hub));
+        emit CopybookHub.Refused(follower, sid, address(btc), Reason.VenueRejected, err);
+        vm.expectEmit(true, true, false, true, address(hub));
+        emit CopybookHub.Unfollowed(follower, sid, false);
+        vm.prank(follower);
+        hub.unfollow(true);
+        assertEq(_size(btc, follower), 50_000);
+        vm.clearMockedCalls();
+
+        vm.mockCallRevert(address(btc), abi.encodeWithSignature("getOneBase()"), err);
+        vm.expectEmit(true, true, true, true, address(hub));
+        emit CopybookHub.Refused(follower2, sid, address(btc), Reason.VenueRejected, err);
+        _follow(follower2, _policy(), _one(btc));
+        assertEq(_size(btc, follower2), 0);
+        vm.clearMockedCalls();
+    }
+
+    function test_unfollow_flatten_unclosablePool_reportsNotFlattened() public {
+        _traderTo(btc, 50_000);
+        _traderTo(eth, -2e16);
+        _follow(follower, _policy(), _two(btc, eth));
+        bytes memory err = abi.encodeWithSignature("InsufficientCollateral()");
+        btc.setRevertFor(follower, err);
+
+        vm.expectEmit(true, true, true, true, address(hub));
+        emit CopybookHub.Refused(follower, sid, address(btc), Reason.VenueRejected, err);
+        vm.expectEmit(true, true, true, true, address(hub));
+        emit CopybookHub.Copied(follower, sid, address(eth), -2e16, 0, ETH_EXIT_BUY, false);
+        vm.expectEmit(true, true, false, true, address(hub));
+        emit CopybookHub.Unfollowed(follower, sid, false);
+        vm.prank(follower);
+        hub.unfollow(true);
+        assertEq(_size(btc, follower), 50_000);
+        assertEq(_size(eth, follower), 0);
+        (bytes32 s,,,,,) = hub.followOf(follower);
+        assertEq(s, bytes32(0));
+    }
+
+    function test_iocSuccessWithoutFill_isBandUnfilled() public {
+        _traderTo(btc, 50_000);
+        _follow(follower, _policy(), _one(btc));
+        _traderTo(btc, 0);
+
+        vm.mockCall(address(btc), abi.encodePacked(IPerpPool.placeOrderFor.selector), abi.encode(true, uint128(1)));
+        vm.expectEmit(true, true, true, true, address(hub));
+        emit CopybookHub.Refused(follower, sid, address(btc), Reason.BandUnfilled, "");
+        hub.catchUp(follower, _one(btc));
+        assertEq(_size(btc, follower), 50_000);
+        vm.clearMockedCalls();
+    }
+
+    function test_follow_hubBelowSubscriptionBalance_reverts() public {
+        CopybookHub poor = new CopybookHub(IMarginBank(address(bank)), themes, 8, owner);
+        vm.deal(address(poor), 31 ether);
+        vm.prank(follower);
+        vm.expectRevert(MockReactivity.InsufficientBalance.selector);
+        poor.follow{value: 0.5 ether}(SourceKind.Trader, uint256(uint160(trader)), _policy(), _none());
+    }
+
+    function test_withdrawTank_reentryBlocked() public {
+        TankReentrant attacker = new TankReentrant(hub);
+        attacker.fund{value: 1 ether}();
+        attacker.withdraw(0.5 ether);
+
+        assertFalse(attacker.reentered());
+        assertEq(bytes4(attacker.innerError()), ReentrancyGuard.ReentrancyGuardReentrantCall.selector);
+        assertEq(hub.tankOf(address(attacker)), 0.5 ether);
+        assertEq(hub.totalTanks(), 0.5 ether);
+        assertEq(address(attacker).balance, 0.5 ether);
     }
 }

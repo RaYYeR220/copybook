@@ -129,6 +129,35 @@ contract PolicyLibTest is Test {
         assertEq(PolicyLib.bandPrice(m, 50, false, TICK), 79_600e18);
     }
 
+    function test_bandPriceInward() public pure {
+        assertEq(PolicyLib.bandPriceInward(MARK, 50, true, TICK), 80_400e18);
+        assertEq(PolicyLib.bandPriceInward(MARK, 50, false, TICK), 79_600e18);
+        // off-tick: 80_400.07035 floors to 80_400.0; 79_600.06965 ceils to 79_600.1
+        uint256 m = 80_000_070_000_000_000_000_000;
+        uint256 bid = PolicyLib.bandPriceInward(m, 50, true, TICK);
+        uint256 ask = PolicyLib.bandPriceInward(m, 50, false, TICK);
+        assertEq(bid, 80_400e18);
+        assertEq(ask, 79_600_100_000_000_000_000_000);
+        // exact bounds, no rounding slack
+        assertLe(bid * 1e4, m * (1e4 + 50));
+        assertGe(ask * 1e4, m * (1e4 - 50));
+    }
+
+    function testFuzz_bandInwardNeverBeyond(uint256 mark, uint16 band, uint256 tick) public pure {
+        mark = bound(mark, 1, 1e30);
+        band = uint16(bound(band, 1, 500));
+        tick = bound(tick, 1, 1e20);
+        uint256 bid = PolicyLib.bandPriceInward(mark, band, true, tick);
+        uint256 ask = PolicyLib.bandPriceInward(mark, band, false, tick);
+        assertLe(bid * 1e4, mark * (1e4 + band));
+        assertGe(ask * 1e4, mark * (1e4 - band));
+        assertEq(bid % tick, 0);
+        assertEq(ask % tick, 0);
+        // and no more than one tick inside the exact edge
+        assertGt((bid + tick) * 1e4, mark * (1e4 + band));
+        assertLt((ask - tick) * 1e4, mark * (1e4 - band));
+    }
+
     function test_exitBand() public pure {
         assertEq(PolicyLib.exitBand(10), 100);
         assertEq(PolicyLib.exitBand(50), 100);

@@ -56,6 +56,7 @@ library PolicyLib {
         return abs * mark / oneBase;
     }
 
+    // Rounds outward (reach), used for exits.
     // bid: ceil to tick of mark*(1+band); ask: floor to tick of mark*(1-band)
     function bandPrice(uint256 mark, uint16 bandBps, bool isBid, uint256 tick) internal pure returns (uint256) {
         if (isBid) {
@@ -64,6 +65,15 @@ library PolicyLib {
             return (raw + tick - 1) / tick * tick;
         }
         return mark * (BPS - bandBps) / BPS / tick * tick;
+    }
+
+    // Rounds inward, used for increases: the limit never lies beyond mark*(1 +/- band).
+    // bid: floor to tick of mark*(1+band); ask: ceil to tick of mark*(1-band)
+    function bandPriceInward(uint256 mark, uint16 bandBps, bool isBid, uint256 tick) internal pure returns (uint256) {
+        if (isBid) return mark * (BPS + bandBps) / BPS / tick * tick;
+        uint256 raw = mark * (BPS - bandBps) / BPS;
+        if (mark * (BPS - bandBps) % BPS != 0) raw += 1;
+        return (raw + tick - 1) / tick * tick;
     }
 
     function exitBand(uint16 bandBps) internal pure returns (uint16) {

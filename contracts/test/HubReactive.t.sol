@@ -194,7 +194,7 @@ contract HubReactiveTest is Base {
         assertGt(amount, 0, "charged");
         assertEq(amount % rate, 0, "whole gas units at the rate");
         uint256 gasUnits = amount / rate;
-        (, uint64 cap,,) = hub.gasParams();
+        (, uint64 cap,,,) = hub.gasParams();
         assertGt(gasUnits, hub.CHARGE_OVERHEAD_GAS(), "overhead plus measured gas");
         assertLt(gasUnits, hub.CHARGE_OVERHEAD_GAS() + cap, "bounded by the slot");
     }
@@ -394,7 +394,7 @@ contract HubReactiveTest is Base {
         Vm.Log memory ev = _traderTo(btc, 50_000);
         uint256 subId = hub.subscriptionOf(sid, 0);
         address[] memory m = hub.membersOf(sid, 0);
-        (uint64 floor,, uint64 tailBase, uint64 perDefer) = hub.gasParams();
+        (uint64 floor,,, uint64 tailBase, uint64 perDefer) = hub.gasParams();
         // what the handler must hold to start member #0: its slot plus the reserve for deferring all n
         uint256 first = floor + tailBase + n * perDefer;
 
@@ -706,9 +706,10 @@ contract HubReactiveTest is Base {
     // ---------- gas parameters ----------
 
     function test_gasParams_defaults() public view {
-        (uint64 floor, uint64 cap, uint64 tailBase, uint64 perDefer) = hub.gasParams();
+        (uint64 floor, uint64 cap, uint64 themeCap, uint64 tailBase, uint64 perDefer) = hub.gasParams();
         assertEq(floor, 8_000_000);
         assertEq(cap, 20_000_000);
+        assertEq(themeCap, 90_000_000);
         assertEq(tailBase, 1_200_000);
         assertEq(perDefer, 30_000);
         (,, uint64 traderGas, uint64 themeGas,) = hub.subParams();
@@ -753,7 +754,7 @@ contract HubReactiveTest is Base {
         // in a slot cut to the handler's budget there is no headroom left: no charge, no event
         uint256 tank = hub.tankOf(b);
         uint256 total = hub.totalTanks();
-        (uint64 floor,, uint64 tailBase, uint64 perDefer) = hub.gasParams();
+        (uint64 floor,,, uint64 tailBase, uint64 perDefer) = hub.gasParams();
         vm.expectEmit(true, true, true, true, address(hub));
         emit CopybookHub.Refused(b, sid, address(btc), Reason.VenueRejected, halted);
         vm.recordLogs();

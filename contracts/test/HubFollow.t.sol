@@ -274,7 +274,8 @@ contract HubFollowTest is Base {
 
     function test_follow_rejectsBadInput() public {
         vm.startPrank(follower);
-        vm.expectRevert(CopybookHub.ThemeNotSupported.selector);
+        // no theme 1 exists yet
+        vm.expectRevert(CopybookHub.InvalidSource.selector);
         hub.follow{value: 0.5 ether}(SourceKind.Theme, 1, _policy(), _none());
 
         vm.expectRevert(CopybookHub.InvalidSource.selector);

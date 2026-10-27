@@ -11,20 +11,20 @@ import {ISomniaEventHandler} from "@somnia-chain/reactivity-contracts/interfaces
 import {GroupRelay} from "./GroupRelay.sol";
 import {PolicyLib} from "./PolicyLib.sol";
 import {ThemeRegistry} from "./ThemeRegistry.sol";
-import {Policy, Reason, SourceKind} from "./Types.sol";
+import {Leg, Policy, Reason, SourceKind} from "./Types.sol";
 import {IMarginBank, IPerpPool, IRiskGate} from "./interfaces/IDreamPerps.sol";
 
 /// @title CopybookHub
 /// @notice The operator followers link on dreamDEX. Keeps each follower's perp positions in sync with
-/// one source under the follower's Policy. In the markets a follow manages, reductions are never gated;
-/// increases are fill-or-kill priced inside the follower's band and pass every policy gate first.
+/// one source under the follower's Policy: a trader's live book, or a thesis basket from ThemeRegistry.
+/// In the markets a follow manages, reductions are never gated; increases are fill-or-kill priced inside
+/// the follower's band and pass every policy gate first. A thesis opens all its legs or none.
 contract CopybookHub is Ownable2Step, ReentrancyGuard {
     error AlreadyFollowing();
     error NotFollowing();
     error TankTooLow();
     error InsufficientTank();
     error TransferFailed();
-    error ThemeNotSupported();
     error InvalidSource();
     error ForeignPool();
     error TooManyPools();
@@ -38,6 +38,8 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
     error UnsubscribeOutOfGas();
     error OutOfGasInSync();
     error SubscriptionUnreadable();
+    error JoinPoolsNotAllowed();
+    error LegFailed(address pool, bytes venueError);
 
     event Followed(address indexed follower, bytes32 indexed sourceId, SourceKind kind, uint256 ref);
     event Unfollowed(address indexed follower, bytes32 indexed sourceId, bool flattened);
@@ -84,13 +86,25 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
     }
 
     /// @dev Gas budget of a group handler. Each member runs in a slot of at least `floor` and at most
-    /// `perFollowerCap`; the handler always keeps `tailBase + perDefer * remainingMembers` back so it can
-    /// still report the rest of the group as Deferred.
+    /// `perFollowerCap` (`themePerFollowerCap` for a theme member, which syncs every leg); the handler
+    /// always keeps `tailBase + perDefer * remainingMembers` back so it can still report the rest of the
+    /// group as Deferred.
     struct GasParams {
         uint64 floor;
         uint64 perFollowerCap;
+        uint64 themePerFollowerCap;
         uint64 tailBase;
         uint64 perDefer;
+    }
+
+    /// @dev One fill-or-kill increase of a theme's all-or-nothing set; `expected` is the size it must reach.
+    struct LegOrder {
+        address pool;
+        bool isBid;
+        uint256 price;
+        uint256 qty;
+        int256 expected;
+        uint256 lot;
     }
 
     struct Market {
@@ -101,10 +115,25 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
         uint256 oneBase;
     }
 
+    /// @dev One market of a theme sync. `weight` 0: not a current leg (its target is flat).
+    struct ThemePool {
+        address pool;
+        int32 weight;
+        bool ok; // market data read
+        bool capped;
+        int256 cur;
+        int256 target;
+        int256 mid; // after the reductions
+        uint256 price; // limit price of the last order that went through
+        uint256 incPrice; // limit price of its increase, if one is in the set
+        Market m;
+    }
+
     uint256 public constant MIN_TANK = 0.2 ether;
     uint256 public constant MIN_TANK_FOR_INCREASE = 0.02 ether;
     uint256 public constant ORDER_TTL = 60;
-    /// @dev Bounds per-follower loops (flatten, total cap) that run inside a shared group handler.
+    /// @dev Bounds per-follower loops (flatten, total cap, a theme's markets) that run inside a shared
+    /// group handler.
     uint256 public constant MAX_JOIN_POOLS = 32;
     bytes32 public constant POSITION_UPDATED_TOPIC = 0xf7816a375f0ca01053ed213b57908bff79f578810301d50971a5f685529b82de;
 
@@ -148,6 +177,8 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
     mapping(bytes32 => uint32) public groupCount;
     mapping(bytes32 => mapping(uint32 => bool)) public subscribed;
     GasParams public gasParams;
+    /// @dev Members per theme group (trader groups hold `groupSize`): a theme member's sync is heavy.
+    uint32 public themeGroupSize;
 
     modifier onlySelf() {
         if (msg.sender != address(this)) revert NotSelf();
@@ -166,7 +197,14 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
             themeGasLimit: 200_000_000,
             guaranteed: false
         });
-        gasParams = GasParams({floor: 8_000_000, perFollowerCap: 20_000_000, tailBase: 1_200_000, perDefer: 30_000});
+        gasParams = GasParams({
+            floor: 8_000_000,
+            perFollowerCap: 20_000_000,
+            themePerFollowerCap: 90_000_000,
+            tailBase: 1_200_000,
+            perDefer: 30_000
+        });
+        themeGroupSize = 2;
     }
 
     /// @dev Funds the subscription balance the Reactivity precompile requires of the hub.
@@ -174,10 +212,12 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
 
     // ---------------------------------------------------------------- follower lifecycle
 
-    /// @notice Follow a source. `joinPools` non-empty: the hub manages only those markets and copies the
-    /// source's current positions there now; every other market of the follower is never touched.
-    /// Empty (`allowAll`): the hub manages every market the source trades, including any position the
-    /// follower already holds there, and nothing is opened until the source moves.
+    /// @notice Follow a source. Trader, `joinPools` non-empty: the hub manages only those markets and
+    /// copies the source's current positions there now; every other market of the follower is never
+    /// touched. Empty (`allowAll`): the hub manages every market the source trades, including any position
+    /// the follower already holds there, and nothing is opened until the source moves.
+    /// Theme (`ref` = themeId, `joinPools` empty): the hub manages every market that is a leg of the theme
+    /// while followed, sized from `p.allocation`, and opens the whole basket now, all legs or none.
     function follow(SourceKind kind, uint256 ref, Policy calldata p, address[] calldata joinPools)
         external
         payable
@@ -185,11 +225,16 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
         returns (bytes32 sourceId)
     {
         if (followsPaused) revert FollowsPaused();
-        if (kind != SourceKind.Trader) revert ThemeNotSupported();
         Follow storage f = _follows[msg.sender];
         if (f.sourceId != 0) revert AlreadyFollowing();
         if (msg.value < MIN_TANK) revert TankTooLow();
-        if (ref == 0 || ref > type(uint160).max || address(uint160(ref)) == msg.sender) revert InvalidSource();
+        bool theme = kind == SourceKind.Theme;
+        if (theme) {
+            if (ref == 0 || ref > themes.themeCount()) revert InvalidSource();
+            if (joinPools.length != 0) revert JoinPoolsNotAllowed();
+        } else if (ref == 0 || ref > type(uint160).max || address(uint160(ref)) == msg.sender) {
+            revert InvalidSource();
+        }
         if (joinPools.length > MAX_JOIN_POOLS) revert TooManyPools();
         PolicyLib.validate(p, kind);
 
@@ -198,11 +243,15 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
         f.ref = ref;
         f.policy = p;
         f.kind = kind;
-        f.allowAll = joinPools.length == 0;
+        f.allowAll = !theme && joinPools.length == 0;
         tankOf[msg.sender] += msg.value;
         totalTanks += msg.value;
         _joinGroup(msg.sender, f, sourceId, kind, ref);
         emit Followed(msg.sender, sourceId, kind, ref);
+        if (theme) {
+            _syncTheme(msg.sender, f, themes.legsOf(ref));
+            return sourceId;
+        }
 
         mapping(address => bool) storage allowed = _allowed[msg.sender][_epoch[msg.sender]];
         for (uint256 i; i < joinPools.length; ++i) {
@@ -268,10 +317,15 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
 
     /// @notice Re-sync `pools` of `follower` to the source's current on-chain positions. Anyone may call;
     /// the target always comes from the source, so a call can only move the follower toward it.
+    /// A theme follow ignores `pools` and syncs the whole basket.
     function catchUp(address follower, address[] calldata pools) external nonReentrant {
         Follow storage f = _active(follower);
-        for (uint256 i; i < pools.length; ++i) {
-            _sync(follower, f, pools[i], _target(f, pools[i]));
+        if (f.kind == SourceKind.Theme) {
+            _syncTheme(follower, f, themes.legsOf(f.ref));
+        } else {
+            for (uint256 i; i < pools.length; ++i) {
+                _sync(follower, f, pools[i], _target(f, pools[i]));
+            }
         }
     }
 
@@ -303,8 +357,9 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
         _subscribe(sourceId, group, f.kind, f.ref);
     }
 
-    /// @notice Entry point for a group's relay. The event only names the pool; the size is the trader's
-    /// live position, so a delayed or reordered event can never open what the trader no longer holds.
+    /// @notice Entry point for a group's relay. The event only names the pool (trader) or the theme; the
+    /// source is read live (the trader's position, the theme's legs), so a delayed or reordered event can
+    /// never open what the source no longer holds.
     /// Each member runs in its own self-call with a bounded gas slot (see GasParams), so one failure stays
     /// with that member, and the handler always keeps enough back to stop cleanly with GroupDeferred, the
     /// rest waiting for catchUp: when the next slot cannot be funded, or when a member runs out of gas in a
@@ -321,14 +376,28 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
         nonReentrant
     {
         if (msg.sender != relayOf[sourceId][group]) revert NotRelay();
-        if (
-            emitter != address(bank) || topics.length < 3 || topics[0] != POSITION_UPDATED_TOPIC
-                || sourceIdOf(SourceKind.Trader, uint256(topics[1])) != sourceId
-        ) revert BadEvent();
-        address pool = address(uint160(uint256(topics[2])));
-        int256 size = _size(address(uint160(uint256(topics[1]))), pool);
-        uint256 rate = block.basefee > MIN_CHARGE_GAS_PRICE ? block.basefee : MIN_CHARGE_GAS_PRICE;
         GasParams memory gp = gasParams;
+        uint256 cap = gp.perFollowerCap;
+        address pool; // trader: the event's pool; theme: none
+        int256 size;
+        Leg[] memory legs;
+        bool theme = emitter == address(themes);
+        if (theme) {
+            if (
+                topics.length < 2 || sourceIdOf(SourceKind.Theme, uint256(topics[1])) != sourceId
+                    || topics[0] != themes.THEME_REBALANCED_TOPIC()
+            ) revert BadEvent();
+            legs = themes.legsOf(uint256(topics[1]));
+            cap = gp.themePerFollowerCap;
+        } else {
+            if (
+                emitter != address(bank) || topics.length < 3 || topics[0] != POSITION_UPDATED_TOPIC
+                    || sourceIdOf(SourceKind.Trader, uint256(topics[1])) != sourceId
+            ) revert BadEvent();
+            pool = address(uint160(uint256(topics[2])));
+            size = _size(address(uint160(uint256(topics[1]))), pool);
+        }
+        uint256 rate = block.basefee > MIN_CHARGE_GAS_PRICE ? block.basefee : MIN_CHARGE_GAS_PRICE;
 
         address[] storage members = _members[sourceId][group];
         uint256 n = members.length;
@@ -342,14 +411,20 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
                 return;
             }
             uint256 slot = start - reserve;
-            bool fullSlot = slot >= gp.perFollowerCap;
-            if (fullSlot) slot = gp.perFollowerCap;
+            bool fullSlot = slot >= cap;
+            if (fullSlot) slot = cap;
             uint256 spent;
             bool reported = true;
-            try this.syncFollowerFromEvent{gas: slot}(sourceId, follower, pool, size) returns (bool acted) {
-                if (acted) spent = start - gasleft();
+            (bool ok, bytes memory ret) = address(this).call{gas: slot}(
+                theme
+                    ? abi.encodeCall(this.syncThemeFromEvent, (sourceId, follower, legs))
+                    : abi.encodeCall(this.syncFollowerFromEvent, (sourceId, follower, pool, size))
+            );
+            if (ok) {
+                if (abi.decode(ret, (bool))) spent = start - gasleft();
                 else reported = false; // nothing to do: the overhead only, silently
-            } catch (bytes memory err) {
+            } else {
+                bytes memory err = ret;
                 bool oog = (err.length == 4 && bytes4(err) == OutOfGasInSync.selector) || _starved(err, start, slot);
                 if (!oog) {
                     emit Refused(follower, sourceId, pool, Reason.VenueRejected, err);
@@ -382,6 +457,41 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
         return _sync(follower, f, pool, PolicyLib.traderTarget(sourceSize, f.policy.scaleBps));
     }
 
+    /// @notice One theme follower's share of a rebalance, against the legs read once for the event. Only
+    /// callable by the hub itself, from onSourceEvent.
+    /// @return acted false when the follower no longer follows this theme
+    function syncThemeFromEvent(bytes32 sourceId, address follower, Leg[] calldata legs)
+        external
+        onlySelf
+        returns (bool acted)
+    {
+        Follow storage f = _follows[follower];
+        if (f.sourceId != sourceId) return false;
+        _syncTheme(follower, f, legs);
+        return true;
+    }
+
+    /// @notice A theme sync's increase set. Only callable by the hub itself: every leg fills completely
+    /// inside its band, or the whole set reverts with the first failing leg and nothing is kept.
+    function applyIncreases(address follower, LegOrder[] calldata orders) external onlySelf {
+        uint64 expiry = uint64((block.timestamp + ORDER_TTL) * 1e9);
+        for (uint256 i; i < orders.length; ++i) {
+            LegOrder calldata o = orders[i];
+            uint256 before = gasleft();
+            try IPerpPool(o.pool)
+                .placeOrderFor(follower, o.isBid, 0, o.price, o.qty, expiry, FOK, 0, address(0), 0) returns (
+                bool success, uint128
+            ) {
+                if (!success) revert LegFailed(o.pool, "");
+            } catch (bytes memory err) {
+                _revertIfStarved(err, before);
+                revert LegFailed(o.pool, err);
+            }
+            int256 got = _size(follower, o.pool);
+            if ((o.isBid ? o.expected - got : got - o.expected) >= int256(o.lot)) revert LegFailed(o.pool, "");
+        }
+    }
+
     // ---------------------------------------------------------------- views
 
     function sourceIdOf(SourceKind kind, uint256 ref) public pure returns (bytes32) {
@@ -412,7 +522,8 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
     function _joinGroup(address follower, Follow storage f, bytes32 sourceId, SourceKind kind, uint256 ref) internal {
         uint32 n = groupCount[sourceId];
         uint32 g;
-        while (g < n && _members[sourceId][g].length >= groupSize) ++g;
+        uint256 seats = kind == SourceKind.Theme ? themeGroupSize : groupSize;
+        while (g < n && _members[sourceId][g].length >= seats) ++g;
         if (g == n) {
             groupCount[sourceId] = n + 1;
             relayOf[sourceId][g] = address(new GroupRelay(address(this), sourceId, g));
@@ -508,17 +619,7 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
 
         uint256 price;
         int256 mid = cur;
-        if (reduceQty != 0) {
-            // A close to zero uses the exact size; a partial trim is rounded to lots and skipped as dust.
-            bool full = reduceQty == _abs(cur);
-            if (!full) reduceQty = PolicyLib.toLots(reduceQty, m.lot);
-            if (full || (reduceQty != 0 && reduceQty >= m.minQty)) {
-                price = PolicyLib.bandPrice(m.mark, PolicyLib.exitBand(f.policy.bandBps), reduceIsBid, m.tick);
-                bool sent = _place(follower, sourceId, pool, reduceIsBid, price, reduceQty, IOC);
-                mid = _size(follower, pool);
-                if (sent && mid == cur) emit Refused(follower, sourceId, pool, Reason.BandUnfilled, "");
-            }
-        }
+        if (reduceQty != 0) (price, mid) = _reduce(follower, f, pool, m, cur, reduceQty, reduceIsBid);
 
         bool capped;
         bool stop;
@@ -536,6 +637,180 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
         }
         if (stop) _stop(follower, f, equity);
         return true;
+    }
+
+    /// @dev Shrinks `cur` by `qty` with one IOC at the exit band. A close to zero uses the exact size; a
+    /// partial trim is rounded to lots and skipped as dust. Returns the limit price (0 when nothing was
+    /// sent) and the size after.
+    function _reduce(
+        address follower,
+        Follow storage f,
+        address pool,
+        Market memory m,
+        int256 cur,
+        uint256 qty,
+        bool isBid
+    ) internal returns (uint256 price, int256 mid) {
+        mid = cur;
+        bool full = qty == _abs(cur);
+        if (!full) qty = PolicyLib.toLots(qty, m.lot);
+        if (!full && (qty == 0 || qty < m.minQty)) return (0, mid);
+        price = PolicyLib.bandPrice(m.mark, PolicyLib.exitBand(f.policy.bandBps), isBid, m.tick);
+        bool sent = _place(follower, f.sourceId, pool, isBid, price, qty, IOC);
+        mid = _size(follower, pool);
+        if (sent && mid == cur) emit Refused(follower, f.sourceId, pool, Reason.BandUnfilled, "");
+    }
+
+    /// @dev Moves a theme follower's whole book toward the theme. Phase A: per-market reductions (a dropped
+    /// leg's target is flat), never gated and kept whatever follows. Phase B: every increase the basket
+    /// needs, as one set behind the theme-level gates, filled all-or-nothing by applyIncreases. A leg
+    /// whose market cannot be read, or whose flip did not close, holds the whole set back.
+    function _syncTheme(address follower, Follow storage f, Leg[] memory legs) internal {
+        bytes32 sourceId = f.sourceId;
+        bool complete = _allowLegs(follower, sourceId, legs);
+        address[] storage pools = _synced[follower];
+        uint256 n = pools.length;
+        ThemePool[] memory ps = new ThemePool[](n);
+        bool open;
+        for (uint256 i; i < n; ++i) {
+            ThemePool memory s = ps[i];
+            s.pool = pools[i];
+            s.cur = _size(follower, s.pool);
+            s.mid = s.cur;
+            for (uint256 j; j < legs.length; ++j) {
+                if (legs[j].pool == s.pool) s.weight = legs[j].weightBps;
+            }
+            if (s.cur != 0) open = true;
+        }
+        if (!open) {
+            // nothing to reduce: a gate that already fails is reported without reading any market
+            Reason early = _earlyGate(follower, f);
+            if (early != Reason.None) {
+                emit Refused(follower, sourceId, address(0), early, "");
+                return;
+            }
+        }
+
+        Policy memory p = f.policy;
+        for (uint256 i; i < n; ++i) {
+            ThemePool memory s = ps[i];
+            if (s.weight == 0 && s.cur == 0) continue; // a dropped leg already closed
+            (s.ok, s.m) = _market(follower, sourceId, s.pool);
+            if (!s.ok) {
+                if (s.weight != 0) complete = false;
+                continue;
+            }
+            if (s.weight != 0) {
+                int256 raw = PolicyLib.themeTarget(p.allocation, s.weight, s.m.mark, s.m.oneBase);
+                (s.target, s.capped) = PolicyLib.clampNotional(raw, s.m.mark, s.m.oneBase, p.maxNotional);
+            }
+            (uint256 reduceQty, bool reduceIsBid,,) = PolicyLib.split(s.cur, s.target);
+            if (reduceQty != 0) (s.price, s.mid) = _reduce(follower, f, s.pool, s.m, s.cur, reduceQty, reduceIsBid);
+        }
+
+        (LegOrder[] memory orders, uint256 total, bool setOk) = _increaseSet(follower, sourceId, ps, p.bandBps);
+        bool stop;
+        int256 equity;
+        if (orders.length != 0 && complete && setOk) {
+            Reason r;
+            (r, equity) = _gate(follower, f, address(0), total);
+            if (r != Reason.None) {
+                emit Refused(follower, sourceId, address(0), r, "");
+                stop = r == Reason.EquityFloor;
+            } else if (_applySet(follower, sourceId, orders)) {
+                for (uint256 i; i < n; ++i) {
+                    if (ps[i].incPrice != 0) ps[i].price = ps[i].incPrice;
+                }
+            }
+        }
+
+        for (uint256 i; i < n; ++i) {
+            ThemePool memory s = ps[i];
+            if (!s.ok) continue;
+            int256 end = _size(follower, s.pool);
+            if (end != s.cur) emit Copied(follower, sourceId, s.pool, s.cur, end, s.price, s.capped);
+        }
+        if (stop) _stop(follower, f, equity);
+    }
+
+    /// @dev Adds the theme's legs to the follow's markets, allowlisted and synced for the rest of the follow
+    /// so a dropped leg can always be closed. Returns false when the MAX_JOIN_POOLS bound left a leg out.
+    function _allowLegs(address follower, bytes32 sourceId, Leg[] memory legs) internal returns (bool all) {
+        mapping(address => bool) storage allowed = _allowed[follower][_epoch[follower]];
+        all = true;
+        for (uint256 i; i < legs.length; ++i) {
+            address pool = legs[i].pool;
+            if (allowed[pool]) continue;
+            if (_synced[follower].length >= MAX_JOIN_POOLS) {
+                emit Refused(follower, sourceId, pool, Reason.MarketNotAllowed, "");
+                all = false;
+                continue;
+            }
+            allowed[pool] = true;
+            _markSynced(follower, pool);
+        }
+    }
+
+    /// @dev The increases the basket needs after the reductions, and the notional of the whole book once
+    /// they fill (an unreadable market holding a position makes it unbounded, failing a total cap closed).
+    /// `ok` is false when a leg's flip did not close, which holds the set back.
+    function _increaseSet(address follower, bytes32 sourceId, ThemePool[] memory ps, uint16 bandBps)
+        internal
+        returns (LegOrder[] memory orders, uint256 total, bool ok)
+    {
+        uint256 n = ps.length;
+        orders = new LegOrder[](n);
+        uint256 k;
+        ok = true;
+        for (uint256 i; i < n; ++i) {
+            ThemePool memory s = ps[i];
+            if (!s.ok) {
+                if (s.cur != 0) total = type(uint256).max;
+                continue;
+            }
+            int256 end = s.mid;
+            if (s.target != 0 && s.mid != 0 && (s.mid > 0) != (s.target > 0)) {
+                emit Refused(follower, sourceId, s.pool, Reason.LegFailed, "");
+                ok = false;
+            } else if (_abs(s.target) > _abs(s.mid)) {
+                uint256 qty = PolicyLib.toLots(_abs(s.target) - _abs(s.mid), s.m.lot);
+                if (qty != 0 && qty >= s.m.minQty) {
+                    bool isBid = s.target > 0;
+                    end = isBid ? s.mid + int256(qty) : s.mid - int256(qty);
+                    s.incPrice = PolicyLib.bandPriceInward(s.m.mark, bandBps, isBid, s.m.tick);
+                    orders[k++] = LegOrder(s.pool, isBid, s.incPrice, qty, end, s.m.lot);
+                }
+            }
+            if (total != type(uint256).max) total += PolicyLib.notional(end, s.m.mark, s.m.oneBase);
+        }
+        assembly ("memory-safe") {
+            mstore(orders, k)
+        }
+    }
+
+    /// @dev Runs the increase set in a self-call so a failing leg rolls back every leg before it. A failure
+    /// is reported once, on the failing leg with the venue's error.
+    function _applySet(address follower, bytes32 sourceId, LegOrder[] memory orders) internal returns (bool) {
+        uint256 before = gasleft();
+        try this.applyIncreases(follower, orders) {
+            return true;
+        } catch (bytes memory err) {
+            _revertIfStarved(err, before);
+            bytes4 sel = bytes4(err);
+            if (sel == OutOfGasInSync.selector) revert OutOfGasInSync();
+            address pool;
+            if (sel == LegFailed.selector) {
+                assembly ("memory-safe") {
+                    // drop the selector: err becomes the abi-encoded (pool, venueError)
+                    let len := mload(err)
+                    err := add(err, 4)
+                    mstore(err, sub(len, 4))
+                }
+                (pool, err) = abi.decode(err, (address, bytes));
+            }
+            emit Refused(follower, sourceId, pool, Reason.LegFailed, err);
+            return false;
+        }
     }
 
     /// @dev The increase gates that need no market data, in _gate's order. With an equity floor armed the
@@ -584,6 +859,8 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
 
     /// @dev Increase gates in order (the allowlist is enforced earlier, in _sync). EquityFloor also returns
     /// the equity read for the stop; an unreadable account health refuses the increase without stopping.
+    /// `newNotional` is the notional of `pool` after the increase, or with `pool` zero (a theme's set) the
+    /// notional of the follow's whole book after it.
     function _gate(address follower, Follow storage f, address pool, uint256 newNotional)
         internal
         view
@@ -601,7 +878,8 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
             }
             if (equity < int256(uint256(p.equityFloor))) return (Reason.EquityFloor, equity);
         }
-        if (p.maxTotalNotional != 0 && !_withinTotal(follower, pool, newNotional, p.maxTotalNotional)) {
+        uint256 cap = p.maxTotalNotional;
+        if (cap != 0 && (pool == address(0) ? newNotional > cap : !_withinTotal(follower, pool, newNotional, cap))) {
             return (Reason.TotalCap, equity);
         }
         if (tankOf[follower] < MIN_TANK_FOR_INCREASE) return (Reason.TankEmpty, equity);

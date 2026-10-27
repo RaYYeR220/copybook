@@ -71,7 +71,8 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
     event GroupClosed(bytes32 indexed sourceId, uint32 group, uint256 subscriptionId, bool cancelled);
     event Deferred(address indexed follower, bytes32 indexed sourceId);
     /// @notice The handler stopped early: members `fromIndex` onward of the group, as listed by
-    /// membersOf at that block, were not synced and wait for catchUp.
+    /// membersOf at that block, were not synced and wait for catchUp. Read the list at the event's block:
+    /// an unfollow moves the group's last member into the leaver's seat.
     event GroupDeferred(bytes32 indexed sourceId, uint32 group, uint256 fromIndex);
     event RiskGateSet(address gate);
     event SubParamsSet(
@@ -447,7 +448,8 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
     }
 
     /// @notice A theme follower's own full sync, at any time (mark drift within THEME_DRIFT_BPS still
-    /// trades nothing).
+    /// trades nothing). Between theme versions catchUp leaves the book alone, so legs drift with their
+    /// marks without bound until this is called; the app prompts it once a leg is 5% or more off.
     function resync() external nonReentrant {
         CopyEngine.Follow storage f = _active(msg.sender);
         if (f.kind != SourceKind.Theme) revert NotThemeFollow();

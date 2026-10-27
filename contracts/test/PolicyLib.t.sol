@@ -20,12 +20,7 @@ contract PolicyLibTest is Test {
 
     function _ok() internal pure returns (Policy memory p) {
         p = Policy({
-            scaleBps: 10_000,
-            allocation: 20e18,
-            maxNotional: 100e18,
-            maxTotalNotional: 0,
-            bandBps: 50,
-            equityFloor: 0
+            scaleBps: 10_000, allocation: 20e18, maxNotional: 100e18, maxTotalNotional: 0, bandBps: 50, equityFloor: 0
         });
     }
 

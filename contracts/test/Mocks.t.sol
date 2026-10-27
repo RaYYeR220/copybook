@@ -5,7 +5,9 @@ import {Base} from "./Base.t.sol";
 import {MockPerpPool} from "./mocks/MockPerpPool.sol";
 import {MockReactivity} from "./mocks/MockReactivity.sol";
 import {IMarginBank, IPerpPool} from "../src/interfaces/IDreamPerps.sol";
-import {ISomniaReactivityPrecompile} from "@somnia-chain/reactivity-contracts/interfaces/ISomniaReactivityPrecompile.sol";
+import {
+    ISomniaReactivityPrecompile
+} from "@somnia-chain/reactivity-contracts/interfaces/ISomniaReactivityPrecompile.sol";
 import {SomniaEventHandler} from "@somnia-chain/reactivity-contracts/SomniaEventHandler.sol";
 
 contract Sink is SomniaEventHandler {
@@ -120,7 +122,11 @@ contract MocksTest is Base {
         assertEq(eq, 1_234e18);
     }
 
-    function _sub(address handler, uint64 gas) internal pure returns (ISomniaReactivityPrecompile.SubscriptionData memory d) {
+    function _sub(address handler, uint64 gas)
+        internal
+        pure
+        returns (ISomniaReactivityPrecompile.SubscriptionData memory d)
+    {
         d.handlerContractAddress = handler;
         d.gasLimit = gas;
     }

@@ -1,0 +1,109 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.30;
+
+import {Leg} from "./Types.sol";
+import {IPerpPool} from "./interfaces/IDreamPerps.sol";
+
+/// Creator-owned weight vectors over perp pools. Followers mirror a theme;
+/// subscribers watch ThemeRebalanced (indexed themeId) to resync.
+contract ThemeRegistry {
+    error NotCreator();
+    error UnknownTheme();
+    error NoLegs();
+    error TooManyLegs();
+    error ZeroWeight();
+    error DuplicatePool();
+    error GrossTooHigh();
+    error ForeignPool();
+
+    event ThemeCreated(uint256 indexed themeId, address indexed creator, string name);
+    event ThemeRebalanced(uint256 indexed themeId, uint32 version);
+
+    uint256 public constant MAX_LEGS = 8;
+    uint256 public constant MAX_GROSS_BPS = 30_000;
+    bytes32 public constant THEME_REBALANCED_TOPIC = keccak256("ThemeRebalanced(uint256,uint32)");
+
+    struct Theme {
+        address creator;
+        uint32 version;
+        string name;
+        string uri;
+        Leg[] legs;
+    }
+
+    address public immutable marginBank;
+    uint256 public themeCount;
+    mapping(uint256 => Theme) internal _themes;
+
+    constructor(address marginBank_) {
+        marginBank = marginBank_;
+    }
+
+    function createTheme(string calldata name, string calldata uri, Leg[] calldata legs)
+        external
+        returns (uint256 themeId)
+    {
+        _validate(legs);
+        themeId = ++themeCount;
+        Theme storage t = _themes[themeId];
+        t.creator = msg.sender;
+        t.version = 1;
+        t.name = name;
+        t.uri = uri;
+        _store(t, legs);
+        emit ThemeCreated(themeId, msg.sender, name);
+    }
+
+    function rebalance(uint256 themeId, Leg[] calldata legs) external {
+        Theme storage t = _theme(themeId);
+        if (t.creator != msg.sender) revert NotCreator();
+        _validate(legs);
+        delete t.legs;
+        _store(t, legs);
+        uint32 v = ++t.version;
+        emit ThemeRebalanced(themeId, v);
+    }
+
+    function legsOf(uint256 themeId) external view returns (Leg[] memory) {
+        return _theme(themeId).legs;
+    }
+
+    function themeOf(uint256 themeId)
+        external
+        view
+        returns (address creator, string memory name, string memory uri, uint32 version)
+    {
+        Theme storage t = _theme(themeId);
+        return (t.creator, t.name, t.uri, t.version);
+    }
+
+    function _theme(uint256 themeId) internal view returns (Theme storage t) {
+        t = _themes[themeId];
+        if (t.creator == address(0)) revert UnknownTheme();
+    }
+
+    function _store(Theme storage t, Leg[] calldata legs) internal {
+        for (uint256 i; i < legs.length; ++i) {
+            t.legs.push(legs[i]);
+        }
+    }
+
+    function _validate(Leg[] calldata legs) internal view {
+        uint256 n = legs.length;
+        if (n == 0) revert NoLegs();
+        if (n > MAX_LEGS) revert TooManyLegs();
+        uint256 gross;
+        for (uint256 i; i < n; ++i) {
+            int32 w = legs[i].weightBps;
+            if (w == 0) revert ZeroWeight();
+            int256 w256 = w;
+            gross += uint256(w256 > 0 ? w256 : -w256);
+            address pool = legs[i].pool;
+            for (uint256 j; j < i; ++j) {
+                if (legs[j].pool == pool) revert DuplicatePool();
+            }
+            if (IPerpPool(pool).marginBank() != marginBank) revert ForeignPool();
+        }
+        if (gross > MAX_GROSS_BPS) revert GrossTooHigh();
+    }
+}

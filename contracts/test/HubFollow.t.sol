@@ -181,6 +181,13 @@ contract HubFollowTest is Base {
         }
     }
 
+    /// Sets a tank directly, as reactive charges would; withdrawTank keeps MIN_TANK while following.
+    function _setTank(address who, uint256 amount) internal {
+        uint256 total = hub.totalTanks() - hub.tankOf(who) + amount;
+        _store.target(address(hub)).sig("tankOf(address)").with_key(who).checked_write(amount);
+        _store.target(address(hub)).sig("totalTanks()").checked_write(total);
+    }
+
     // ---------- follow lifecycle ----------
 
     function test_follow_trader_opensGroupAndSubscribes() public {
@@ -335,6 +342,7 @@ contract HubFollowTest is Base {
     function test_unfollow_keep_thenRefollowStartsClean() public {
         _traderTo(btc, 50_000);
         _follow(follower, _policy(), _one(btc));
+        address relay = hub.relayOf(sid, 0);
 
         vm.expectEmit(true, true, false, true, address(hub));
         emit CopybookHub.Unfollowed(follower, sid, false);
@@ -342,11 +350,13 @@ contract HubFollowTest is Base {
         hub.unfollow(false);
         assertEq(_size(btc, follower), 50_000);
 
-        // the old allowlist and synced set do not carry over into a new follow
+        // the old allowlist and synced set do not carry over into a new follow;
+        // the emptied group is reused with its relay and subscribed again
         _traderTo(btc, 70_000);
         _traderTo(eth, -2e16);
         _follow(follower, _policy(), _one(eth));
-        assertEq(reactivity.count(), 1);
+        assertEq(hub.relayOf(sid, 0), relay);
+        assertEq(reactivity.count(), 2);
         address[] memory synced = hub.syncedPools(follower);
         assertEq(synced.length, 1);
         assertEq(synced[0], address(eth));
@@ -438,8 +448,7 @@ contract HubFollowTest is Base {
         _follow(follower, _policy(), _one(btc));
         assertEq(_size(btc, follower), 50_000);
 
-        vm.prank(follower);
-        hub.withdrawTank(0.5 ether);
+        _setTank(follower, 0);
         assertEq(hub.tankOf(follower), 0);
 
         Policy memory strict = _policy();
@@ -544,8 +553,7 @@ contract HubFollowTest is Base {
 
     function test_tankEmpty_refusesIncrease() public {
         _follow(follower, _policy(), _one(btc));
-        vm.prank(follower);
-        hub.withdrawTank(0.5 ether - 0.02 ether + 1);
+        _setTank(follower, 0.02 ether - 1);
         _traderTo(btc, 50_000);
         vm.expectEmit(true, true, true, true, address(hub));
         emit CopybookHub.Refused(follower, sid, address(btc), Reason.TankEmpty, "");
@@ -880,8 +888,7 @@ contract HubFollowTest is Base {
         hub.poke(follower);
         assertTrue(_paused(follower));
         btc.setRevertFor(follower, "");
-        vm.prank(follower);
-        hub.withdrawTank(0.5 ether);
+        _setTank(follower, 0);
 
         vm.recordLogs();
         _traderTo(btc, 0);

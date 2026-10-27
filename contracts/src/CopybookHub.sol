@@ -33,6 +33,9 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
     error NotRelay();
     error BadEvent();
     error StillBelowFloor();
+    error NotSelf();
+    error TankFloor();
+    error UnsubscribeOutOfGas();
 
     event Followed(address indexed follower, bytes32 indexed sourceId, SourceKind kind, uint256 ref);
     event Unfollowed(address indexed follower, bytes32 indexed sourceId, bool flattened);
@@ -53,6 +56,8 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
     event Stopped(address indexed follower, int256 equity);
     event GroupOpened(bytes32 indexed sourceId, uint32 group, address relay, uint256 subscriptionId);
     event TankCharged(address indexed follower, uint256 amount);
+    event GroupClosed(bytes32 indexed sourceId, uint32 group, uint256 subscriptionId);
+    event Deferred(address indexed follower, bytes32 indexed sourceId);
 
     struct Follow {
         bytes32 sourceId; // zero when not following
@@ -88,6 +93,14 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
     uint256 public constant MAX_JOIN_POOLS = 32;
     bytes32 public constant POSITION_UPDATED_TOPIC = 0xf7816a375f0ca01053ed213b57908bff79f578810301d50971a5f685529b82de;
 
+    /// @dev Gas a group handler keeps in hand before each follower; below it the rest of the group is
+    /// deferred to catchUp.
+    uint256 public constant PER_FOLLOWER_GAS_FLOOR = 6_000_000;
+    /// @dev Added to each follower's measured gas for the shared handler work around it.
+    uint256 public constant CHARGE_OVERHEAD_GAS = 60_000;
+    /// @dev Somnia's minimum base fee; handler gas is never charged below it.
+    uint256 public constant MIN_CHARGE_GAS_PRICE = 6 gwei;
+
     address internal constant REACTIVITY = address(0x0100);
     uint8 internal constant FOK = 1;
     uint8 internal constant IOC = 2;
@@ -114,6 +127,14 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
     mapping(address => uint64) internal _epoch;
     mapping(address => mapping(uint64 => mapping(address => bool))) internal _isSynced;
     mapping(address => mapping(uint64 => mapping(address => bool))) internal _allowed;
+    /// @dev Groups ever opened per source. An emptied group keeps its relay and is reused.
+    mapping(bytes32 => uint32) public groupCount;
+    mapping(bytes32 => mapping(uint32 => bool)) public subscribed;
+
+    modifier onlySelf() {
+        if (msg.sender != address(this)) revert NotSelf();
+        _;
+    }
 
     constructor(IMarginBank bank_, ThemeRegistry themes_, uint32 groupSize_, address owner_) Ownable(owner_) {
         if (groupSize_ == 0) revert InvalidGroupSize();
@@ -212,10 +233,13 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
         totalTanks += msg.value;
     }
 
+    /// @notice While following, the tank must keep MIN_TANK; all of it comes out after unfollowing.
     function withdrawTank(uint256 amount) external nonReentrant {
         uint256 tank = tankOf[msg.sender];
         if (amount > tank) revert InsufficientTank();
-        tankOf[msg.sender] = tank - amount;
+        uint256 left = tank - amount;
+        if (left < MIN_TANK && _follows[msg.sender].sourceId != 0) revert TankFloor();
+        tankOf[msg.sender] = left;
         totalTanks -= amount;
         (bool ok,) = msg.sender.call{value: amount}("");
         if (!ok) revert TransferFailed();
@@ -244,6 +268,9 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
 
     /// @notice Entry point for a group's relay. The event only names the pool; the size is the trader's
     /// live position, so a delayed or reordered event can never open what the trader no longer holds.
+    /// Each follower runs in its own self-call, so one failure stays with that follower. When gas runs
+    /// below PER_FOLLOWER_GAS_FLOOR the remaining followers are reported as Deferred for catchUp.
+    /// Every follower the handler acted for pays its own gas from its tank.
     function onSourceEvent(
         bytes32 sourceId,
         uint32 group,
@@ -261,13 +288,39 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
         ) revert BadEvent();
         address pool = address(uint160(uint256(topics[2])));
         int256 size = _size(address(uint160(uint256(topics[1]))), pool);
+        uint256 rate = block.basefee > MIN_CHARGE_GAS_PRICE ? block.basefee : MIN_CHARGE_GAS_PRICE;
 
         address[] storage members = _members[sourceId][group];
-        for (uint256 i; i < members.length; ++i) {
+        uint256 n = members.length;
+        for (uint256 i; i < n; ++i) {
+            if (gasleft() < PER_FOLLOWER_GAS_FLOOR) {
+                for (uint256 j = i; j < n; ++j) {
+                    emit Deferred(members[j], sourceId);
+                }
+                return;
+            }
             address follower = members[i];
-            Follow storage f = _follows[follower];
-            _sync(follower, f, pool, PolicyLib.traderTarget(size, f.policy.scaleBps));
+            uint256 start = gasleft();
+            bool acted = true;
+            try this.syncFollowerFromEvent(sourceId, follower, pool, size) returns (bool a) {
+                acted = a;
+            } catch (bytes memory err) {
+                emit Refused(follower, sourceId, pool, Reason.VenueRejected, err);
+            }
+            if (acted) _charge(follower, (start - gasleft() + CHARGE_OVERHEAD_GAS) * rate);
         }
+    }
+
+    /// @notice One follower's share of a source event. Only callable by the hub itself, from onSourceEvent.
+    /// @return acted false when the pool is outside the follow or the follower already matches the source
+    function syncFollowerFromEvent(bytes32 sourceId, address follower, address pool, int256 sourceSize)
+        external
+        onlySelf
+        returns (bool acted)
+    {
+        Follow storage f = _follows[follower];
+        if (f.sourceId != sourceId) return false;
+        return _sync(follower, f, pool, PolicyLib.traderTarget(sourceSize, f.policy.scaleBps));
     }
 
     // ---------------------------------------------------------------- views
@@ -295,9 +348,17 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
 
     // ---------------------------------------------------------------- groups
 
+    /// @dev Seats the follower in the first group with room, opening a new group (relay + subscription)
+    /// when all are full. A reused empty group is subscribed again with its existing relay.
     function _joinGroup(address follower, Follow storage f, bytes32 sourceId, SourceKind kind, uint256 ref) internal {
-        uint32 g = 0;
-        if (relayOf[sourceId][g] == address(0)) _openGroup(sourceId, g, kind, ref);
+        uint32 n = groupCount[sourceId];
+        uint32 g;
+        while (g < n && _members[sourceId][g].length >= groupSize) ++g;
+        if (g == n) {
+            groupCount[sourceId] = n + 1;
+            relayOf[sourceId][g] = address(new GroupRelay(address(this), sourceId, g));
+        }
+        if (!subscribed[sourceId][g]) _subscribe(sourceId, g, kind, ref);
         address[] storage members = _members[sourceId][g];
         f.group = g;
         f.index = uint32(members.length);
@@ -305,7 +366,9 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
     }
 
     function _leaveGroup(Follow storage f) internal {
-        address[] storage members = _members[f.sourceId][f.group];
+        bytes32 sourceId = f.sourceId;
+        uint32 g = f.group;
+        address[] storage members = _members[sourceId][g];
         uint256 last = members.length - 1;
         uint32 i = f.index;
         if (i != last) {
@@ -314,10 +377,24 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
             _follows[moved].index = i;
         }
         members.pop();
+        if (last == 0) _closeGroup(sourceId, g);
     }
 
-    function _openGroup(bytes32 sourceId, uint32 g, SourceKind kind, uint256 ref) internal {
-        address relay = address(new GroupRelay(address(this), sourceId, g));
+    /// @dev Cancels an empty group's subscription so it stops costing the hub; the relay is kept for reuse.
+    /// The cancel is best effort so the precompile can never trap the last member in a follow, but a cancel
+    /// starved of gas reverts, so a tight gas estimate cannot leave the subscription running. It is a
+    /// low-level call: the precompile has no code, which a typed call without return data would reject.
+    function _closeGroup(bytes32 sourceId, uint32 g) internal {
+        uint256 id = subscriptionOf[sourceId][g];
+        subscribed[sourceId][g] = false;
+        uint256 before = gasleft();
+        (bool ok,) = REACTIVITY.call(abi.encodeCall(ISomniaReactivityPrecompile.unsubscribe, (id)));
+        if (!ok && gasleft() <= before / 64) revert UnsubscribeOutOfGas();
+        emit GroupClosed(sourceId, g, id);
+    }
+
+    function _subscribe(bytes32 sourceId, uint32 g, SourceKind kind, uint256 ref) internal {
+        address relay = relayOf[sourceId][g];
         SubParams memory s = subParams;
         bool isTrader = kind == SourceKind.Trader;
 
@@ -334,8 +411,8 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
         d.isGuaranteed = s.guaranteed;
 
         uint256 id = ISomniaReactivityPrecompile(REACTIVITY).subscribe(d);
-        relayOf[sourceId][g] = relay;
         subscriptionOf[sourceId][g] = id;
+        subscribed[sourceId][g] = true;
         emit GroupOpened(sourceId, g, relay, id);
     }
 
@@ -347,16 +424,25 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
     }
 
     /// @dev Moves one pool of one follower toward `target`. Never reverts on venue failure.
-    function _sync(address follower, Follow storage f, address pool, int256 target) internal {
+    /// @return acted false when the pool is outside the follow or already at target (nothing else was read)
+    function _sync(address follower, Follow storage f, address pool, int256 target) internal returns (bool) {
         // Outside an allowlist the hub never acts: any position there is the follower's own.
-        if (!f.allowAll && !_allowed[follower][_epoch[follower]][pool]) return;
+        if (!f.allowAll && !_allowed[follower][_epoch[follower]][pool]) return false;
         int256 cur = _size(follower, pool);
-        if (cur == target) return;
+        if (cur == target) return false;
         bytes32 sourceId = f.sourceId;
-        (bool ok, Market memory m) = _market(follower, sourceId, pool);
-        if (!ok) return;
-
         (uint256 reduceQty, bool reduceIsBid, uint256 increaseQty, bool increaseIsBid) = PolicyLib.split(cur, target);
+        if (reduceQty == 0) {
+            // increase only: a gate that already fails is reported without reading the market
+            Reason early = _earlyGate(follower, f);
+            if (early != Reason.None) {
+                emit Refused(follower, sourceId, pool, early, "");
+                return true;
+            }
+        }
+        (bool ok, Market memory m) = _market(follower, sourceId, pool);
+        if (!ok) return true;
+
         uint256 price;
         int256 mid = cur;
         if (reduceQty != 0) {
@@ -386,6 +472,15 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
             emit Copied(follower, sourceId, pool, cur, end, price, capped);
         }
         if (stop) _stop(follower, f, equity);
+        return true;
+    }
+
+    /// @dev The increase gates that need no market data, in _gate's order. With an equity floor armed the
+    /// tank check is left to _gate, so the floor (which can stop the follow) is still evaluated first.
+    function _earlyGate(address follower, Follow storage f) internal view returns (Reason) {
+        if (f.paused) return Reason.Paused;
+        if (f.policy.equityFloor == 0 && tankOf[follower] < MIN_TANK_FOR_INCREASE) return Reason.TankEmpty;
+        return Reason.None;
     }
 
     /// @dev Grows the position from `mid` toward `target`, clamped, as one fill-or-kill order inside the band.
@@ -554,6 +649,17 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
             emit Refused(follower, sourceId, pool, r, err);
         }
         return false;
+    }
+
+    /// @dev Moves handler gas from the follower's tank to the hub's own balance, saturating at the tank.
+    /// The STT never leaves the hub: it backs the handler fees the precompile draws from it.
+    function _charge(address follower, uint256 amount) internal {
+        uint256 tank = tankOf[follower];
+        if (amount > tank) amount = tank;
+        if (amount == 0) return;
+        tankOf[follower] = tank - amount;
+        totalTanks -= amount;
+        emit TankCharged(follower, amount);
     }
 
     function _markSynced(address follower, address pool) internal {

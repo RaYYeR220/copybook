@@ -1043,6 +1043,24 @@ contract HubFollowTest is Base {
         poor.follow{value: 0.5 ether}(SourceKind.Trader, uint256(uint160(trader)), _policy(), _none());
     }
 
+    // The engine's books keep the hub's original slots: follows 11, synced 12, epoch 13, isSynced 14,
+    // allowed 15 (per-follower mappings keyed by the follower address).
+    function test_storageLayout_booksKeepSlots() public {
+        _traderTo(btc, 50_000);
+        _follow(follower, _policy(), _one(btc));
+        bytes32 key = bytes32(uint256(uint160(follower)));
+        assertEq(vm.load(address(hub), keccak256(abi.encode(key, uint256(11)))), sid, "follows.sourceId");
+        assertEq(uint256(vm.load(address(hub), keccak256(abi.encode(key, uint256(12))))), 1, "synced.length");
+        bytes32 isSynced = keccak256(abi.encode(uint256(0), keccak256(abi.encode(key, uint256(14)))));
+        bytes32 allowed = keccak256(abi.encode(uint256(0), keccak256(abi.encode(key, uint256(15)))));
+        assertEq(uint256(vm.load(address(hub), keccak256(abi.encode(address(btc), isSynced)))), 1, "isSynced");
+        assertEq(uint256(vm.load(address(hub), keccak256(abi.encode(address(btc), allowed)))), 1, "allowed");
+        vm.prank(follower);
+        hub.unfollow(false);
+        assertEq(uint256(vm.load(address(hub), keccak256(abi.encode(key, uint256(13))))), 1, "epoch");
+        assertEq(uint256(vm.load(address(hub), keccak256(abi.encode(sid, uint256(16))))), 1, "groupCount after");
+    }
+
     function test_withdrawTank_reentryBlocked() public {
         TankReentrant attacker = new TankReentrant(hub);
         attacker.fund{value: 1 ether}();

@@ -6,6 +6,7 @@ import {StdStorage, stdStorage} from "forge-std/StdStorage.sol";
 import {Base} from "./Base.t.sol";
 import {MockPerpPool} from "./mocks/MockPerpPool.sol";
 import {CopybookHub} from "../src/CopybookHub.sol";
+import {CopyEngine} from "../src/CopyEngine.sol";
 import {ThemeRegistry} from "../src/ThemeRegistry.sol";
 import {PolicyLib} from "../src/PolicyLib.sol";
 import {Leg, Policy, Reason, SourceKind} from "../src/Types.sol";
@@ -833,7 +834,7 @@ contract HubThemeTest is Base {
 
     function test_theme_selfCallsOnlySelf() public {
         _followTheme(follower, _policy(100e18));
-        CopybookHub.LegOrder[] memory orders = new CopybookHub.LegOrder[](0);
+        CopyEngine.LegOrder[] memory orders = new CopyEngine.LegOrder[](0);
         vm.prank(stranger);
         vm.expectRevert(CopybookHub.NotSelf.selector);
         hub.applyIncreases(follower, orders);

@@ -301,8 +301,8 @@ contract HubFollowTest is Base {
         hub.follow{value: 0.5 ether}(SourceKind.Trader, uint256(uint160(trader)), _policy(), many);
         vm.stopPrank();
 
-        // slot 3: riskGate (20 bytes) | followsPaused (byte 20); the admin setter arrives with the admin surface
-        vm.store(address(hub), bytes32(uint256(3)), bytes32(uint256(1) << 160));
+        vm.prank(owner);
+        hub.pauseNewFollows(true);
         assertTrue(hub.followsPaused());
         vm.prank(follower);
         vm.expectRevert(CopybookHub.FollowsPaused.selector);

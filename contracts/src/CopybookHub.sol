@@ -43,6 +43,11 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
     error JoinPoolsNotAllowed();
     error LegFailed(address pool, bytes venueError);
     error NotThemeFollow();
+    /// @dev `field`: 1-based position of the rejected argument of the admin call.
+    error InvalidParam(uint8 field);
+    error InsufficientSurplus();
+    error NotOrphan();
+    error NoMembers();
 
     event Followed(address indexed follower, bytes32 indexed sourceId, SourceKind kind, uint256 ref);
     event Unfollowed(address indexed follower, bytes32 indexed sourceId, bool flattened);
@@ -68,6 +73,17 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
     /// @notice The handler stopped early: members `fromIndex` onward of the group, as listed by
     /// membersOf at that block, were not synced and wait for catchUp.
     event GroupDeferred(bytes32 indexed sourceId, uint32 group, uint256 fromIndex);
+    event RiskGateSet(address gate);
+    event SubParamsSet(
+        uint64 priorityFeePerGas, uint64 maxFeePerGas, uint64 traderGasLimit, uint64 themeGasLimit, bool guaranteed
+    );
+    event GasParamsSet(
+        uint64 floor, uint64 perFollowerCap, uint64 themePerFollowerCap, uint64 tailBase, uint64 perDefer
+    );
+    event NewFollowsPaused(bool paused);
+    event SurplusWithdrawn(address indexed to, uint256 amount);
+    /// @notice An owner attempt to cancel a recorded orphan; a failed one stays recorded.
+    event OrphanCancelled(uint256 subscriptionId, bool cancelled);
 
     struct SubParams {
         uint64 priorityFeePerGas;
@@ -110,6 +126,13 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
     /// @dev Somnia: touching a storage key that is cold or does not exist yet (a tank charged to zero) can
     /// cost or require about this much gas.
     uint256 internal constant COLD_KEY_GAS = 1_000_000;
+    /// @dev The precompile's rule: a subscription owner keeps at least this balance.
+    uint256 public constant MIN_SUBSCRIPTION_BALANCE = 32 ether;
+    /// @dev The precompile's ceiling for a handler's gas limit.
+    uint256 internal constant MAX_HANDLER_GAS = 200_000_000;
+    /// @dev Admin floors for the handler budget: a member slot, and one deferral's log and slot read.
+    uint256 internal constant MIN_SLOT_GAS = 1_000_000;
+    uint256 internal constant MIN_PER_DEFER = 20_000;
 
     address internal constant REACTIVITY = address(0x0100);
 
@@ -135,6 +158,9 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
     GasParams public gasParams;
     /// @dev Members per theme group (trader groups hold `groupSize`): a theme member's sync is heavy.
     uint32 public themeGroupSize;
+    /// @notice Subscription ids the hub failed to cancel when no group used them any more; only these can
+    /// go to cancelOrphan.
+    mapping(uint256 => bool) public orphanSubs;
 
     modifier onlySelf() {
         if (msg.sender != address(this)) revert NotSelf();
@@ -294,9 +320,7 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
         if (!ok || ret.length < 480) revert SubscriptionUnreadable();
         (, address subOwner) = abi.decode(ret, (ISomniaReactivityPrecompile.SubscriptionData, address));
         if (subOwner == address(this)) return;
-        _unsubscribe(oldId);
-        CopyEngine.Follow storage f = _books.follows[members[0]];
-        _subscribe(sourceId, group, f.kind, f.ref);
+        _resubscribe(sourceId, group, members[0]);
     }
 
     /// @notice Entry point for a group's relay. The event only names the pool (trader) or the theme; the
@@ -460,6 +484,99 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
         return _members[sourceId][group];
     }
 
+    /// @return group the follower's group of its source
+    /// @return index its position in membersOf(sourceId, group)
+    function seatOf(address follower) external view returns (uint32 group, uint32 index) {
+        CopyEngine.Follow storage f = _books.follows[follower];
+        return (f.group, f.index);
+    }
+
+    // ---------------------------------------------------------------- admin
+    // Bounded: the owner tunes the risk gate and the subscription and handler budgets within the
+    // precompile's limits, pauses new follows, takes out STT above the tanks and the subscription
+    // reserve, and repairs subscriptions. Nothing here moves follower margin, calls a target of the
+    // owner's choosing with data, or touches a tank.
+
+    /// @notice The gate consulted before every increase (address(0): none). Reductions never ask it.
+    function setRiskGate(address gate) external onlyOwner {
+        riskGate = gate;
+        emit RiskGateSet(gate);
+    }
+
+    /// @notice Subscription settings for groups opened or subscribed again from now on; live subscriptions
+    /// keep theirs. Gas limits 1..200M; maxFeePerGas at least the priority fee plus Somnia's 6 gwei base fee.
+    function setSubParams(
+        uint64 priorityFeePerGas,
+        uint64 maxFeePerGas,
+        uint64 traderGasLimit,
+        uint64 themeGasLimit,
+        bool guaranteed
+    ) external onlyOwner {
+        if (maxFeePerGas < uint256(priorityFeePerGas) + MIN_CHARGE_GAS_PRICE) {
+            revert InvalidParam(2);
+        }
+        if (traderGasLimit == 0 || traderGasLimit > MAX_HANDLER_GAS) revert InvalidParam(3);
+        if (themeGasLimit == 0 || themeGasLimit > MAX_HANDLER_GAS) revert InvalidParam(4);
+        subParams = SubParams(priorityFeePerGas, maxFeePerGas, traderGasLimit, themeGasLimit, guaranteed);
+        emit SubParamsSet(priorityFeePerGas, maxFeePerGas, traderGasLimit, themeGasLimit, guaranteed);
+    }
+
+    /// @notice The group handler's budget (see GasParams), used from the next event on. `floor` at least 1M;
+    /// both caps between `floor` and 200M; `tailBase` at least 1M (Somnia's cold-key cost, so the handler can
+    /// always report a deferral); `perDefer` at least 20k.
+    function setGasParams(
+        uint64 floor,
+        uint64 perFollowerCap,
+        uint64 themePerFollowerCap,
+        uint64 tailBase,
+        uint64 perDefer
+    ) external onlyOwner {
+        if (floor < MIN_SLOT_GAS) revert InvalidParam(1);
+        if (perFollowerCap < floor || perFollowerCap > MAX_HANDLER_GAS) revert InvalidParam(2);
+        if (themePerFollowerCap < floor || themePerFollowerCap > MAX_HANDLER_GAS) revert InvalidParam(3);
+        if (tailBase < COLD_KEY_GAS) revert InvalidParam(4);
+        if (perDefer < MIN_PER_DEFER) revert InvalidParam(5);
+        gasParams = GasParams(floor, perFollowerCap, themePerFollowerCap, tailBase, perDefer);
+        emit GasParamsSet(floor, perFollowerCap, themePerFollowerCap, tailBase, perDefer);
+    }
+
+    /// @notice Stops new follows. Existing follows are untouched: they keep syncing both ways and can
+    /// unfollow, catchUp, poke, resume and withdraw.
+    function pauseNewFollows(bool paused) external onlyOwner {
+        followsPaused = paused;
+        emit NewFollowsPaused(paused);
+    }
+
+    /// @notice Sends STT the hub holds above the followers' tanks and the precompile's subscription reserve.
+    function withdrawSurplus(address to, uint256 amount) external nonReentrant onlyOwner {
+        if (to == address(0)) revert InvalidParam(1);
+        uint256 balance = address(this).balance;
+        if (amount > balance || balance - amount < MIN_SUBSCRIPTION_BALANCE + totalTanks) {
+            revert InsufficientSurplus();
+        }
+        emit SurplusWithdrawn(to, amount);
+        (bool ok,) = to.call{value: amount}("");
+        if (!ok) revert TransferFailed();
+    }
+
+    /// @notice Cancels a subscription the hub failed to cancel when its group emptied or was subscribed
+    /// again (see orphanSubs). Best effort: a failed attempt keeps the id recorded for another try.
+    function cancelOrphan(uint256 subscriptionId) external nonReentrant onlyOwner {
+        if (!orphanSubs[subscriptionId]) revert NotOrphan();
+        bool cancelled = _unsubscribe(subscriptionId);
+        if (cancelled) delete orphanSubs[subscriptionId];
+        emit OrphanCancelled(subscriptionId, cancelled);
+    }
+
+    /// @notice Recovery for a group whose subscription the chain dropped when ensureSubscribed cannot tell
+    /// (the precompile reverts reading a removed id, so it fails closed): cancels the group's current id
+    /// (best effort, recorded as an orphan when that fails) and subscribes the group again with its relay.
+    function forceResubscribe(bytes32 sourceId, uint32 group) external nonReentrant onlyOwner {
+        address[] storage members = _members[sourceId][group];
+        if (members.length == 0) revert NoMembers();
+        _resubscribe(sourceId, group, members[0]);
+    }
+
     // ---------------------------------------------------------------- groups
 
     /// @dev Seats the follower in the first group with room, opening a new group (relay + subscription)
@@ -506,12 +623,22 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
 
     /// @dev Runs the cancel on a fixed budget the caller must afford at the call itself, so a tight gas
     /// estimate cannot skip it; beyond that it is best effort, so the precompile can never trap the last
-    /// member in a follow. Low-level: the precompile has no code, which a typed call without return data
-    /// rejects.
+    /// member in a follow. A failed cancel is recorded in orphanSubs for cancelOrphan; the budget leaves room
+    /// for that record (a new key on Somnia). Low-level: the precompile has no code, which a typed call
+    /// without return data rejects.
     function _unsubscribe(uint256 id) internal returns (bool cancelled) {
         bytes memory call = abi.encodeCall(ISomniaReactivityPrecompile.unsubscribe, (id));
-        if (gasleft() < UNSUB_GAS * 64 / 63 + 50_000) revert UnsubscribeOutOfGas();
+        if (gasleft() < UNSUB_GAS * 64 / 63 + COLD_KEY_GAS + 50_000) revert UnsubscribeOutOfGas();
         (cancelled,) = REACTIVITY.call{gas: UNSUB_GAS}(call);
+        if (!cancelled) orphanSubs[id] = true;
+    }
+
+    /// @dev Cancels the group's current subscription (best effort) and subscribes it again with its relay,
+    /// for the source of `member`.
+    function _resubscribe(bytes32 sourceId, uint32 group, address member) internal {
+        _unsubscribe(subscriptionOf[sourceId][group]);
+        CopyEngine.Follow storage f = _books.follows[member];
+        _subscribe(sourceId, group, f.kind, f.ref);
     }
 
     function _subscribe(bytes32 sourceId, uint32 g, SourceKind kind, uint256 ref) internal {

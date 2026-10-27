@@ -613,7 +613,7 @@ contract HubReactiveTest is Base {
         vm.expectEmit(true, false, false, true, address(hub));
         emit CopybookHub.GroupClosed(sid, 0, 1, true);
         vm.prank(a);
-        hub.unfollow{gas: budget * 64 / 63 + 150_000}(false);
+        hub.unfollow{gas: budget * 64 / 63 + 1_150_000}(false);
         assertFalse(hub.subscribed(sid, 0));
     }
 

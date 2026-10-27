@@ -40,6 +40,7 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
     error SubscriptionUnreadable();
     error JoinPoolsNotAllowed();
     error LegFailed(address pool, bytes venueError);
+    error NotThemeFollow();
 
     event Followed(address indexed follower, bytes32 indexed sourceId, SourceKind kind, uint256 ref);
     event Unfollowed(address indexed follower, bytes32 indexed sourceId, bool flattened);
@@ -75,6 +76,8 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
         bool allowAll;
         uint32 group;
         uint32 index; // position in the group's member list
+        uint32 syncedVersion; // theme: registry version of the last sync that left every leg at target
+        bool lastSyncComplete; // theme: the last sync left every leg at target
     }
 
     struct SubParams {
@@ -135,6 +138,10 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
     /// @dev Bounds per-follower loops (flatten, total cap, a theme's markets) that run inside a shared
     /// group handler.
     uint256 public constant MAX_JOIN_POOLS = 32;
+    bytes32 public constant THEME_REBALANCED_TOPIC = keccak256("ThemeRebalanced(uint256,uint32)");
+    /// @dev A theme leg on the right side within this share of its target is left alone, so mark drift
+    /// alone does not trade.
+    uint256 public constant THEME_DRIFT_BPS = 500;
     bytes32 public constant POSITION_UPDATED_TOPIC = 0xf7816a375f0ca01053ed213b57908bff79f578810301d50971a5f685529b82de;
 
     /// @dev Added to each follower's measured gas for the shared handler work around it.
@@ -216,8 +223,9 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
     /// copies the source's current positions there now; every other market of the follower is never
     /// touched. Empty (`allowAll`): the hub manages every market the source trades, including any position
     /// the follower already holds there, and nothing is opened until the source moves.
-    /// Theme (`ref` = themeId, `joinPools` empty): the hub manages every market that is a leg of the theme
-    /// while followed, sized from `p.allocation`, and opens the whole basket now, all legs or none.
+    /// Theme (`ref` = themeId, `joinPools` empty): the hub manages every pool that is or becomes a leg of
+    /// the theme while followed, sized from `p.allocation`, including a position the follower opened there
+    /// by hand; use a dedicated wallet per source. The whole basket opens now, all legs or none.
     function follow(SourceKind kind, uint256 ref, Policy calldata p, address[] calldata joinPools)
         external
         payable
@@ -249,7 +257,7 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
         _joinGroup(msg.sender, f, sourceId, kind, ref);
         emit Followed(msg.sender, sourceId, kind, ref);
         if (theme) {
-            _syncTheme(msg.sender, f, themes.legsOf(ref));
+            _syncThemeNow(msg.sender, f, false);
             return sourceId;
         }
 
@@ -281,6 +289,7 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
         Follow storage f = _active(msg.sender);
         PolicyLib.validate(p, f.kind);
         f.policy = p;
+        f.lastSyncComplete = false;
         emit PolicyUpdated(msg.sender);
     }
 
@@ -317,11 +326,12 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
 
     /// @notice Re-sync `pools` of `follower` to the source's current on-chain positions. Anyone may call;
     /// the target always comes from the source, so a call can only move the follower toward it.
-    /// A theme follow ignores `pools` and syncs the whole basket.
+    /// A theme follow ignores `pools` and syncs the whole basket, and only when the theme has a version
+    /// the follower's book does not match yet or its last sync did not finish; otherwise nothing happens.
     function catchUp(address follower, address[] calldata pools) external nonReentrant {
         Follow storage f = _active(follower);
         if (f.kind == SourceKind.Theme) {
-            _syncTheme(follower, f, themes.legsOf(f.ref));
+            _syncThemeNow(follower, f, true);
         } else {
             for (uint256 i; i < pools.length; ++i) {
                 _sync(follower, f, pools[i], _target(f, pools[i]));
@@ -381,13 +391,14 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
         address pool; // trader: the event's pool; theme: none
         int256 size;
         Leg[] memory legs;
+        uint32 version;
         bool theme = emitter == address(themes);
         if (theme) {
             if (
                 topics.length < 2 || sourceIdOf(SourceKind.Theme, uint256(topics[1])) != sourceId
-                    || topics[0] != themes.THEME_REBALANCED_TOPIC()
+                    || topics[0] != THEME_REBALANCED_TOPIC
             ) revert BadEvent();
-            legs = themes.legsOf(uint256(topics[1]));
+            (legs, version) = _liveTheme(uint256(topics[1]));
             cap = gp.themePerFollowerCap;
         } else {
             if (
@@ -417,7 +428,7 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
             bool reported = true;
             (bool ok, bytes memory ret) = address(this).call{gas: slot}(
                 theme
-                    ? abi.encodeCall(this.syncThemeFromEvent, (sourceId, follower, legs))
+                    ? abi.encodeCall(this.syncThemeFromEvent, (sourceId, follower, legs, version))
                     : abi.encodeCall(this.syncFollowerFromEvent, (sourceId, follower, pool, size))
             );
             if (ok) {
@@ -457,18 +468,18 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
         return _sync(follower, f, pool, PolicyLib.traderTarget(sourceSize, f.policy.scaleBps));
     }
 
-    /// @notice One theme follower's share of a rebalance, against the legs read once for the event. Only
-    /// callable by the hub itself, from onSourceEvent.
-    /// @return acted false when the follower no longer follows this theme
-    function syncThemeFromEvent(bytes32 sourceId, address follower, Leg[] calldata legs)
+    /// @notice One theme follower's share of a rebalance, against the legs and version read once for the
+    /// event. Only callable by the hub itself, from onSourceEvent.
+    /// @return acted false when the follower no longer follows this theme, its book already matches this
+    /// version, or the sync found nothing to send or refuse
+    function syncThemeFromEvent(bytes32 sourceId, address follower, Leg[] calldata legs, uint32 version)
         external
         onlySelf
         returns (bool acted)
     {
         Follow storage f = _follows[follower];
-        if (f.sourceId != sourceId) return false;
-        _syncTheme(follower, f, legs);
-        return true;
+        if (f.sourceId != sourceId || _themeCurrent(f, version)) return false;
+        return _syncTheme(follower, f, legs, version);
     }
 
     /// @notice A theme sync's increase set. Only callable by the hub itself: every leg fills completely
@@ -492,7 +503,22 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
         }
     }
 
+    /// @notice A theme follower's own full sync, at any time (mark drift within THEME_DRIFT_BPS still
+    /// trades nothing).
+    function resync() external nonReentrant {
+        Follow storage f = _active(msg.sender);
+        if (f.kind != SourceKind.Theme) revert NotThemeFollow();
+        _syncThemeNow(msg.sender, f, false);
+    }
+
     // ---------------------------------------------------------------- views
+
+    /// @return syncedVersion theme version of the follower's last sync that left every leg at target
+    /// @return lastSyncComplete whether its last sync did; when true at the current version catchUp is a no-op
+    function themeSyncOf(address follower) external view returns (uint32 syncedVersion, bool lastSyncComplete) {
+        Follow storage f = _follows[follower];
+        return (f.syncedVersion, f.lastSyncComplete);
+    }
 
     function sourceIdOf(SourceKind kind, uint256 ref) public pure returns (bytes32) {
         return keccak256(abi.encode(kind, ref));
@@ -573,7 +599,7 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
         bool isTrader = kind == SourceKind.Trader;
 
         ISomniaReactivityPrecompile.SubscriptionData memory d;
-        d.eventTopics[0] = isTrader ? POSITION_UPDATED_TOPIC : themes.THEME_REBALANCED_TOPIC();
+        d.eventTopics[0] = isTrader ? POSITION_UPDATED_TOPIC : THEME_REBALANCED_TOPIC;
         // trader: the address left-padded; theme: the theme id
         d.eventTopics[1] = bytes32(ref);
         d.emitter = isTrader ? address(bank) : address(themes);
@@ -664,10 +690,17 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
     /// @dev Moves a theme follower's whole book toward the theme. Phase A: per-market reductions (a dropped
     /// leg's target is flat), never gated and kept whatever follows. Phase B: every increase the basket
     /// needs, as one set behind the theme-level gates, filled all-or-nothing by applyIncreases. A leg
-    /// whose market cannot be read, or whose flip did not close, holds the whole set back.
-    function _syncTheme(address follower, Follow storage f, Leg[] memory legs) internal {
+    /// whose market cannot be read, whose flip did not close, or that is too small to open holds the whole
+    /// set back. A leg on the right side within THEME_DRIFT_BPS of its target is left alone. When every
+    /// leg ends at target, `version` is recorded as synced.
+    /// @return acted whether anything was sent or refused
+    function _syncTheme(address follower, Follow storage f, Leg[] memory legs, uint32 version)
+        internal
+        returns (bool acted)
+    {
         bytes32 sourceId = f.sourceId;
         bool complete = _allowLegs(follower, sourceId, legs);
+        acted = !complete;
         address[] storage pools = _synced[follower];
         uint256 n = pools.length;
         ThemePool[] memory ps = new ThemePool[](n);
@@ -687,7 +720,8 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
             Reason early = _earlyGate(follower, f);
             if (early != Reason.None) {
                 emit Refused(follower, sourceId, address(0), early, "");
-                return;
+                f.lastSyncComplete = false;
+                return true;
             }
         }
 
@@ -697,6 +731,7 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
             if (s.weight == 0 && s.cur == 0) continue; // a dropped leg already closed
             (s.ok, s.m) = _market(follower, sourceId, s.pool);
             if (!s.ok) {
+                acted = true;
                 if (s.weight != 0) complete = false;
                 continue;
             }
@@ -704,11 +739,16 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
                 int256 raw = PolicyLib.themeTarget(p.allocation, s.weight, s.m.mark, s.m.oneBase);
                 (s.target, s.capped) = PolicyLib.clampNotional(raw, s.m.mark, s.m.oneBase, p.maxNotional);
             }
+            if (_settled(s.cur, s.target, s.m)) continue;
             (uint256 reduceQty, bool reduceIsBid,,) = PolicyLib.split(s.cur, s.target);
-            if (reduceQty != 0) (s.price, s.mid) = _reduce(follower, f, s.pool, s.m, s.cur, reduceQty, reduceIsBid);
+            if (reduceQty != 0) {
+                (s.price, s.mid) = _reduce(follower, f, s.pool, s.m, s.cur, reduceQty, reduceIsBid);
+                if (s.price != 0) acted = true;
+            }
         }
 
         (LegOrder[] memory orders, uint256 total, bool setOk) = _increaseSet(follower, sourceId, ps, p.bandBps);
+        if (!setOk || orders.length != 0) acted = true;
         bool stop;
         int256 equity;
         if (orders.length != 0 && complete && setOk) {
@@ -724,13 +764,51 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
             }
         }
 
+        bool done = complete;
         for (uint256 i; i < n; ++i) {
             ThemePool memory s = ps[i];
-            if (!s.ok) continue;
+            if (!s.ok) {
+                if (s.cur != 0) done = false;
+                continue;
+            }
             int256 end = _size(follower, s.pool);
             if (end != s.cur) emit Copied(follower, sourceId, s.pool, s.cur, end, s.price, s.capped);
+            if ((s.weight != 0 && s.target == 0) || !_settled(end, s.target, s.m)) done = false;
         }
+        if (done && f.syncedVersion != version) f.syncedVersion = version;
+        if (f.lastSyncComplete != done) f.lastSyncComplete = done;
         if (stop) _stop(follower, f, equity);
+    }
+
+    /// @dev Syncs a theme follower against the theme's live legs and version; with `ifBehind`, only when
+    /// its book does not match that version yet.
+    function _syncThemeNow(address follower, Follow storage f, bool ifBehind) internal {
+        (Leg[] memory legs, uint32 v) = _liveTheme(f.ref);
+        if (!ifBehind || !_themeCurrent(f, v)) _syncTheme(follower, f, legs, v);
+    }
+
+    /// @dev The theme's live legs and version.
+    function _liveTheme(uint256 id) internal view returns (Leg[] memory, uint32) {
+        return (themes.legsOf(id), themes.versionOf(id));
+    }
+
+    /// @dev True when the follower's book already matches theme version `v`, so catchUp and a late or
+    /// repeated event leave it alone.
+    function _themeCurrent(Follow storage f, uint32 v) internal view returns (bool) {
+        return f.lastSyncComplete && f.syncedVersion >= v;
+    }
+
+    /// @dev True when a theme sync leaves `size` alone against `target`: equal, on the same side within
+    /// THEME_DRIFT_BPS of it, or a move below one lot or the venue minimum.
+    function _settled(int256 size, int256 target, Market memory m) internal pure returns (bool) {
+        if (size == target) return true;
+        if (size == 0 || target == 0 || (size > 0) != (target > 0)) return false;
+        uint256 have = _abs(size);
+        uint256 want = _abs(target);
+        uint256 gap = have > want ? have - want : want - have;
+        if (gap * 1e4 < THEME_DRIFT_BPS * want) return true;
+        gap = PolicyLib.toLots(gap, m.lot);
+        return gap == 0 || gap < m.minQty;
     }
 
     /// @dev Adds the theme's legs to the follow's markets, allowlisted and synced for the rest of the follow
@@ -753,7 +831,9 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
 
     /// @dev The increases the basket needs after the reductions, and the notional of the whole book once
     /// they fill (an unreadable market holding a position makes it unbounded, failing a total cap closed).
-    /// `ok` is false when a leg's flip did not close, which holds the set back.
+    /// `ok` is false when a leg cannot take its part: its flip did not close, or it is not open and its size
+    /// rounds below one lot or the venue minimum. Such a leg is reported and holds the set back; a top-up of
+    /// an open leg that small is skipped.
     function _increaseSet(address follower, bytes32 sourceId, ThemePool[] memory ps, uint16 bandBps)
         internal
         returns (LegOrder[] memory orders, uint256 total, bool ok)
@@ -769,16 +849,25 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
                 continue;
             }
             int256 end = s.mid;
-            if (s.target != 0 && s.mid != 0 && (s.mid > 0) != (s.target > 0)) {
-                emit Refused(follower, sourceId, s.pool, Reason.LegFailed, "");
-                ok = false;
-            } else if (_abs(s.target) > _abs(s.mid)) {
-                uint256 qty = PolicyLib.toLots(_abs(s.target) - _abs(s.mid), s.m.lot);
-                if (qty != 0 && qty >= s.m.minQty) {
-                    bool isBid = s.target > 0;
-                    end = isBid ? s.mid + int256(qty) : s.mid - int256(qty);
-                    s.incPrice = PolicyLib.bandPriceInward(s.m.mark, bandBps, isBid, s.m.tick);
-                    orders[k++] = LegOrder(s.pool, isBid, s.incPrice, qty, end, s.m.lot);
+            if (s.weight != 0 && (s.mid == 0 || !_settled(s.mid, s.target, s.m))) {
+                uint256 want = _abs(s.target);
+                uint256 have = _abs(s.mid);
+                bool failed = want == 0 || (have != 0 && (s.mid > 0) != (s.target > 0));
+                if (!failed && want > have) {
+                    // outside the band a top-up is never this small, so only an opening leg fails here
+                    uint256 qty = PolicyLib.toLots(want - have, s.m.lot);
+                    if (qty == 0 || qty < s.m.minQty) {
+                        failed = true;
+                    } else {
+                        bool isBid = s.target > 0;
+                        end = isBid ? s.mid + int256(qty) : s.mid - int256(qty);
+                        s.incPrice = PolicyLib.bandPriceInward(s.m.mark, bandBps, isBid, s.m.tick);
+                        orders[k++] = LegOrder(s.pool, isBid, s.incPrice, qty, end, s.m.lot);
+                    }
+                }
+                if (failed) {
+                    emit Refused(follower, sourceId, s.pool, Reason.LegFailed, "");
+                    ok = false;
                 }
             }
             if (total != type(uint256).max) total += PolicyLib.notional(end, s.m.mark, s.m.oneBase);
@@ -930,6 +1019,7 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
     function _stop(address follower, Follow storage f, int256 equity) internal {
         _flatten(follower, f);
         f.paused = true;
+        f.lastSyncComplete = false;
         emit Stopped(follower, equity);
     }
 

@@ -115,6 +115,7 @@ contract ThemeRegistryTest is Base {
 
     function test_rebalance_bumpsVersion_emits() public {
         uint256 id = _create();
+        vm.warp(block.timestamp + reg.MIN_REBALANCE_INTERVAL());
         Leg[] memory legs = new Leg[](1);
         legs[0] = Leg(address(btc), 5_000);
         vm.expectEmit(true, false, false, true, address(reg));
@@ -130,10 +131,12 @@ contract ThemeRegistryTest is Base {
         Leg[] memory got = reg.legsOf(id);
         assertEq(got.length, 1);
         assertEq(got[0].weightBps, 5_000);
+        assertEq(reg.versionOf(id), 2);
     }
 
     function test_rebalance_validatesLegs() public {
         uint256 id = _create();
+        vm.warp(block.timestamp + reg.MIN_REBALANCE_INTERVAL());
         Leg[] memory legs = _two();
         legs[0].weightBps = 0;
         vm.prank(alice);
@@ -143,5 +146,57 @@ contract ThemeRegistryTest is Base {
 
     function test_topicConstant() public view {
         assertEq(reg.THEME_REBALANCED_TOPIC(), keccak256("ThemeRebalanced(uint256,uint32)"));
+    }
+
+    // Identical legs, in any order, are not a rebalance: every follower would pay to re-check its book.
+    function test_rebalance_rejectsNoChange() public {
+        uint256 id = _create();
+        vm.warp(block.timestamp + reg.MIN_REBALANCE_INTERVAL());
+        Leg[] memory same = _two();
+        Leg[] memory swapped = new Leg[](2);
+        swapped[0] = same[1];
+        swapped[1] = same[0];
+        vm.startPrank(alice);
+        vm.expectRevert(ThemeRegistry.NoChange.selector);
+        reg.rebalance(id, same);
+        vm.expectRevert(ThemeRegistry.NoChange.selector);
+        reg.rebalance(id, swapped);
+
+        // a different weight, a dropped leg or an added one is a change
+        same[1].weightBps = -9_999;
+        reg.rebalance(id, same);
+        vm.warp(block.timestamp + reg.MIN_REBALANCE_INTERVAL());
+        Leg[] memory one = new Leg[](1);
+        one[0] = same[0];
+        reg.rebalance(id, one);
+        vm.stopPrank();
+        assertEq(reg.versionOf(id), 3);
+    }
+
+    function test_rebalance_minInterval() public {
+        uint256 id = _create();
+        assertEq(reg.MIN_REBALANCE_INTERVAL(), 60);
+        Leg[] memory legs = _two();
+        legs[0].weightBps = 5_000;
+
+        vm.startPrank(alice);
+        // counted from the creation
+        vm.warp(block.timestamp + 59);
+        vm.expectRevert(ThemeRegistry.RebalanceTooSoon.selector);
+        reg.rebalance(id, legs);
+        vm.warp(block.timestamp + 1);
+        reg.rebalance(id, legs);
+
+        // and from the last rebalance
+        legs[0].weightBps = 6_000;
+        vm.expectRevert(ThemeRegistry.RebalanceTooSoon.selector);
+        reg.rebalance(id, legs);
+        vm.warp(block.timestamp + 60);
+        reg.rebalance(id, legs);
+        vm.stopPrank();
+        assertEq(reg.versionOf(id), 3);
+
+        vm.expectRevert(ThemeRegistry.UnknownTheme.selector);
+        reg.versionOf(9);
     }
 }

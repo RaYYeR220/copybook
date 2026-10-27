@@ -129,8 +129,10 @@ contract HubThemeTest is Base {
         return themes.createTheme("thesis", "ipfs://thesis", legs);
     }
 
-    /// Rebalances theme `tid` and returns the ThemeRebalanced log a subscription would deliver.
+    /// Rebalances theme `tid` (after the registry's minimum interval) and returns the ThemeRebalanced log a
+    /// subscription would deliver.
     function _rebalance(Leg[] memory legs) internal returns (Vm.Log memory ev) {
+        vm.warp(block.timestamp + themes.MIN_REBALANCE_INTERVAL());
         vm.recordLogs();
         vm.prank(creator);
         themes.rebalance(tid, legs);
@@ -839,7 +841,255 @@ contract HubThemeTest is Base {
         Leg[] memory legs = themes.legsOf(tid);
         vm.prank(relay);
         vm.expectRevert(CopybookHub.NotSelf.selector);
-        hub.syncThemeFromEvent(tsid, follower, legs);
+        hub.syncThemeFromEvent(tsid, follower, legs, 1);
         assertEq(_size(btc, follower), BTC_5K);
+    }
+
+    function test_theme_topicMatchesRegistry() public view {
+        assertEq(hub.THEME_REBALANCED_TOPIC(), themes.THEME_REBALANCED_TOPIC());
+        assertEq(hub.THEME_REBALANCED_TOPIC(), THEME_REBALANCED);
+    }
+
+    // ---------- fix round 1: dust legs, churn, rebalance spam, short fills ----------
+
+    // A leg too small to open (it rounds below the venue minimum) holds the whole basket back: a pair trade
+    // never opens as a naked short.
+    function test_theme_dustLegHoldsBackBasket() public {
+        _prep(follower);
+        vm.recordLogs();
+        vm.expectEmit(true, true, true, true, address(hub));
+        emit CopybookHub.Refused(follower, tsid, address(btc), Reason.LegFailed, "");
+        vm.prank(follower);
+        hub.follow{value: TANK}(SourceKind.Theme, tid, _policy(20e18), _none()); // BTC 12_500 < 13_000 minimum
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        assertEq(_size(btc, follower), 0);
+        assertEq(_size(eth, follower), 0, "no naked ETH short");
+        assertEq(_fills(logs, eth, follower), 0);
+        (uint32 v, bool done) = hub.themeSyncOf(follower);
+        assertEq(v, 0);
+        assertFalse(done);
+
+        // a larger allocation opens both
+        Policy memory p = _policy(100e18);
+        vm.prank(follower);
+        hub.updatePolicy(p);
+        hub.catchUp(follower, _none());
+        assertEq(_size(btc, follower), BTC_5K);
+        assertEq(_size(eth, follower), -ETH_5K);
+    }
+
+    // Mark drift alone never lets anyone trade a theme follower: catchUp acts only on a new theme version or
+    // after a sync that did not finish.
+    function test_theme_strangerCatchUpAfterMarkDrift_noFills() public {
+        Policy memory p = _policy(1_000e18);
+        p.maxNotional = 1_000e18;
+        _followTheme(follower, p);
+        int256 b0 = _size(btc, follower);
+        int256 e0 = _size(eth, follower);
+        assertEq(b0, 625_000);
+
+        btc.setMark(76_000e18); // -5%
+        eth.setMark(2_415e18); // +5%
+        vm.recordLogs();
+        vm.prank(stranger);
+        hub.catchUp(follower, _none());
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        assertEq(_hubLogs(logs), 0);
+        assertEq(_fills(logs, btc, follower) + _fills(logs, eth, follower), 0);
+        assertEq(_size(btc, follower), b0);
+        assertEq(_size(eth, follower), e0);
+
+        // even far beyond the drift band
+        btc.setMark(60_000e18);
+        vm.recordLogs();
+        vm.prank(stranger);
+        hub.catchUp(follower, _none());
+        assertEq(_hubLogs(vm.getRecordedLogs()), 0);
+        assertEq(_size(btc, follower), b0);
+    }
+
+    // The follower can resync any time. A leg on the right side within THEME_DRIFT_BPS of its target is left
+    // alone; one beyond it is resized.
+    function test_theme_resync_driftBand() public {
+        Policy memory p = _policy(1_000e18);
+        p.maxNotional = 1_000e18;
+        _followTheme(follower, p);
+        assertEq(hub.THEME_DRIFT_BPS(), 500);
+        int256 e0 = _size(eth, follower);
+
+        btc.setMark(76_800e18); // -4%
+        eth.setMark(2_392e18); // +4%
+        vm.recordLogs();
+        vm.prank(follower);
+        hub.resync();
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        assertEq(_fills(logs, btc, follower) + _fills(logs, eth, follower), 0, "inside the band");
+        assertEq(_size(btc, follower), 625_000);
+
+        btc.setMark(72_000e18); // -10%: target 694_444
+        vm.expectEmit(true, true, true, true, address(hub));
+        emit CopybookHub.Copied(follower, tsid, address(btc), 625_000, 694_000, 72_360e18, false);
+        vm.prank(follower);
+        hub.resync();
+        assertEq(_size(btc, follower), 694_000);
+        assertEq(_size(eth, follower), e0, "ETH still inside the band");
+
+        vm.prank(stranger);
+        vm.expectRevert(CopybookHub.NotFollowing.selector);
+        hub.resync();
+    }
+
+    function test_theme_resync_traderFollowReverts() public {
+        _prep(follower);
+        vm.prank(follower);
+        hub.follow{value: TANK}(SourceKind.Trader, uint256(uint160(creator)), _traderPolicy(), _none());
+        vm.prank(follower);
+        vm.expectRevert(CopybookHub.NotThemeFollow.selector);
+        hub.resync();
+    }
+
+    // The sync state follows the theme version: only a sync that leaves every leg at target records it.
+    function test_theme_syncStateTracksVersion() public {
+        eth.setLiquidity(0, 0, 10);
+        _followTheme(follower, _policy(100e18));
+        (uint32 v, bool done) = hub.themeSyncOf(follower);
+        assertEq(v, 0);
+        assertFalse(done);
+
+        eth.setLiquidity(10e18, 10e18, 10);
+        hub.catchUp(follower, _none());
+        (v, done) = hub.themeSyncOf(follower);
+        assertEq(v, 1);
+        assertTrue(done);
+
+        // a new version, missed by the subscription: catchUp acts
+        _rebalance(_legs(btc, 7_000, eth, -7_000));
+        hub.catchUp(follower, _none());
+        assertEq(_size(btc, follower), BTC_7K);
+        (v, done) = hub.themeSyncOf(follower);
+        assertEq(v, 2);
+        assertTrue(done);
+
+        // a policy change reopens the sync for anyone
+        Policy memory p = _policy(80e18);
+        vm.prank(follower);
+        hub.updatePolicy(p);
+        (, done) = hub.themeSyncOf(follower);
+        assertFalse(done);
+        hub.catchUp(follower, _none());
+        assertEq(_size(btc, follower), 70_000);
+        (v, done) = hub.themeSyncOf(follower);
+        assertEq(v, 2);
+        assertTrue(done);
+
+        // a stop reopens it too
+        Policy memory floor = _policy(80e18);
+        floor.equityFloor = 50e18;
+        vm.prank(follower);
+        hub.updatePolicy(floor);
+        bank.setEquity(follower, 100e18);
+        hub.catchUp(follower, _none());
+        (, done) = hub.themeSyncOf(follower);
+        assertTrue(done);
+        bank.setEquity(follower, 10e18);
+        hub.poke(follower);
+        assertEq(_size(btc, follower), 0);
+        (, done) = hub.themeSyncOf(follower);
+        assertFalse(done);
+    }
+
+    // The registry refuses a rebalance that changes nothing, or that comes too soon; a rebalance that leaves
+    // a member's book inside the drift band costs it only the fixed overhead, silently.
+    function test_theme_quietRebalance_billsOverheadOnly() public {
+        address a = _f(1);
+        address b = _f(2);
+        _followTheme(a, _policy(100e18));
+        _followTheme(b, _policy(100e18));
+        vm.fee(6 gwei);
+
+        vm.warp(block.timestamp + themes.MIN_REBALANCE_INTERVAL());
+        vm.startPrank(creator);
+        vm.expectRevert(ThemeRegistry.NoChange.selector);
+        themes.rebalance(tid, _legs(btc, 5_000, eth, -5_000));
+        vm.expectRevert(ThemeRegistry.NoChange.selector);
+        themes.rebalance(tid, _legs(eth, -5_000, btc, 5_000)); // the same set in another order
+        vm.stopPrank();
+
+        Vm.Log memory ev = _rebalance(_legs(btc, 5_100, eth, -5_000)); // BTC target +2.8%
+        vm.prank(creator);
+        vm.expectRevert(ThemeRegistry.RebalanceTooSoon.selector);
+        themes.rebalance(tid, _legs(btc, 5_200, eth, -5_000));
+
+        uint256 ta = hub.tankOf(a);
+        uint256 tb = hub.tankOf(b);
+        vm.recordLogs();
+        _fire(0, ev);
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        assertEq(_fills(logs, btc, a) + _fills(logs, eth, a) + _fills(logs, btc, b) + _fills(logs, eth, b), 0);
+        assertEq(_hubLogs(logs), 0, "no TankCharged, no Copied");
+        uint256 overhead = hub.CHARGE_OVERHEAD_GAS() * 6 gwei;
+        assertEq(hub.tankOf(a), ta - overhead);
+        assertEq(hub.tankOf(b), tb - overhead);
+        (uint32 v, bool done) = hub.themeSyncOf(a);
+        assertEq(v, 2);
+        assertTrue(done);
+    }
+
+    // The venue reports success without filling, or reports failure: the leg before it is rolled back.
+    function test_theme_successWithoutFill_rollsBackSet() public {
+        vm.mockCall(
+            address(eth), abi.encodeWithSelector(IPerpPool.placeOrderFor.selector), abi.encode(true, uint128(1))
+        );
+        _prep(follower);
+        vm.expectEmit(true, true, true, true, address(hub));
+        emit CopybookHub.Refused(follower, tsid, address(eth), Reason.LegFailed, "");
+        vm.prank(follower);
+        hub.follow{value: TANK}(SourceKind.Theme, tid, _policy(100e18), _none());
+        vm.clearMockedCalls();
+        assertEq(_size(eth, follower), 0);
+        assertEq(_size(btc, follower), 0, "BTC rolled back with the unfilled ETH leg");
+    }
+
+    function test_theme_venueFalse_rollsBackSet() public {
+        vm.mockCall(
+            address(eth), abi.encodeWithSelector(IPerpPool.placeOrderFor.selector), abi.encode(false, uint128(0))
+        );
+        _prep(follower);
+        vm.expectEmit(true, true, true, true, address(hub));
+        emit CopybookHub.Refused(follower, tsid, address(eth), Reason.LegFailed, "");
+        vm.prank(follower);
+        hub.follow{value: TANK}(SourceKind.Theme, tid, _policy(100e18), _none());
+        vm.clearMockedCalls();
+        assertEq(_size(btc, follower), 0, "BTC rolled back with the refused ETH leg");
+    }
+
+    // A revert inside the set that is not a leg's own answer (here venue return data that does not decode)
+    // still rolls the set back, and is reported without a pool.
+    function test_theme_undecodableVenueReturn_rollsBackSet() public {
+        vm.mockCall(address(eth), abi.encodeWithSelector(IPerpPool.placeOrderFor.selector), abi.encode(true));
+        _prep(follower);
+        vm.expectEmit(true, true, true, true, address(hub));
+        emit CopybookHub.Refused(follower, tsid, address(0), Reason.LegFailed, "");
+        vm.prank(follower);
+        hub.follow{value: TANK}(SourceKind.Theme, tid, _policy(100e18), _none());
+        vm.clearMockedCalls();
+        assertEq(_size(btc, follower), 0);
+        assertEq(_size(eth, follower), 0);
+    }
+
+    // Documented in follow: a theme manages every pool that is or becomes a leg, including a position the
+    // follower opened there by hand (use a dedicated wallet per source).
+    function test_theme_newLegManagesHeldPosition() public {
+        sol.approve(follower, address(this));
+        _move(sol, follower, 3e18);
+        _followTheme(follower, _policy(100e18));
+        assertEq(_size(sol, follower), 3e18, "not a leg yet");
+        _fire(0, _rebalance(_legs3(btc, 5_000, eth, -3_000, sol, -2_000)));
+        assertEq(_size(sol, follower), -SOL_2K);
+    }
+
+    function _traderPolicy() internal pure returns (Policy memory p) {
+        p = _policy(0);
+        p.scaleBps = 10_000;
     }
 }

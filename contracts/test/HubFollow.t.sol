@@ -161,7 +161,9 @@ contract HubFollowTest is Base {
     }
 
     function _fire(Vm.Log memory ev) internal {
-        reactivity.fire(hub.subscriptionOf(sid, 0), ev.emitter, ev.topics, ev.data);
+        uint256 id = hub.subscriptionOf(sid, 0);
+        vm.prank(address(this), address(hub)); // the hub's own subscription: the hub is the origin
+        reactivity.fire(id, ev.emitter, ev.topics, ev.data);
     }
 
     function _traderTo(MockPerpPool pool, int256 target) internal {
@@ -692,12 +694,13 @@ contract HubFollowTest is Base {
         assertEq(_size(eth, follower), -2e16);
 
         bank.setEquity(follower, 40e18);
+        // the pause comes first, so it stands even if a close cannot complete
+        vm.expectEmit(true, false, false, true, address(hub));
+        emit CopybookHub.Stopped(follower, 40e18);
         vm.expectEmit(true, true, true, true, address(hub));
         emit CopybookHub.Copied(follower, sid, address(btc), 50_000, 0, BTC_EXIT_SELL, false);
         vm.expectEmit(true, true, true, true, address(hub));
         emit CopybookHub.Copied(follower, sid, address(eth), -2e16, 0, ETH_EXIT_BUY, false);
-        vm.expectEmit(true, false, false, true, address(hub));
-        emit CopybookHub.Stopped(follower, 40e18);
         vm.prank(stranger);
         hub.poke(follower);
 
@@ -752,10 +755,10 @@ contract HubFollowTest is Base {
         _traderTo(eth, -2e16);
         vm.expectEmit(true, true, true, true, address(hub));
         emit CopybookHub.Refused(follower, sid, address(eth), Reason.EquityFloor, "");
-        vm.expectEmit(true, true, true, true, address(hub));
-        emit CopybookHub.Copied(follower, sid, address(btc), 50_000, 0, BTC_EXIT_SELL, false);
         vm.expectEmit(true, false, false, true, address(hub));
         emit CopybookHub.Stopped(follower, 10e18);
+        vm.expectEmit(true, true, true, true, address(hub));
+        emit CopybookHub.Copied(follower, sid, address(btc), 50_000, 0, BTC_EXIT_SELL, false);
         hub.catchUp(follower, _one(eth));
         assertEq(_size(btc, follower), 0);
         assertEq(_size(eth, follower), 0);
@@ -798,10 +801,12 @@ contract HubFollowTest is Base {
         hub.catchUp(follower, _one(btc));
         assertEq(_size(btc, follower), 30_000);
 
-        // the source flips: close at the exit band, then open the other side inside the band
+        // the source flips: close at the exit band, then open the other side inside the band (one Copied each)
         _traderTo(btc, -20_000);
         vm.expectEmit(true, true, true, true, address(hub));
-        emit CopybookHub.Copied(follower, sid, address(btc), 30_000, -20_000, BTC_SELL, false);
+        emit CopybookHub.Copied(follower, sid, address(btc), 30_000, 0, BTC_EXIT_SELL, false);
+        vm.expectEmit(true, true, true, true, address(hub));
+        emit CopybookHub.Copied(follower, sid, address(btc), 0, -20_000, BTC_SELL, false);
         hub.catchUp(follower, _one(btc));
         assertEq(_size(btc, follower), -20_000);
 
@@ -836,6 +841,7 @@ contract HubFollowTest is Base {
         emit CopybookHub.Copied(follower, sid, address(btc), 0, 50_000, BTC_BUY, false);
         vm.expectEmit(true, true, true, true, address(hub));
         emit CopybookHub.Copied(follower2, sid, address(btc), 0, 25_000, BTC_BUY, false);
+        vm.prank(address(this), address(hub));
         reactivity.fire(subId, ev.emitter, ev.topics, ev.data);
 
         assertEq(_size(btc, follower), 50_000);
@@ -862,18 +868,18 @@ contract HubFollowTest is Base {
         GroupRelay(relay).onEvent(address(bank), topics, data);
 
         // an event for a different account or emitter is rejected even through the relay
-        vm.prank(relay);
+        vm.prank(relay, address(hub));
         vm.expectRevert(CopybookHub.BadEvent.selector);
         hub.onSourceEvent(sid, 0, address(0xBAD), topics, data);
         topics[1] = bytes32(uint256(uint160(stranger)));
-        vm.prank(relay);
+        vm.prank(relay, address(hub));
         vm.expectRevert(CopybookHub.BadEvent.selector);
         hub.onSourceEvent(sid, 0, address(bank), topics, data);
 
         // wrong event signature
         topics[1] = bytes32(uint256(uint160(trader)));
         topics[0] = keccak256("Other(address,address)");
-        vm.prank(relay);
+        vm.prank(relay, address(hub));
         vm.expectRevert(CopybookHub.BadEvent.selector);
         hub.onSourceEvent(sid, 0, address(bank), topics, data);
 
@@ -881,7 +887,7 @@ contract HubFollowTest is Base {
         bytes32[] memory short = new bytes32[](2);
         short[0] = POSITION_UPDATED;
         short[1] = bytes32(uint256(uint160(trader)));
-        vm.prank(relay);
+        vm.prank(relay, address(hub));
         vm.expectRevert(CopybookHub.BadEvent.selector);
         hub.onSourceEvent(sid, 0, address(bank), short, data);
     }
@@ -941,7 +947,9 @@ contract HubFollowTest is Base {
         uint256 ask = 79_600_100_000_000_000_000_000;
         _traderTo(btc, -50_000);
         vm.expectEmit(true, true, true, true, address(hub));
-        emit CopybookHub.Copied(follower, sid, address(btc), 50_000, -50_000, ask, false);
+        emit CopybookHub.Copied(follower, sid, address(btc), 50_000, 0, 79_200e18, false); // the close, exit band
+        vm.expectEmit(true, true, true, true, address(hub));
+        emit CopybookHub.Copied(follower, sid, address(btc), 0, -50_000, ask, false);
         hub.catchUp(follower, _one(btc));
         assertGe(ask * 1e4, m * (1e4 - 50));
     }

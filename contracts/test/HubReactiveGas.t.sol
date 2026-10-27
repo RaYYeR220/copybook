@@ -61,6 +61,7 @@ contract HubReactiveGasTest is Base {
         bytes memory call =
             abi.encodeCall(MockReactivity.fire, (hub.subscriptionOf(sid, 0), ev.emitter, ev.topics, ev.data));
         uint256 g0 = gasleft();
+        vm.prank(address(this), address(hub)); // the hub's own subscription: the hub is the origin
         (ok,) = REACTIVITY.call{gas: gas}(call);
         used = g0 - gasleft();
     }

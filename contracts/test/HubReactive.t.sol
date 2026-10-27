@@ -9,7 +9,7 @@ import {MockReactivity} from "./mocks/MockReactivity.sol";
 import {CopybookHub} from "../src/CopybookHub.sol";
 import {GroupRelay} from "../src/GroupRelay.sol";
 import {ThemeRegistry} from "../src/ThemeRegistry.sol";
-import {Policy, Reason, SourceKind} from "../src/Types.sol";
+import {Leg, Policy, Reason, SourceKind} from "../src/Types.sol";
 import {IMarginBank, IPerpPool} from "../src/interfaces/IDreamPerps.sol";
 import {
     ISomniaReactivityPrecompile
@@ -72,6 +72,12 @@ contract HubReactiveTest is Base {
 
     // ---------- helpers ----------
 
+    /// The fixed gas added to every member's bill.
+    function _overhead() internal view returns (uint256) {
+        (,,,,, uint64 o) = hub.gasParams();
+        return o;
+    }
+
     function _f(uint256 i) internal pure returns (address) {
         return address(uint160(0xF000 + i));
     }
@@ -130,7 +136,9 @@ contract HubReactiveTest is Base {
     }
 
     function _fire(uint32 group, Vm.Log memory ev) internal {
-        reactivity.fire(hub.subscriptionOf(sid, group), ev.emitter, ev.topics, ev.data);
+        uint256 id = hub.subscriptionOf(sid, group);
+        vm.prank(address(this), address(hub)); // the hub's own subscription: the hub is the origin
+        reactivity.fire(id, ev.emitter, ev.topics, ev.data);
     }
 
     function _size(MockPerpPool pool, address account) internal view returns (int256) {
@@ -194,9 +202,9 @@ contract HubReactiveTest is Base {
         assertGt(amount, 0, "charged");
         assertEq(amount % rate, 0, "whole gas units at the rate");
         uint256 gasUnits = amount / rate;
-        (, uint64 cap,,,) = hub.gasParams();
-        assertGt(gasUnits, hub.CHARGE_OVERHEAD_GAS(), "overhead plus measured gas");
-        assertLt(gasUnits, hub.CHARGE_OVERHEAD_GAS() + cap, "bounded by the slot");
+        (, uint64 cap,,,,) = hub.gasParams();
+        assertGt(gasUnits, _overhead(), "overhead plus measured gas");
+        assertLt(gasUnits, _overhead() + cap, "bounded by the slot");
     }
 
     // ---------- fan-out ----------
@@ -293,6 +301,7 @@ contract HubReactiveTest is Base {
         // this trader's event delivered through the other source's subscription is rejected
         uint256 otherSub = hub.subscriptionOf(otherSid, 0);
         vm.expectRevert(CopybookHub.BadEvent.selector);
+        vm.prank(address(this), address(hub));
         reactivity.fire(otherSub, ev.emitter, ev.topics, ev.data);
 
         assertEq(_size(btc, _f(1)), 0);
@@ -312,22 +321,29 @@ contract HubReactiveTest is Base {
         }
         assertEq(_size(btc, _f(1)), 0);
 
-        vm.prank(REACTIVITY);
+        vm.prank(REACTIVITY, address(hub));
         GroupRelay(relay).onEvent(ev.emitter, ev.topics, ev.data);
         assertEq(_size(btc, _f(1)), 50_000);
     }
 
-    function test_syncFollowerFromEvent_onlySelf() public {
+    function test_eventPhases_onlySelf() public {
         _follow(_f(1), 10_000);
         _traderTo(btc, 50_000);
         address relay = hub.relayOf(sid, 0);
+        Leg[] memory none = new Leg[](0);
 
-        vm.prank(stranger);
-        vm.expectRevert(CopybookHub.NotSelf.selector);
-        hub.syncFollowerFromEvent(sid, _f(1), address(btc), 50_000);
-        vm.prank(relay);
-        vm.expectRevert(CopybookHub.NotSelf.selector);
-        hub.syncFollowerFromEvent(sid, _f(1), address(btc), 50_000);
+        address[2] memory callers = [stranger, relay];
+        for (uint256 i; i < callers.length; ++i) {
+            vm.prank(callers[i], address(hub));
+            vm.expectRevert(CopybookHub.NotSelf.selector);
+            hub.exitFromEvent(sid, _f(1), address(btc), 50_000, none, 0);
+            vm.prank(callers[i], address(hub));
+            vm.expectRevert(CopybookHub.NotSelf.selector);
+            hub.entryFromEvent(sid, _f(1), address(btc), 50_000, none, 0);
+            vm.prank(callers[i], address(hub));
+            vm.expectRevert(CopybookHub.NotSelf.selector);
+            hub.flattenFromEvent(sid, _f(1));
+        }
         assertEq(_size(btc, _f(1)), 0);
     }
 
@@ -394,12 +410,13 @@ contract HubReactiveTest is Base {
         Vm.Log memory ev = _traderTo(btc, 50_000);
         uint256 subId = hub.subscriptionOf(sid, 0);
         address[] memory m = hub.membersOf(sid, 0);
-        (uint64 floor,,, uint64 tailBase, uint64 perDefer) = hub.gasParams();
+        (uint64 floor,,, uint64 tailBase, uint64 perDefer,) = hub.gasParams();
         // what the handler must hold to start member #0: its slot plus the reserve for deferring all n
         uint256 first = floor + tailBase + n * perDefer;
 
         // below the floor from the start: one GroupDeferred from index 0, nothing is sent
         vm.recordLogs();
+        vm.prank(address(this), address(hub));
         reactivity.fire{gas: floor}(subId, ev.emitter, ev.topics, ev.data);
         Vm.Log[] memory logs = vm.getRecordedLogs();
         (uint256 bails, uint256 from) = _groupDeferred(logs, 0);
@@ -414,6 +431,7 @@ contract HubReactiveTest is Base {
 
         // just above the floor: the first members are copied, the group is deferred from the next one
         vm.recordLogs();
+        vm.prank(address(this), address(hub));
         reactivity.fire{gas: first * 105 / 100}(subId, ev.emitter, ev.topics, ev.data);
         logs = vm.getRecordedLogs();
         (bails, from) = _groupDeferred(logs, 0);
@@ -532,6 +550,7 @@ contract HubReactiveTest is Base {
 
         Vm.Log memory ev = _traderTo(btc, 50_000);
         vm.expectRevert(MockReactivity.UnknownSubscription.selector);
+        vm.prank(address(this), address(hub));
         reactivity.fire(1, ev.emitter, ev.topics, ev.data);
     }
 
@@ -706,7 +725,7 @@ contract HubReactiveTest is Base {
     // ---------- gas parameters ----------
 
     function test_gasParams_defaults() public view {
-        (uint64 floor, uint64 cap, uint64 themeCap, uint64 tailBase, uint64 perDefer) = hub.gasParams();
+        (uint64 floor, uint64 cap, uint64 themeCap, uint64 tailBase, uint64 perDefer,) = hub.gasParams();
         assertEq(floor, 8_000_000);
         assertEq(cap, 20_000_000);
         assertEq(themeCap, 90_000_000);
@@ -746,6 +765,7 @@ contract HubReactiveTest is Base {
 
         // with gas to spare the refusal is billed as usual
         vm.recordLogs();
+        vm.prank(address(this), address(hub));
         reactivity.fire(subId, ev.emitter, ev.topics, ev.data);
         Vm.Log[] memory logs = vm.getRecordedLogs();
         assertEq(_count(logs, CopybookHub.Refused.selector, b), 1);
@@ -754,10 +774,11 @@ contract HubReactiveTest is Base {
         // in a slot cut to the handler's budget there is no headroom left: no charge, no event
         uint256 tank = hub.tankOf(b);
         uint256 total = hub.totalTanks();
-        (uint64 floor,,, uint64 tailBase, uint64 perDefer) = hub.gasParams();
+        (uint64 floor,,, uint64 tailBase, uint64 perDefer,) = hub.gasParams();
         vm.expectEmit(true, true, true, true, address(hub));
         emit CopybookHub.Refused(b, sid, address(btc), Reason.VenueRejected, halted);
         vm.recordLogs();
+        vm.prank(address(this), address(hub));
         reactivity.fire{gas: (floor + tailBase + perDefer) * 11 / 10}(subId, ev.emitter, ev.topics, ev.data);
         logs = vm.getRecordedLogs();
         vm.clearMockedCalls();
@@ -813,7 +834,7 @@ contract HubReactiveTest is Base {
         uint256 cb = _charged(logs, b);
         _assertCharge(ca, 10 gwei);
         _assertCharge(cb, 10 gwei);
-        uint256 overhead = hub.CHARGE_OVERHEAD_GAS();
+        uint256 overhead = _overhead();
         assertEq(hub.tankOf(a), TANK - ca);
         assertEq(hub.tankOf(b), TANK - cb);
         // outside c's markets: only the fixed overhead, without an event
@@ -927,6 +948,7 @@ contract HubReactiveTest is Base {
         emit CopybookHub.Refused(a, sid, address(btc), Reason.TankEmpty, "");
         vm.expectEmit(true, true, true, true, address(hub));
         emit CopybookHub.Refused(b, sid, address(btc), Reason.Paused, "");
+        vm.prank(address(this), address(hub));
         reactivity.fire(subId, ev.emitter, ev.topics, ev.data);
         assertEq(_size(btc, a), 0);
         assertEq(_size(btc, b), 0);
@@ -948,10 +970,10 @@ contract HubReactiveTest is Base {
         Vm.Log memory ev = _traderTo(eth, -2e16);
         vm.expectEmit(true, true, true, true, address(hub));
         emit CopybookHub.Refused(a, sid, address(eth), Reason.EquityFloor, "");
-        vm.expectEmit(true, true, true, true, address(hub));
-        emit CopybookHub.Copied(a, sid, address(btc), 50_000, 0, BTC_EXIT_SELL, false);
         vm.expectEmit(true, false, false, true, address(hub));
         emit CopybookHub.Stopped(a, 10e18);
+        vm.expectEmit(true, true, true, true, address(hub));
+        emit CopybookHub.Copied(a, sid, address(btc), 50_000, 0, BTC_EXIT_SELL, false);
         _fire(0, ev);
         assertTrue(_paused(a));
         assertEq(_size(btc, a), 0);

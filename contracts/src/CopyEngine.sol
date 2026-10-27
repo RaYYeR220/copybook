@@ -15,6 +15,10 @@ interface IIncreaseSet {
 /// the hub's storage (the Books the hub declares), so it acts and emits as the hub. In the markets a follow
 /// manages, reductions are never gated; increases are fill-or-kill priced inside the follower's band and pass
 /// every policy gate first. A thesis opens all its legs or none.
+/// Every sync has two halves. The exit half only reduces (a flip closes there) and reads no gate; the entry
+/// half runs the increases behind the gates and reports an equity stop instead of acting on it. The hub's
+/// event handler runs them in separate self-calls, so an increase that fails or runs out of gas never takes
+/// a reduction with it; every other caller runs them back to back.
 library CopyEngine {
     error ForeignPool();
     error OutOfGasInSync();
@@ -91,7 +95,7 @@ library CopyEngine {
         bool capped;
         int256 cur;
         int256 target;
-        int256 mid; // after the reductions
+        int256 mid; // where the increase set starts
         uint256 price; // limit price of the last order that went through
         uint256 incPrice; // limit price of its increase, if one is in the set
         Market m;
@@ -105,6 +109,8 @@ library CopyEngine {
     /// @dev A theme leg on the right side within this share of its target is left alone, so mark drift
     /// alone does not trade.
     uint256 internal constant THEME_DRIFT_BPS = 500;
+    /// @dev Fixed budget of the risk gate's answer: a gate that needs more, or burns it, refuses the increase.
+    uint256 internal constant RISK_GATE_GAS = 2_000_000;
 
     uint8 internal constant FOK = 1;
     uint8 internal constant IOC = 2;
@@ -124,29 +130,60 @@ library CopyEngine {
             if (!e.bank.isPerpPoolRegistered(pool)) revert ForeignPool();
             allowed[pool] = true;
             _markSynced(b, e.follower, pool);
-            _sync(b, e, f, pool, _target(e, f, pool));
+            _sync(b, e, f, pool, _target(f, _sourceSize(e, f, pool)));
         }
     }
 
-    /// @notice Moves `pools` of a trader follow to the source's current positions.
+    /// @notice Moves `pools` of a trader follow to the source's current positions. A follow of every market
+    /// acts only where the source holds a position now or the hub has already traded for it, so a market
+    /// the source never touched stays the follower's own.
     function syncPools(Books storage b, Env memory e, address[] calldata pools) external {
         Follow storage f = b.follows[e.follower];
+        mapping(address => bool) storage synced = b.isSynced[e.follower][b.epoch[e.follower]];
         for (uint256 i; i < pools.length; ++i) {
-            _sync(b, e, f, pools[i], _target(e, f, pools[i]));
+            address pool = pools[i];
+            int256 size = _sourceSize(e, f, pool);
+            if (f.allowAll && size == 0 && !synced[pool]) continue;
+            _sync(b, e, f, pool, _target(f, size));
         }
     }
 
-    /// @notice Moves one pool of a trader follow to the source size read for an event.
-    /// @return acted false when the pool is outside the follow or already at target
-    function syncTrader(Books storage b, Env memory e, address pool, int256 sourceSize) external returns (bool) {
+    /// @notice Exit half of a trader event: the reduction toward the source size read for the event.
+    /// @return acted false when the pool is outside the follow or nothing needs reducing
+    function exitTrader(Books storage b, Env memory e, address pool, int256 sourceSize) external returns (bool) {
         Follow storage f = b.follows[e.follower];
-        return _sync(b, e, f, pool, PolicyLib.traderTarget(sourceSize, f.policy.scaleBps));
+        return _exitTrader(b, e, f, pool, _target(f, sourceSize));
     }
 
-    /// @notice Moves a theme follow's whole book toward `legs` at theme version `version`.
+    /// @notice Entry half of a trader event: the increase, behind every gate.
+    /// @return acted false when the pool is outside the follow or nothing needs increasing
+    /// @return stopped the equity floor tripped: the caller stops the follow
+    /// @return equity the equity read for the stop
+    function entryTrader(Books storage b, Env memory e, address pool, int256 sourceSize)
+        external
+        returns (bool acted, bool stopped, int256 equity)
+    {
+        Follow storage f = b.follows[e.follower];
+        return _entryTrader(b, e, f, pool, _target(f, sourceSize));
+    }
+
+    /// @notice Moves a theme follow's whole book toward `legs` at theme version `version`, both halves.
     /// @return acted whether anything was sent or refused
     function syncTheme(Books storage b, Env memory e, Leg[] memory legs, uint32 version) external returns (bool) {
         return _syncTheme(b, e, b.follows[e.follower], legs, version);
+    }
+
+    /// @notice Exit half of a theme rebalance: every reduction the basket needs (phase A).
+    function exitTheme(Books storage b, Env memory e, Leg[] memory legs) external returns (bool) {
+        return _themeExit(b, e, b.follows[e.follower], legs);
+    }
+
+    /// @notice Entry half of a theme rebalance: the all-or-nothing increase set (phase B).
+    function entryTheme(Books storage b, Env memory e, Leg[] memory legs, uint32 version)
+        external
+        returns (bool acted, bool stopped, int256 equity)
+    {
+        return _themeEntry(b, e, b.follows[e.follower], legs, version);
     }
 
     /// @notice Closes every synced position of the follow.
@@ -155,7 +192,7 @@ library CopyEngine {
         return _flatten(b, e, b.follows[e.follower]);
     }
 
-    /// @notice The equity stop: every synced position is closed and the follow paused.
+    /// @notice The equity stop: the follow is paused, then every synced position is closed.
     function stop(Books storage b, Env memory e, int256 equity) external {
         _stop(b, e, b.follows[e.follower], equity);
     }
@@ -195,74 +232,101 @@ library CopyEngine {
 
     // ---------------------------------------------------------------- trader sync
 
-    function _target(Env memory e, Follow storage f, address pool) internal view returns (int256) {
-        return PolicyLib.traderTarget(_size(e.bank, address(uint160(f.ref)), pool), f.policy.scaleBps);
+    function _sourceSize(Env memory e, Follow storage f, address pool) internal view returns (int256) {
+        return _size(e.bank, address(uint160(f.ref)), pool);
     }
 
-    /// @dev Moves one pool of one follower toward `target`. Never reverts on venue failure.
-    /// @return acted false when the pool is outside the follow or already at target (nothing else was read)
+    function _target(Follow storage f, int256 sourceSize) internal view returns (int256) {
+        return PolicyLib.traderTarget(sourceSize, f.policy.scaleBps);
+    }
+
+    /// @dev Outside an allowlist the hub never acts: any position there is the follower's own.
+    function _inFollow(Books storage b, Follow storage f, address follower, address pool) internal view returns (bool) {
+        return f.allowAll || b.allowed[follower][b.epoch[follower]][pool];
+    }
+
+    /// @dev Both halves of one pool, back to back; an equity stop pauses and flattens the follow.
+    /// @return acted false when the pool is outside the follow or already at target
     function _sync(Books storage b, Env memory e, Follow storage f, address pool, int256 target)
+        internal
+        returns (bool acted)
+    {
+        acted = _exitTrader(b, e, f, pool, target);
+        (bool entered, bool stopped, int256 equity) = _entryTrader(b, e, f, pool, target);
+        if (stopped) _stop(b, e, f, equity);
+        return acted || entered;
+    }
+
+    /// @dev Shrinks the position toward `target` (to zero on a flip). Never gated, never reverts on a venue
+    /// answer.
+    function _exitTrader(Books storage b, Env memory e, Follow storage f, address pool, int256 target)
         internal
         returns (bool)
     {
         address follower = e.follower;
-        // Outside an allowlist the hub never acts: any position there is the follower's own.
-        if (!f.allowAll && !b.allowed[follower][b.epoch[follower]][pool]) return false;
+        if (!_inFollow(b, f, follower, pool)) return false;
         int256 cur = _size(e.bank, follower, pool);
-        if (cur == target) return false;
+        (uint256 reduceQty, bool reduceIsBid,,) = PolicyLib.split(cur, target);
+        if (reduceQty == 0) return false;
         bytes32 sourceId = f.sourceId;
-        (uint256 reduceQty, bool reduceIsBid, uint256 increaseQty, bool increaseIsBid) = PolicyLib.split(cur, target);
-        if (reduceQty == 0) {
-            // increase only: a gate that already fails is reported without reading the market
-            Reason early = _earlyGate(e, f);
-            if (early != Reason.None) {
-                emit Refused(follower, sourceId, pool, early, "");
-                return true;
-            }
-        }
-        (bool ok, Market memory m) = _market(follower, sourceId, pool);
+        (bool ok, Market memory m) = _market(follower, sourceId, pool, true);
         if (!ok) return true;
-
-        uint256 price;
-        int256 mid = cur;
-        if (reduceQty != 0) (price, mid) = _reduce(e, f, pool, m, cur, reduceQty, reduceIsBid);
-
-        bool capped;
-        bool stopped;
-        int256 equity;
-        if (increaseQty != 0) {
-            uint256 increasePrice;
-            (increasePrice, capped, stopped, equity) = _increase(b, e, f, pool, m, mid, target, increaseIsBid);
-            if (increasePrice != 0) price = increasePrice;
+        (uint256 price, int256 mid) = _reduce(e, f, pool, m, cur, reduceQty, reduceIsBid);
+        if (mid != cur) {
+            _markSynced(b, follower, pool);
+            emit Copied(follower, sourceId, pool, cur, mid, price, false);
         }
+        return true;
+    }
 
+    /// @dev Grows the position toward `target`, once the exit half left it on the target's side. A gate
+    /// that already fails is reported without reading the market. Reports an equity stop, never acts on it.
+    function _entryTrader(Books storage b, Env memory e, Follow storage f, address pool, int256 target)
+        internal
+        returns (bool, bool stopped, int256 equity)
+    {
+        address follower = e.follower;
+        if (!_inFollow(b, f, follower, pool)) return (false, false, 0);
+        int256 cur = _size(e.bank, follower, pool);
+        (uint256 reduceQty,, uint256 increaseQty, bool isBid) = PolicyLib.split(cur, target);
+        // nothing to grow, or a flip whose close did not complete: it waits for the next sync
+        if (increaseQty == 0 || reduceQty != 0) return (false, false, 0);
+        bytes32 sourceId = f.sourceId;
+        Reason early = _earlyGate(e, f);
+        if (early != Reason.None) {
+            emit Refused(follower, sourceId, pool, early, "");
+            return (true, false, 0);
+        }
+        (bool ok, Market memory m) = _market(follower, sourceId, pool, true);
+        if (!ok) return (true, false, 0);
+        uint256 price;
+        bool capped;
+        (price, capped, stopped, equity) = _increase(b, e, f, pool, m, cur, target, isBid);
         int256 end = _size(e.bank, follower, pool);
         if (end != cur) {
             _markSynced(b, follower, pool);
             emit Copied(follower, sourceId, pool, cur, end, price, capped);
         }
-        if (stopped) _stop(b, e, f, equity);
-        return true;
+        return (true, stopped, equity);
     }
 
-    /// @dev Shrinks `cur` by `qty` with one IOC at the exit band. A close to zero uses the exact size; a
-    /// partial trim is rounded to lots and skipped as dust. Returns the limit price (0 when nothing was
-    /// sent) and the size after.
+    /// @dev Shrinks `cur` by `qty` with one IOC at the exit band, in whole lots only: a residue below one lot or
+    /// the venue minimum is dust the venue cannot take, left in place without an order. Returns the limit
+    /// price (0 when nothing was sent) and the size after.
     function _reduce(Env memory e, Follow storage f, address pool, Market memory m, int256 cur, uint256 qty, bool isBid)
         internal
         returns (uint256 price, int256 mid)
     {
         mid = cur;
-        bool full = qty == _abs(cur);
-        if (!full) qty = PolicyLib.toLots(qty, m.lot);
-        if (!full && (qty == 0 || qty < m.minQty)) return (0, mid);
+        qty = PolicyLib.toLots(qty, m.lot);
+        if (qty == 0 || qty < m.minQty) return (0, mid);
         price = PolicyLib.bandPrice(m.mark, PolicyLib.exitBand(f.policy.bandBps), isBid, m.tick);
         bool sent = _place(e.follower, f.sourceId, pool, isBid, price, qty, IOC);
         mid = _size(e.bank, e.follower, pool);
         if (sent && mid == cur) emit Refused(e.follower, f.sourceId, pool, Reason.BandUnfilled, "");
     }
 
-    /// @dev Grows the position from `mid` toward `target`, clamped, as one fill-or-kill order inside the band.
+    /// @dev Grows the position from `cur` toward `target`, clamped, as one fill-or-kill order inside the band.
     /// Returns the limit price and cap flag when the order was accepted, and whether the equity floor tripped.
     function _increase(
         Books storage b,
@@ -270,20 +334,18 @@ library CopyEngine {
         Follow storage f,
         address pool,
         Market memory m,
-        int256 mid,
+        int256 cur,
         int256 target,
         bool isBid
     ) internal returns (uint256 price, bool capped, bool stopped, int256 equity) {
-        // a flip whose closing leg did not complete waits for the next sync
-        if (mid != 0 && (mid > 0) != (target > 0)) return (0, false, false, 0);
         int256 clamped;
         (clamped, capped) = PolicyLib.clampNotional(target, m.mark, m.oneBase, f.policy.maxNotional);
-        uint256 have = _abs(mid);
+        uint256 have = _abs(cur);
         uint256 want = _abs(clamped);
         if (want <= have) return (0, false, false, 0);
         uint256 qty = PolicyLib.toLots(want - have, m.lot);
         if (qty == 0 || qty < m.minQty) return (0, false, false, 0);
-        int256 expected = isBid ? mid + int256(qty) : mid - int256(qty);
+        int256 expected = isBid ? cur + int256(qty) : cur - int256(qty);
 
         Reason r;
         (r, equity) = _gate(b, e, f, pool, PolicyLib.notional(expected, m.mark, m.oneBase));
@@ -301,20 +363,61 @@ library CopyEngine {
 
     // ---------------------------------------------------------------- theme sync
 
-    /// @dev Moves a theme follower's whole book toward the theme. Phase A: per-market reductions (a dropped
-    /// leg's target is flat), never gated and kept whatever follows. Phase B: every increase the basket
-    /// needs, as one set behind the theme-level gates, filled all-or-nothing by applyIncreases. A leg
-    /// whose market cannot be read, whose flip did not close, or that is too small to open holds the whole
-    /// set back. A leg on the right side within THEME_DRIFT_BPS of its target is left alone. When every
-    /// leg ends at target, `version` is recorded as synced.
+    /// @dev Both halves of a theme sync, back to back; an equity stop pauses and flattens the follow.
     /// @return acted whether anything was sent or refused
     function _syncTheme(Books storage b, Env memory e, Follow storage f, Leg[] memory legs, uint32 version)
         internal
         returns (bool acted)
     {
+        acted = _themeExit(b, e, f, legs);
+        (bool entered, bool stopped, int256 equity) = _themeEntry(b, e, f, legs, version);
+        if (stopped) _stop(b, e, f, equity);
+        return acted || entered;
+    }
+
+    /// @dev Phase A: adds new legs to the follow's markets, then makes every reduction the basket needs (a
+    /// dropped leg's target is flat, a flip closes here). Never gated, so it stands whatever phase B does. A
+    /// leg on the right side within THEME_DRIFT_BPS of its target is left alone. Unreadable markets are
+    /// reported by phase B.
+    function _themeExit(Books storage b, Env memory e, Follow storage f, Leg[] memory legs)
+        internal
+        returns (bool acted)
+    {
         address follower = e.follower;
         bytes32 sourceId = f.sourceId;
-        bool complete = _allowLegs(b, follower, sourceId, legs);
+        acted = !_allowLegs(b, follower, sourceId, legs);
+        address[] storage pools = b.synced[follower];
+        Policy memory p = f.policy;
+        for (uint256 i; i < pools.length; ++i) {
+            address pool = pools[i];
+            int256 cur = _size(e.bank, follower, pool);
+            if (cur == 0) continue;
+            (bool ok, Market memory m) = _market(follower, sourceId, pool, false);
+            if (!ok) {
+                acted = true;
+                continue;
+            }
+            (int256 target, bool capped) = _legTarget(p, _weight(legs, pool), m);
+            if (_settled(cur, target, m)) continue;
+            (uint256 reduceQty, bool reduceIsBid,,) = PolicyLib.split(cur, target);
+            if (reduceQty == 0) continue;
+            (uint256 price, int256 mid) = _reduce(e, f, pool, m, cur, reduceQty, reduceIsBid);
+            if (price != 0) acted = true;
+            if (mid != cur) emit Copied(follower, sourceId, pool, cur, mid, price, capped);
+        }
+    }
+
+    /// @dev Phase B: every increase the basket needs, as one set behind the theme-level gates, filled
+    /// all-or-nothing by applyIncreases. A leg left out by the MAX_JOIN_POOLS bound, whose market cannot be
+    /// read, whose flip did not close, or that is too small to open holds the whole set back. When every leg
+    /// ends at target, `version` is recorded as synced. Reports an equity stop, never acts on it.
+    function _themeEntry(Books storage b, Env memory e, Follow storage f, Leg[] memory legs, uint32 version)
+        internal
+        returns (bool acted, bool stopped, int256 equity)
+    {
+        address follower = e.follower;
+        bytes32 sourceId = f.sourceId;
+        bool complete = _legsAllowed(b, follower, legs);
         acted = !complete;
         address[] storage pools = b.synced[follower];
         uint256 n = pools.length;
@@ -325,18 +428,16 @@ library CopyEngine {
             s.pool = pools[i];
             s.cur = _size(e.bank, follower, s.pool);
             s.mid = s.cur;
-            for (uint256 j; j < legs.length; ++j) {
-                if (legs[j].pool == s.pool) s.weight = legs[j].weightBps;
-            }
+            s.weight = _weight(legs, s.pool);
             if (s.cur != 0) open = true;
         }
         if (!open) {
-            // nothing to reduce: a gate that already fails is reported without reading any market
+            // nothing held: a gate that already fails is reported without reading any market
             Reason early = _earlyGate(e, f);
             if (early != Reason.None) {
                 emit Refused(follower, sourceId, address(0), early, "");
                 f.lastSyncComplete = false;
-                return true;
+                return (true, false, 0);
             }
         }
 
@@ -344,28 +445,17 @@ library CopyEngine {
         for (uint256 i; i < n; ++i) {
             ThemePool memory s = ps[i];
             if (s.weight == 0 && s.cur == 0) continue; // a dropped leg already closed
-            (s.ok, s.m) = _market(follower, sourceId, s.pool);
+            (s.ok, s.m) = _market(follower, sourceId, s.pool, true);
             if (!s.ok) {
                 acted = true;
                 if (s.weight != 0) complete = false;
                 continue;
             }
-            if (s.weight != 0) {
-                int256 raw = PolicyLib.themeTarget(p.allocation, s.weight, s.m.mark, s.m.oneBase);
-                (s.target, s.capped) = PolicyLib.clampNotional(raw, s.m.mark, s.m.oneBase, p.maxNotional);
-            }
-            if (_settled(s.cur, s.target, s.m)) continue;
-            (uint256 reduceQty, bool reduceIsBid,,) = PolicyLib.split(s.cur, s.target);
-            if (reduceQty != 0) {
-                (s.price, s.mid) = _reduce(e, f, s.pool, s.m, s.cur, reduceQty, reduceIsBid);
-                if (s.price != 0) acted = true;
-            }
+            (s.target, s.capped) = _legTarget(p, s.weight, s.m);
         }
 
         (LegOrder[] memory orders, uint256 total, bool setOk) = _increaseSet(follower, sourceId, ps, p.bandBps);
         if (!setOk || orders.length != 0) acted = true;
-        bool stopped;
-        int256 equity;
         if (orders.length != 0 && complete && setOk) {
             Reason r;
             (r, equity) = _gate(b, e, f, address(0), total);
@@ -392,18 +482,32 @@ library CopyEngine {
         }
         if (done && f.syncedVersion != version) f.syncedVersion = version;
         if (f.lastSyncComplete != done) f.lastSyncComplete = done;
-        if (stopped) _stop(b, e, f, equity);
     }
 
-    /// @dev True when a theme sync leaves `size` alone against `target`: equal, on the same side within
-    /// THEME_DRIFT_BPS of it, or a move below one lot or the venue minimum.
+    /// @dev A leg's target: flat when it is not a current leg, else sized from the allocation and clamped.
+    function _legTarget(Policy memory p, int32 weight, Market memory m) internal pure returns (int256, bool) {
+        if (weight == 0) return (0, false);
+        int256 raw = PolicyLib.themeTarget(p.allocation, weight, m.mark, m.oneBase);
+        return PolicyLib.clampNotional(raw, m.mark, m.oneBase, p.maxNotional);
+    }
+
+    function _weight(Leg[] memory legs, address pool) internal pure returns (int32 w) {
+        for (uint256 j; j < legs.length; ++j) {
+            if (legs[j].pool == pool) w = legs[j].weightBps;
+        }
+    }
+
+    /// @dev True when a theme sync leaves `size` alone against `target`: equal; on the same side within
+    /// THEME_DRIFT_BPS of it; or, on the same side or against a flat target, a move below one lot or the
+    /// venue minimum (dust the venue cannot take).
     function _settled(int256 size, int256 target, Market memory m) internal pure returns (bool) {
         if (size == target) return true;
-        if (size == 0 || target == 0 || (size > 0) != (target > 0)) return false;
+        bool sameSide = size != 0 && target != 0 && (size > 0) == (target > 0);
+        if (!sameSide && target != 0) return false;
         uint256 have = _abs(size);
         uint256 want = _abs(target);
         uint256 gap = have > want ? have - want : want - have;
-        if (gap * 1e4 < THEME_DRIFT_BPS * want) return true;
+        if (sameSide && gap * 1e4 < THEME_DRIFT_BPS * want) return true;
         gap = PolicyLib.toLots(gap, m.lot);
         return gap == 0 || gap < m.minQty;
     }
@@ -429,11 +533,20 @@ library CopyEngine {
         }
     }
 
-    /// @dev The increases the basket needs after the reductions, and the notional of the whole book once
-    /// they fill (an unreadable market holding a position makes it unbounded, failing a total cap closed).
-    /// `ok` is false when a leg cannot take its part: its flip did not close, or it is not open and its size
-    /// rounds below one lot or the venue minimum. Such a leg is reported and holds the set back; a top-up of
-    /// an open leg that small is skipped.
+    /// @dev Whether every leg is in the follow's markets (phase A added all the bound let in).
+    function _legsAllowed(Books storage b, address follower, Leg[] memory legs) internal view returns (bool) {
+        mapping(address => bool) storage allowed = b.allowed[follower][b.epoch[follower]];
+        for (uint256 i; i < legs.length; ++i) {
+            if (!allowed[legs[i].pool]) return false;
+        }
+        return true;
+    }
+
+    /// @dev The increases the basket needs from where phase A left it, and the notional of the whole book
+    /// once they fill (an unreadable market holding a position makes it unbounded, failing a total cap
+    /// closed). `ok` is false when a leg cannot take its part: its flip did not close, its target rounds to
+    /// zero, or it is not open and its size rounds below one lot or the venue minimum. Such a leg is
+    /// reported and holds the set back; a top-up of an open leg that small is skipped.
     function _increaseSet(address follower, bytes32 sourceId, ThemePool[] memory ps, uint16 bandBps)
         internal
         returns (LegOrder[] memory orders, uint256 total, bool ok)
@@ -449,7 +562,7 @@ library CopyEngine {
                 continue;
             }
             int256 end = s.mid;
-            if (s.weight != 0 && (s.mid == 0 || !_settled(s.mid, s.target, s.m))) {
+            if (s.weight != 0 && (s.mid == 0 || s.target == 0 || !_settled(s.mid, s.target, s.m))) {
                 uint256 want = _abs(s.target);
                 uint256 have = _abs(s.mid);
                 bool failed = want == 0 || (have != 0 && (s.mid > 0) != (s.target > 0));
@@ -512,8 +625,8 @@ library CopyEngine {
         return Reason.None;
     }
 
-    /// @dev Increase gates in order (the allowlist is enforced earlier, in _sync). EquityFloor also returns
-    /// the equity read for the stop; an unreadable account health refuses the increase without stopping.
+    /// @dev Increase gates in order (the allowlist is enforced earlier). EquityFloor also returns the equity
+    /// read for the stop; an unreadable account health refuses the increase without stopping.
     /// `newNotional` is the notional of `pool` after the increase, or with `pool` zero (a theme's set) the
     /// notional of the follow's whole book after it.
     function _gate(Books storage b, Env memory e, Follow storage f, address pool, uint256 newNotional)
@@ -539,16 +652,23 @@ library CopyEngine {
         }
         if (e.tank < MIN_TANK_FOR_INCREASE) return (Reason.TankEmpty, equity);
         address gate = e.riskGate;
-        if (gate != address(0)) {
-            uint256 before = gasleft();
-            try IRiskGate(gate).allowIncrease(f.sourceId) returns (bool allowed) {
-                if (!allowed) return (Reason.RiskGate, equity);
-            } catch (bytes memory err) {
-                _revertIfStarved(err, before);
-                return (Reason.RiskGate, equity);
-            }
-        }
+        if (gate != address(0) && !_gateAllows(gate, f.sourceId)) return (Reason.RiskGate, equity);
         return (Reason.None, equity);
+    }
+
+    /// @dev Asks the risk gate on a fixed budget, reading at most one word back. Anything but a clean `true`
+    /// (a revert, an answer that is not a bool, no code, a burnt budget) refuses the increase. Only when the
+    /// caller cannot fund the budget does the sync abort as out of gas.
+    function _gateAllows(address gate, bytes32 sourceId) internal view returns (bool allowed) {
+        if (gasleft() < RISK_GATE_GAS * 64 / 63 + 10_000) revert OutOfGasInSync();
+        bytes4 sel = IRiskGate.allowIncrease.selector;
+        assembly ("memory-safe") {
+            let p := mload(0x40)
+            mstore(p, sel)
+            mstore(add(p, 4), sourceId)
+            let ok := staticcall(RISK_GATE_GAS, gate, p, 36, p, 32)
+            allowed := and(and(ok, gt(returndatasize(), 31)), eq(mload(p), 1))
+        }
     }
 
     /// @dev Sum of the follower's other synced positions at mark plus `sum`, against `cap`.
@@ -588,11 +708,12 @@ library CopyEngine {
 
     // ---------------------------------------------------------------- stop
 
+    /// @dev Pauses first, so the stop stands even if a close cannot complete, then closes every synced position.
     function _stop(Books storage b, Env memory e, Follow storage f, int256 equity) internal {
-        _flatten(b, e, f);
         f.paused = true;
         f.lastSyncComplete = false;
         emit Stopped(e.follower, equity);
+        _flatten(b, e, f);
     }
 
     /// @return closed whether every synced position is zero afterwards
@@ -601,16 +722,19 @@ library CopyEngine {
         closed = true;
         for (uint256 i; i < pools.length; ++i) {
             address pool = pools[i];
-            _sync(b, e, f, pool, 0);
+            _exitTrader(b, e, f, pool, 0);
             if (_size(e.bank, e.follower, pool) != 0) closed = false;
         }
     }
 
     // ---------------------------------------------------------------- venue
 
-    /// @dev Reads mark and book parameters. A reverting or zero read is reported (with the revert data)
-    /// and skips the pool.
-    function _market(address follower, bytes32 sourceId, address pool) internal returns (bool, Market memory m) {
+    /// @dev Reads mark and book parameters. A reverting or zero read skips the pool, and is reported (with
+    /// the revert data) when `report` is set.
+    function _market(address follower, bytes32 sourceId, address pool, bool report)
+        internal
+        returns (bool, Market memory m)
+    {
         bytes memory err;
         uint256 before = gasleft();
         try IPerpPool(pool).getMarkPrice() returns (uint256 x) {
@@ -640,12 +764,14 @@ library CopyEngine {
             }
         }
         if (m.mark == 0 || m.tick == 0 || m.lot == 0 || m.oneBase == 0) {
-            emit Refused(follower, sourceId, pool, Reason.VenueRejected, err);
+            if (report) emit Refused(follower, sourceId, pool, Reason.VenueRejected, err);
             return (false, m);
         }
         return (true, m);
     }
 
+    /// @dev Places one order. Any answer but a clean (true, id) is reported, including one that does not
+    /// decode, so an order never reverts the sync it belongs to (only running out of gas does).
     /// @return filled false when the venue reported no fill or rejected the order (already reported)
     function _place(
         address follower,
@@ -658,17 +784,22 @@ library CopyEngine {
     ) internal returns (bool filled) {
         uint64 expiry = uint64((block.timestamp + ORDER_TTL) * 1e9);
         uint256 before = gasleft();
-        try IPerpPool(pool).placeOrderFor(follower, isBid, 0, price, qty, expiry, orderType, 0, address(0), 0) returns (
-            bool success, uint128
-        ) {
-            if (success) return true;
-            emit Refused(follower, sourceId, pool, Reason.BandUnfilled, "");
-        } catch (bytes memory err) {
-            _revertIfStarved(err, before);
-            bytes4 sel = bytes4(err);
-            Reason r = sel == IOC_NO_FILL || sel == FOK_NO_FILL ? Reason.BandUnfilled : Reason.VenueRejected;
-            emit Refused(follower, sourceId, pool, r, err);
+        (bool ok, bytes memory ret) = pool.call(
+            abi.encodeCall(
+                IPerpPool.placeOrderFor, (follower, isBid, 0, price, qty, expiry, orderType, 0, address(0), 0)
+            )
+        );
+        Reason r = Reason.VenueRejected;
+        if (!ok) {
+            _revertIfStarved(ret, before);
+            bytes4 sel = bytes4(ret);
+            if (sel == IOC_NO_FILL || sel == FOK_NO_FILL) r = Reason.BandUnfilled;
+        } else if (ret.length >= 64) {
+            uint256 success = abi.decode(ret, (uint256));
+            if (success == 1) return true;
+            if (success == 0) (r, ret) = (Reason.BandUnfilled, "");
         }
+        emit Refused(follower, sourceId, pool, r, ret);
         return false;
     }
 

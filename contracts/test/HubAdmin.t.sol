@@ -104,6 +104,7 @@ contract HubAdminTest is Base {
     }
 
     function _fire(uint256 subId, address source, MockPerpPool pool) internal {
+        vm.prank(address(this), address(hub)); // the hub's own subscription: the hub is the origin
         reactivity.fire(subId, address(bank), _topics(source, pool), "");
     }
 
@@ -133,7 +134,7 @@ contract HubAdminTest is Base {
         vm.expectRevert(_unauthorized(stranger));
         hub.setSubParams(0, 20 gwei, 1, 1, false);
         vm.expectRevert(_unauthorized(stranger));
-        hub.setGasParams(8_000_000, 20_000_000, 90_000_000, 1_200_000, 30_000);
+        hub.setGasParams(8_000_000, 20_000_000, 90_000_000, 1_200_000, 30_000, 300_000);
         vm.expectRevert(_unauthorized(stranger));
         hub.pauseNewFollows(true);
         vm.expectRevert(_unauthorized(stranger));
@@ -143,6 +144,20 @@ contract HubAdminTest is Base {
         vm.expectRevert(_unauthorized(stranger));
         hub.forceResubscribe(sid, 0);
         vm.stopPrank();
+    }
+
+    // R31: ownership cannot be renounced, so the admin surface stays reachable; it still moves in two steps.
+    function test_renounceOwnership_disabled() public {
+        vm.prank(owner);
+        vm.expectRevert(CopybookHub.RenounceDisabled.selector);
+        hub.renounceOwnership();
+        assertEq(hub.owner(), owner);
+        vm.prank(owner);
+        hub.transferOwnership(stranger);
+        assertEq(hub.owner(), owner);
+        vm.prank(stranger);
+        hub.acceptOwnership();
+        assertEq(hub.owner(), stranger);
     }
 
     // ---------- risk gate ----------
@@ -177,34 +192,73 @@ contract HubAdminTest is Base {
         assertEq(_size(btc, a), 0);
     }
 
+    // R29: the gate must be a contract (address(0) turns it off).
+    function test_setRiskGate_rejectsAccountsWithoutCode() public {
+        vm.startPrank(owner);
+        vm.expectRevert(abi.encodeWithSelector(CopybookHub.InvalidParam.selector, uint8(1)));
+        hub.setRiskGate(address(0xBEEF));
+        hub.setRiskGate(address(new SwitchGate()));
+        hub.setRiskGate(address(0));
+        vm.stopPrank();
+        assertEq(hub.riskGate(), address(0));
+    }
+
     // ---------- subscription parameters ----------
 
+    // R30/R31: fees capped at MAX_FEE_PER_GAS with room for the 6 gwei base fee; every gas limit at most 200M
+    // and enough for the handler's floor and tail reserve (8M + 1.2M + 30k + 2M = 11.23M by default).
     function test_setSubParams_bounds() public {
+        uint64 need = 11_230_000;
         vm.startPrank(owner);
-        vm.expectRevert(abi.encodeWithSelector(CopybookHub.InvalidParam.selector, uint8(3)));
-        hub.setSubParams(0, 20 gwei, 0, 1, false);
-        vm.expectRevert(abi.encodeWithSelector(CopybookHub.InvalidParam.selector, uint8(3)));
-        hub.setSubParams(0, 20 gwei, uint64(MAX_GAS + 1), 1, false);
-        vm.expectRevert(abi.encodeWithSelector(CopybookHub.InvalidParam.selector, uint8(4)));
-        hub.setSubParams(0, 20 gwei, 1, 0, false);
-        vm.expectRevert(abi.encodeWithSelector(CopybookHub.InvalidParam.selector, uint8(4)));
-        hub.setSubParams(0, 20 gwei, 1, uint64(MAX_GAS + 1), false);
+        assertEq(hub.MAX_FEE_PER_GAS(), 100 gwei);
         vm.expectRevert(abi.encodeWithSelector(CopybookHub.InvalidParam.selector, uint8(2)));
-        hub.setSubParams(1 gwei, 7 gwei - 1, 1, 1, false);
+        hub.setSubParams(0, 100 gwei + 1, need, need, false);
         vm.expectRevert(abi.encodeWithSelector(CopybookHub.InvalidParam.selector, uint8(2)));
-        hub.setSubParams(type(uint64).max, type(uint64).max, 1, 1, false);
+        hub.setSubParams(0, 6 gwei - 1, need, need, false);
+        vm.expectRevert(abi.encodeWithSelector(CopybookHub.InvalidParam.selector, uint8(2)));
+        hub.setSubParams(type(uint64).max - 6 gwei, type(uint64).max, need, need, false);
+        vm.expectRevert(abi.encodeWithSelector(CopybookHub.InvalidParam.selector, uint8(1)));
+        hub.setSubParams(1 gwei, 7 gwei - 1, need, need, false);
+        vm.expectRevert(abi.encodeWithSelector(CopybookHub.InvalidParam.selector, uint8(1)));
+        hub.setSubParams(94 gwei + 1, 100 gwei, need, need, false);
+        vm.expectRevert(abi.encodeWithSelector(CopybookHub.InvalidParam.selector, uint8(3)));
+        hub.setSubParams(0, 20 gwei, uint64(MAX_GAS + 1), need, false);
+        vm.expectRevert(abi.encodeWithSelector(CopybookHub.InvalidParam.selector, uint8(4)));
+        hub.setSubParams(0, 20 gwei, need, uint64(MAX_GAS + 1), false);
+        vm.expectRevert(CopybookHub.GasLimitTooLow.selector);
+        hub.setSubParams(0, 20 gwei, need - 1, need, false);
+        vm.expectRevert(CopybookHub.GasLimitTooLow.selector);
+        hub.setSubParams(0, 20 gwei, need, need - 1, false);
+        vm.expectRevert(CopybookHub.GasLimitTooLow.selector);
+        hub.setSubParams(0, 20 gwei, 0, need, false);
 
         // the edges are accepted
         vm.expectEmit(false, false, false, true, address(hub));
-        emit CopybookHub.SubParamsSet(1 gwei, 7 gwei, 1, uint64(MAX_GAS), true);
-        hub.setSubParams(1 gwei, 7 gwei, 1, uint64(MAX_GAS), true);
+        emit CopybookHub.SubParamsSet(94 gwei, 100 gwei, need, uint64(MAX_GAS), true);
+        hub.setSubParams(94 gwei, 100 gwei, need, uint64(MAX_GAS), true);
+        hub.setSubParams(0, 6 gwei, need, need, false);
         vm.stopPrank();
         (uint64 prio, uint64 maxFee, uint64 traderGas, uint64 themeGas, bool guaranteed) = hub.subParams();
-        assertEq(prio, 1 gwei);
-        assertEq(maxFee, 7 gwei);
-        assertEq(traderGas, 1);
-        assertEq(themeGas, MAX_GAS);
-        assertTrue(guaranteed);
+        assertEq(prio, 0);
+        assertEq(maxFee, 6 gwei);
+        assertEq(traderGas, need);
+        assertEq(themeGas, need);
+        assertFalse(guaranteed);
+    }
+
+    // Regression (review I2): no fee ceiling let the owner set a live group's priority fee to ~2^64 wei per gas
+    // through forceResubscribe. The ceiling now refuses it, so the live group keeps sane fees.
+    function test_feeCeiling_keepsLiveGroupFees() public {
+        _follow(_f(1), trader);
+        vm.startPrank(owner);
+        vm.expectRevert(abi.encodeWithSelector(CopybookHub.InvalidParam.selector, uint8(2)));
+        hub.setSubParams(type(uint64).max - 6 gwei, type(uint64).max, 200_000_000, 200_000_000, true);
+        hub.forceResubscribe(sid, 0);
+        vm.stopPrank();
+        ISomniaReactivityPrecompile.SubscriptionData memory d = _subOf(hub.subscriptionOf(sid, 0));
+        assertEq(d.priorityFeePerGas, 0);
+        assertEq(d.maxFeePerGas, 20 gwei);
+        assertLe(d.maxFeePerGas, hub.MAX_FEE_PER_GAS());
     }
 
     // New parameters reach groups opened or subscribed again afterwards; a live subscription keeps its own.
@@ -237,31 +291,67 @@ contract HubAdminTest is Base {
     function test_setGasParams_bounds() public {
         vm.startPrank(owner);
         vm.expectRevert(abi.encodeWithSelector(CopybookHub.InvalidParam.selector, uint8(1)));
-        hub.setGasParams(999_999, 20_000_000, 90_000_000, 1_200_000, 30_000);
+        hub.setGasParams(999_999, 20_000_000, 90_000_000, 1_200_000, 30_000, 300_000);
         vm.expectRevert(abi.encodeWithSelector(CopybookHub.InvalidParam.selector, uint8(2)));
-        hub.setGasParams(8_000_000, 7_999_999, 90_000_000, 1_200_000, 30_000);
+        hub.setGasParams(8_000_000, 7_999_999, 90_000_000, 1_200_000, 30_000, 300_000);
         vm.expectRevert(abi.encodeWithSelector(CopybookHub.InvalidParam.selector, uint8(2)));
-        hub.setGasParams(8_000_000, uint64(MAX_GAS + 1), 90_000_000, 1_200_000, 30_000);
+        hub.setGasParams(8_000_000, uint64(MAX_GAS + 1), 90_000_000, 1_200_000, 30_000, 300_000);
         vm.expectRevert(abi.encodeWithSelector(CopybookHub.InvalidParam.selector, uint8(3)));
-        hub.setGasParams(8_000_000, 20_000_000, 7_999_999, 1_200_000, 30_000);
+        hub.setGasParams(8_000_000, 20_000_000, 7_999_999, 1_200_000, 30_000, 300_000);
         vm.expectRevert(abi.encodeWithSelector(CopybookHub.InvalidParam.selector, uint8(3)));
-        hub.setGasParams(8_000_000, 20_000_000, uint64(MAX_GAS + 1), 1_200_000, 30_000);
+        hub.setGasParams(8_000_000, 20_000_000, uint64(MAX_GAS + 1), 1_200_000, 30_000, 300_000);
         vm.expectRevert(abi.encodeWithSelector(CopybookHub.InvalidParam.selector, uint8(4)));
-        hub.setGasParams(8_000_000, 20_000_000, 90_000_000, 999_999, 30_000);
+        hub.setGasParams(8_000_000, 20_000_000, 90_000_000, 999_999, 30_000, 300_000);
         vm.expectRevert(abi.encodeWithSelector(CopybookHub.InvalidParam.selector, uint8(5)));
-        hub.setGasParams(8_000_000, 20_000_000, 90_000_000, 1_200_000, 19_999);
+        hub.setGasParams(8_000_000, 20_000_000, 90_000_000, 1_200_000, 19_999, 300_000);
+        vm.expectRevert(abi.encodeWithSelector(CopybookHub.InvalidParam.selector, uint8(6)));
+        hub.setGasParams(8_000_000, 20_000_000, 90_000_000, 1_200_000, 30_000, 19_999);
+        vm.expectRevert(abi.encodeWithSelector(CopybookHub.InvalidParam.selector, uint8(6)));
+        hub.setGasParams(8_000_000, 20_000_000, 90_000_000, 1_200_000, 30_000, 2_000_001);
+        // the subscriptions' 200M gas limits must still fund floor + tail + one deferral + 2M
+        vm.expectRevert(CopybookHub.GasLimitTooLow.selector);
+        hub.setGasParams(196_980_001, uint64(MAX_GAS), uint64(MAX_GAS), 1_000_000, 20_000, 300_000);
+        hub.setGasParams(196_980_000, uint64(MAX_GAS), uint64(MAX_GAS), 1_000_000, 20_000, 300_000);
 
         // the edges are accepted
         vm.expectEmit(false, false, false, true, address(hub));
-        emit CopybookHub.GasParamsSet(1_000_000, 1_000_000, uint64(MAX_GAS), 1_000_000, 20_000);
-        hub.setGasParams(1_000_000, 1_000_000, uint64(MAX_GAS), 1_000_000, 20_000);
+        emit CopybookHub.GasParamsSet(1_000_000, 1_000_000, uint64(MAX_GAS), 1_000_000, 20_000, 20_000);
+        hub.setGasParams(1_000_000, 1_000_000, uint64(MAX_GAS), 1_000_000, 20_000, 20_000);
+        hub.setGasParams(1_000_000, 1_000_000, uint64(MAX_GAS), 1_000_000, 20_000, 2_000_000);
         vm.stopPrank();
-        (uint64 floor, uint64 cap, uint64 themeCap, uint64 tailBase, uint64 perDefer) = hub.gasParams();
+        (uint64 floor, uint64 cap, uint64 themeCap, uint64 tailBase, uint64 perDefer, uint64 overhead) = hub.gasParams();
         assertEq(floor, 1_000_000);
         assertEq(cap, 1_000_000);
         assertEq(themeCap, MAX_GAS);
         assertEq(tailBase, 1_000_000);
         assertEq(perDefer, 20_000);
+        assertEq(overhead, 2_000_000);
+    }
+
+    // R32: the fixed charge overhead is a gas parameter (default 300k), billed on top of measured gas.
+    function test_chargeOverhead_isTunable() public {
+        (,,,,, uint64 overhead) = hub.gasParams();
+        assertEq(overhead, 300_000);
+        address a = _f(1);
+        _follow(a, trader);
+        address[] memory eth1 = new address[](1);
+        eth1[0] = address(eth);
+        vm.deal(_f(2), 1 ether);
+        vm.prank(_f(2));
+        hub.follow{value: TANK}(SourceKind.Trader, uint256(uint160(trader)), _policy(), eth1);
+        vm.fee(6 gwei);
+        // a BTC event: nothing to do for the ETH-only follower, so it pays the overhead alone, silently
+        _move(btc, trader, 50_000);
+        uint256 t0 = hub.tankOf(_f(2));
+        _fire(1, trader, btc);
+        assertEq(t0 - hub.tankOf(_f(2)), 300_000 * 6 gwei);
+
+        vm.prank(owner);
+        hub.setGasParams(8_000_000, 20_000_000, 90_000_000, 1_200_000, 30_000, 1_000_000);
+        _move(btc, trader, 80_000);
+        t0 = hub.tankOf(_f(2));
+        _fire(1, trader, btc);
+        assertEq(t0 - hub.tankOf(_f(2)), 1_000_000 * 6 gwei);
     }
 
     // The handler runs on the new budget at once: a floor above what the event brings defers the group.
@@ -270,14 +360,16 @@ contract HubAdminTest is Base {
         _follow(a, trader);
         _move(btc, trader, 50_000);
         vm.prank(owner);
-        hub.setGasParams(150_000_000, 150_000_000, 150_000_000, 1_000_000, 20_000);
+        hub.setGasParams(150_000_000, 150_000_000, 150_000_000, 1_000_000, 20_000, 300_000);
         vm.expectEmit(true, false, false, true, address(hub));
         emit CopybookHub.GroupDeferred(sid, 0, 0);
+        vm.prank(address(this), address(hub));
         reactivity.fire{gas: 100_000_000}(1, address(bank), _topics(trader, btc), "");
         assertEq(_size(btc, a), 0);
 
         vm.prank(owner);
-        hub.setGasParams(8_000_000, 20_000_000, 90_000_000, 1_200_000, 30_000);
+        hub.setGasParams(8_000_000, 20_000_000, 90_000_000, 1_200_000, 30_000, 300_000);
+        vm.prank(address(this), address(hub));
         reactivity.fire{gas: 100_000_000}(1, address(bank), _topics(trader, btc), "");
         assertEq(_size(btc, a), 50_000);
     }

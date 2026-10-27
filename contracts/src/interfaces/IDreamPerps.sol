@@ -27,8 +27,6 @@ interface IPerpPool {
     function getOrderBookParameters() external view returns (OBParams memory);
 
     function getOneBase() external view returns (uint256);
-
-    function marginBank() external view returns (address);
 }
 
 /// @notice Minimal view of the dreamDEX margin bank as used by Copybook.

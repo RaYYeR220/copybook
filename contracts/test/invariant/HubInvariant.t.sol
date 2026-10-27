@@ -12,15 +12,29 @@ import {ThemeRegistry} from "../../src/ThemeRegistry.sol";
 import {Leg, Policy, Reason, SourceKind} from "../../src/Types.sol";
 import {IMarginBank, IRiskGate} from "../../src/interfaces/IDreamPerps.sol";
 
+/// A risk gate that allows, denies, burns its whole budget, or answers something that is not a bool.
 contract SwitchableGate is IRiskGate {
-    bool public allow = true;
+    uint8 public mode; // 0 allow, 1 deny, 2 burn, 3 garbage
 
-    function set(bool allow_) external {
-        allow = allow_;
+    function set(uint8 mode_) external {
+        mode = mode_;
     }
 
     function allowIncrease(bytes32) external view returns (bool) {
-        return allow;
+        uint8 m = mode;
+        if (m == 2) {
+            uint256 x;
+            while (true) {
+                x = uint256(keccak256(abi.encode(x)));
+            }
+        }
+        if (m == 3) {
+            assembly {
+                mstore(0, 7)
+                return(0, 32)
+            }
+        }
+        return m == 0;
     }
 }
 
@@ -282,7 +296,7 @@ contract HubHandler is Test {
     // ---------------------------------------------------------------- sources and venue
 
     /// A trader moves; every subscribed group of its source gets the venue's event.
-    function traderMove(uint256 tSeed, uint256 pSeed, uint256 sizeSeed) external {
+    function traderMove(uint256 tSeed, uint256 pSeed, uint256 sizeSeed, uint256 gasSeed) external {
         address t = _traders[tSeed % _traders.length];
         MockPerpPool pool = _pool(pSeed);
         _force(pool, t, _size(pool, sizeSeed));
@@ -291,12 +305,12 @@ contract HubHandler is Test {
         topics[1] = bytes32(uint256(uint160(t)));
         topics[2] = bytes32(uint256(uint160(address(pool))));
         _begin();
-        _fireAll(hub.sourceIdOf(SourceKind.Trader, uint256(uint160(t))), address(bank), topics);
+        _fireAll(hub.sourceIdOf(SourceKind.Trader, uint256(uint160(t))), address(bank), topics, gasSeed);
         _scan();
     }
 
     /// The creator rebalances a theme; every subscribed group of it gets the registry's event.
-    function rebalance(uint256 thSeed, uint256 legSeed) external {
+    function rebalance(uint256 thSeed, uint256 legSeed, uint256 gasSeed) external {
         uint256 id = _themeIds[thSeed % _themeIds.length];
         Leg[] memory legs = _legs(legSeed);
         vm.warp(block.timestamp + themes.MIN_REBALANCE_INTERVAL());
@@ -317,7 +331,7 @@ contract HubHandler is Test {
         topics[0] = THEME_REBALANCED;
         topics[1] = bytes32(id);
         _begin();
-        _fireAll(hub.sourceIdOf(SourceKind.Theme, id), address(themes), topics);
+        _fireAll(hub.sourceIdOf(SourceKind.Theme, id), address(themes), topics, gasSeed);
         _scan();
     }
 
@@ -341,11 +355,16 @@ contract HubHandler is Test {
 
     // ---------------------------------------------------------------- owner
 
+    /// The gate off, allowing, denying, burning its budget, answering garbage, or losing its code (as an
+    /// account without code would answer): increases may be refused, nothing else changes.
     function ownerRiskGate(uint256 mode) external {
-        mode %= 3; // 0 off, 1 allows, 2 denies
-        gate.set(mode == 1);
+        mode %= 6;
+        address g = address(gate);
+        if (mode == 5) g = address(new SwitchableGate());
+        else if (mode != 0) gate.set(uint8(mode - 1));
         vm.prank(owner);
-        hub.setRiskGate(mode == 0 ? address(0) : address(gate));
+        hub.setRiskGate(mode == 0 ? address(0) : g);
+        if (mode == 5) vm.etch(g, "");
     }
 
     function ownerPause(bool paused) external {
@@ -370,7 +389,7 @@ contract HubHandler is Test {
         uint64 cap = uint64(bound(seed >> 64, floor, 40_000_000));
         uint64 themeCap = uint64(bound(seed >> 128, floor, 150_000_000));
         vm.prank(owner);
-        hub.setGasParams(floor, cap, themeCap, 1_200_000, 30_000);
+        hub.setGasParams(floor, cap, themeCap, 1_200_000, 30_000, uint64(bound(seed >> 192, 20_000, 2_000_000)));
     }
 
     function ownerResubscribe(uint256 sSeed, uint256 gSeed) external {
@@ -446,12 +465,17 @@ contract HubHandler is Test {
 
     // ---------------------------------------------------------------- helpers
 
-    function _fireAll(bytes32 sid, address emitter, bytes32[] memory topics) internal {
+    /// Delivers the event to every subscribed group, each with a handler gas limit between 5M and 200M, through
+    /// the hub's own subscription (the hub is the transaction origin).
+    function _fireAll(bytes32 sid, address emitter, bytes32[] memory topics, uint256 gasSeed) internal {
         uint32 n = hub.groupCount(sid);
         for (uint32 g; g < n; ++g) {
             if (!hub.subscribed(sid, g)) continue;
             ++fires;
-            try REACTIVITY.fire(hub.subscriptionOf(sid, g), emitter, topics, "") {}
+            uint256 id = hub.subscriptionOf(sid, g);
+            uint256 gas = bound(uint256(keccak256(abi.encode(gasSeed, g))), 5_000_000, 200_000_000);
+            vm.prank(address(this), address(hub));
+            try REACTIVITY.fire{gas: gas}(id, emitter, topics, "") {}
             catch (bytes memory err) {
                 _unexpected(err);
             }

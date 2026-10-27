@@ -48,6 +48,9 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
     error InsufficientSurplus();
     error NotOrphan();
     error NoMembers();
+    error GasLimitTooLow();
+    error NotOwnSubscription();
+    error RenounceDisabled();
 
     event Followed(address indexed follower, bytes32 indexed sourceId, SourceKind kind, uint256 ref);
     event Unfollowed(address indexed follower, bytes32 indexed sourceId, bool flattened);
@@ -72,14 +75,20 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
     event Deferred(address indexed follower, bytes32 indexed sourceId);
     /// @notice The handler stopped early: members `fromIndex` onward of the group, as listed by
     /// membersOf at that block, were not synced and wait for catchUp. Read the list at the event's block:
-    /// an unfollow moves the group's last member into the leaver's seat.
+    /// an unfollow moves the group's last member into the leaver's seat. The member at `fromIndex` may
+    /// already have had its exits.
     event GroupDeferred(bytes32 indexed sourceId, uint32 group, uint256 fromIndex);
     event RiskGateSet(address gate);
     event SubParamsSet(
         uint64 priorityFeePerGas, uint64 maxFeePerGas, uint64 traderGasLimit, uint64 themeGasLimit, bool guaranteed
     );
     event GasParamsSet(
-        uint64 floor, uint64 perFollowerCap, uint64 themePerFollowerCap, uint64 tailBase, uint64 perDefer
+        uint64 floor,
+        uint64 perFollowerCap,
+        uint64 themePerFollowerCap,
+        uint64 tailBase,
+        uint64 perDefer,
+        uint64 chargeOverhead
     );
     event NewFollowsPaused(bool paused);
     event SurplusWithdrawn(address indexed to, uint256 amount);
@@ -94,16 +103,32 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
         bool guaranteed;
     }
 
-    /// @dev Gas budget of a group handler. Each member runs in a slot of at least `floor` and at most
-    /// `perFollowerCap` (`themePerFollowerCap` for a theme member, which syncs every leg); the handler
-    /// always keeps `tailBase + perDefer * remainingMembers` back so it can still report the rest of the
-    /// group as Deferred.
+    /// @dev Gas budget of a group handler. Each member runs its exits in one self-call on everything above
+    /// the reserve, then its increases in a second one of at least `floor` and at most `perFollowerCap`
+    /// (`themePerFollowerCap` for a theme member, which syncs every leg). The handler always keeps
+    /// `tailBase + perDefer * remainingMembers` back so it can still report the rest of the group as
+    /// deferred. Each member is billed its measured gas plus `chargeOverhead` for the shared work around it
+    /// (the tank write, a cold key on Somnia).
     struct GasParams {
         uint64 floor;
         uint64 perFollowerCap;
         uint64 themePerFollowerCap;
         uint64 tailBase;
         uint64 perDefer;
+        uint64 chargeOverhead;
+    }
+
+    /// @dev One event as every member's phases see it: the trader's pool and live size, or the theme's legs.
+    struct Delivery {
+        bytes32 sourceId;
+        uint32 group;
+        bool theme;
+        address pool;
+        int256 size;
+        Leg[] legs;
+        uint32 version;
+        uint256 cap;
+        uint256 rate;
     }
 
     uint256 public constant MIN_TANK = 0.2 ether;
@@ -118,8 +143,6 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
     uint256 public constant THEME_DRIFT_BPS = CopyEngine.THEME_DRIFT_BPS;
     bytes32 public constant POSITION_UPDATED_TOPIC = 0xf7816a375f0ca01053ed213b57908bff79f578810301d50971a5f685529b82de;
 
-    /// @dev Added to each follower's measured gas for the shared handler work around it.
-    uint256 public constant CHARGE_OVERHEAD_GAS = 60_000;
     /// @dev Somnia's minimum base fee; handler gas is never charged below it.
     uint256 public constant MIN_CHARGE_GAS_PRICE = 6 gwei;
     /// @dev Fixed budget for cancelling a subscription; an unfollow that empties a group must afford it.
@@ -134,6 +157,13 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
     /// @dev Admin floors for the handler budget: a member slot, and one deferral's log and slot read.
     uint256 internal constant MIN_SLOT_GAS = 1_000_000;
     uint256 internal constant MIN_PER_DEFER = 20_000;
+    uint256 internal constant MIN_CHARGE_OVERHEAD = 20_000;
+    uint256 internal constant MAX_CHARGE_OVERHEAD = 2_000_000;
+    /// @dev Room a subscription's gas limit keeps above the handler's floor and tail reserve for its own
+    /// dispatch and the event checks.
+    uint256 internal constant HANDLER_MARGIN_GAS = 2_000_000;
+    /// @dev Ceiling for a subscription's maxFeePerGas: handler fees come out of the balance that backs tanks.
+    uint256 public constant MAX_FEE_PER_GAS = 100 gwei;
 
     address internal constant REACTIVITY = address(0x0100);
 
@@ -185,7 +215,8 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
             perFollowerCap: 20_000_000,
             themePerFollowerCap: 90_000_000,
             tailBase: 1_200_000,
-            perDefer: 30_000
+            perDefer: 30_000,
+            chargeOverhead: 300_000
         });
         themeGroupSize = 2;
     }
@@ -308,9 +339,10 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
         CopyEngine.stop(_books, _env(follower), equity);
     }
 
-    /// @notice Subscribes a group again, with its relay, when the chain dropped its subscription while the
-    /// group still has members. A live hub-owned subscription, or a group without members, is left alone.
-    /// Fails closed: an answer the hub cannot read reverts instead of risking a duplicate subscription.
+    /// @notice Subscribes a group again, with its relay and the current subParams, when the chain dropped its
+    /// subscription while the group still has members. A live hub-owned subscription, or a group without
+    /// members, is left alone. Fails closed: an answer the hub cannot read reverts instead of risking a
+    /// duplicate subscription.
     function ensureSubscribed(bytes32 sourceId, uint32 group) external nonReentrant {
         address[] storage members = _members[sourceId][group];
         if (members.length == 0) return;
@@ -324,16 +356,21 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
         _resubscribe(sourceId, group, members[0]);
     }
 
-    /// @notice Entry point for a group's relay. The event only names the pool (trader) or the theme; the
+    /// @notice Entry point for a group's relay, run by the hub's own subscription only (Somnia makes the
+    /// subscription owner the transaction origin). The event only names the pool (trader) or the theme; the
     /// source is read live (the trader's position, the theme's legs), so a delayed or reordered event can
     /// never open what the source no longer holds.
-    /// Each member runs in its own self-call with a bounded gas slot (see GasParams), so one failure stays
-    /// with that member, and the handler always keeps enough back to stop cleanly with GroupDeferred, the
-    /// rest waiting for catchUp: when the next slot cannot be funded, or when a member runs out of gas in a
-    /// slot the handler had to cut short. A member that runs out of a full slot is Deferred alone. Members
-    /// pay their own gas from their tank. One with nothing to do is billed silently: a trader member only
-    /// the overhead (its no-op stops at the allowlist or one position read), a theme member the gas its sync
-    /// measured (a quiet rebalance still reads every leg; the hub does not fund a creator's rebalances).
+    /// Each member runs in two self-calls (see GasParams), so one member's failure stays with it. First its
+    /// exits, on everything above the reserve: they only reduce and stand whatever follows; if they run out
+    /// of gas the member is Deferred, unbilled. Then its increases in a bounded slot; an equity stop they
+    /// report is written here, before the closes it calls for, so the pause stands even if the closes run
+    /// out of gas (Deferred, that part unbilled). The handler always keeps enough back to stop cleanly with
+    /// GroupDeferred, the rest waiting for catchUp: when the next slot cannot be funded, or when a member's
+    /// increases run out of gas in a slot the handler had to cut short; increases that run out of a full slot
+    /// leave that member Deferred alone. Members pay their own gas from their tank. One with nothing to do is
+    /// billed silently: a trader member only the overhead (its no-op stops at the allowlist or one position
+    /// read), a theme member the gas its sync measured (a quiet rebalance still reads every leg; the hub does
+    /// not fund a creator's rebalances).
     function onSourceEvent(
         bytes32 sourceId,
         uint32 group,
@@ -345,29 +382,30 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
         nonReentrant
     {
         if (msg.sender != relayOf[sourceId][group]) revert NotRelay();
+        // a subscription someone else pointed at the relay cannot drive the group or bill its tanks
+        if (tx.origin != address(this)) revert NotOwnSubscription();
         GasParams memory gp = gasParams;
-        uint256 cap = gp.perFollowerCap;
-        address pool; // trader: the event's pool; theme: none
-        int256 size;
-        Leg[] memory legs;
-        uint32 version;
-        bool theme = emitter == address(themes);
-        if (theme) {
+        Delivery memory d;
+        d.sourceId = sourceId;
+        d.group = group;
+        d.cap = gp.perFollowerCap;
+        d.theme = emitter == address(themes);
+        if (d.theme) {
             if (
                 topics.length < 2 || sourceIdOf(SourceKind.Theme, uint256(topics[1])) != sourceId
                     || topics[0] != THEME_REBALANCED_TOPIC
             ) revert BadEvent();
-            (legs, version) = _liveTheme(uint256(topics[1]));
-            cap = gp.themePerFollowerCap;
+            (d.legs, d.version) = _liveTheme(uint256(topics[1]));
+            d.cap = gp.themePerFollowerCap;
         } else {
             if (
                 emitter != address(bank) || topics.length < 3 || topics[0] != POSITION_UPDATED_TOPIC
                     || sourceIdOf(SourceKind.Trader, uint256(topics[1])) != sourceId
             ) revert BadEvent();
-            pool = address(uint160(uint256(topics[2])));
-            size = bank.getPosition(address(uint160(uint256(topics[1]))), pool).size;
+            d.pool = address(uint160(uint256(topics[2])));
+            d.size = bank.getPosition(address(uint160(uint256(topics[1]))), d.pool).size;
         }
-        uint256 rate = block.basefee > MIN_CHARGE_GAS_PRICE ? block.basefee : MIN_CHARGE_GAS_PRICE;
+        d.rate = block.basefee > MIN_CHARGE_GAS_PRICE ? block.basefee : MIN_CHARGE_GAS_PRICE;
 
         address[] storage members = _members[sourceId][group];
         uint256 n = members.length;
@@ -375,70 +413,129 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
             // read before measuring, so a cold member slot is not paid out of the reserve
             address follower = members[i];
             uint256 reserve = gp.tailBase + (n - i) * gp.perDefer;
-            uint256 start = gasleft();
-            if (start < gp.floor + reserve) {
+            if (gasleft() < gp.floor + reserve) {
                 emit GroupDeferred(sourceId, group, i);
                 return;
             }
-            uint256 slot = start - reserve;
-            bool fullSlot = slot >= cap;
-            if (fullSlot) slot = cap;
-            uint256 spent;
-            bool reported = true;
-            (bool ok, bytes memory ret) = address(this).call{gas: slot}(
-                theme
-                    ? abi.encodeCall(this.syncThemeFromEvent, (sourceId, follower, legs, version))
-                    : abi.encodeCall(this.syncFollowerFromEvent, (sourceId, follower, pool, size))
-            );
-            if (ok) {
-                reported = abi.decode(ret, (bool));
-                if (reported || theme) spent = start - gasleft();
-            } else {
-                bytes memory err = ret;
-                bool oog =
-                    (err.length == 4 && bytes4(err) == OutOfGasInSync.selector) || CopyEngine.starved(err, start, slot);
-                if (!oog) {
-                    emit Refused(follower, sourceId, pool, Reason.VenueRejected, err);
-                } else if (fullSlot) {
-                    emit Deferred(follower, sourceId);
-                } else {
-                    // the handler ran short, not the member: it and the rest wait for catchUp, unbilled
-                    emit GroupDeferred(sourceId, group, i);
-                    return;
-                }
-                spent = start - gasleft();
-            }
-            // The tank may be a cold or missing key. Without that much headroom above the next member's
-            // reserve the charge is skipped rather than paid out of the reserve.
-            if (gasleft() >= COLD_KEY_GAS + reserve - gp.perDefer) {
-                _charge(follower, (spent + CHARGE_OVERHEAD_GAS) * rate, reported);
-            }
+            if (!_member(d, gp, follower, i, reserve)) return;
         }
     }
 
-    /// @notice One follower's share of a source event. Only callable by the hub itself, from onSourceEvent.
-    /// @return acted false when the pool is outside the follow or the follower already matches the source
-    function syncFollowerFromEvent(bytes32 sourceId, address follower, address pool, int256 sourceSize)
-        external
-        onlySelf
-        returns (bool acted)
+    /// @dev One member's share of an event: its exits, then its increases, then its bill.
+    /// @return more false when the handler stopped the group with GroupDeferred
+    function _member(Delivery memory d, GasParams memory gp, address follower, uint256 i, uint256 reserve)
+        internal
+        returns (bool more)
     {
-        if (_books.follows[follower].sourceId != sourceId) return false;
-        return CopyEngine.syncTrader(_books, _env(follower), pool, sourceSize);
+        uint256 start = gasleft();
+        bytes memory args = abi.encode(d.sourceId, follower, d.pool, d.size, d.legs, d.version);
+        (bool ok, bytes memory ret) = _phase(this.exitFromEvent.selector, args, start - reserve);
+        uint256 spent;
+        bool reported = true;
+        if (ok) {
+            reported = abi.decode(ret, (bool));
+            if (reported || d.theme) spent = start - gasleft();
+            (bool entered, uint256 entrySpent, bool entryActed) = _entryPhase(d, gp, follower, i, reserve, args);
+            if (!entered) return false;
+            spent += entrySpent;
+            reported = reported || entryActed;
+        } else if (_outOfGas(ret, start, start - reserve)) {
+            // never billed: a source must not drain tanks with exits too heavy to finish
+            emit Deferred(follower, d.sourceId);
+            return true;
+        } else {
+            emit Refused(follower, d.sourceId, d.pool, Reason.VenueRejected, ret);
+            spent = start - gasleft();
+        }
+        // The tank may be a cold or missing key. Without that much headroom above the next member's
+        // reserve the charge is skipped rather than paid out of the reserve.
+        if (gasleft() >= COLD_KEY_GAS + reserve - gp.perDefer) {
+            _charge(follower, (spent + gp.chargeOverhead) * d.rate, reported);
+        }
+        return true;
     }
 
-    /// @notice One theme follower's share of a rebalance, against the legs and version read once for the
-    /// event. Only callable by the hub itself, from onSourceEvent.
-    /// @return acted false when the follower no longer follows this theme, its book already matches this
-    /// version, or the sync found nothing to send or refuse
-    function syncThemeFromEvent(bytes32 sourceId, address follower, Leg[] calldata legs, uint32 version)
-        external
-        onlySelf
-        returns (bool acted)
-    {
+    /// @dev A member's increases, in a slot between the floor and the per-member cap, and the equity stop
+    /// they may report.
+    /// @return more false when the handler stopped the group with GroupDeferred (its exits are in; its
+    /// increases and the rest of the group wait for catchUp, unbilled)
+    /// @return spent the gas to bill for this part
+    /// @return acted whether it sent or refused anything
+    function _entryPhase(
+        Delivery memory d,
+        GasParams memory gp,
+        address follower,
+        uint256 i,
+        uint256 reserve,
+        bytes memory args
+    ) internal returns (bool more, uint256 spent, bool acted) {
+        uint256 start = gasleft();
+        if (start < gp.floor + reserve) {
+            emit GroupDeferred(d.sourceId, d.group, i);
+            return (false, 0, false);
+        }
+        uint256 slot = start - reserve;
+        bool fullSlot = slot >= d.cap;
+        if (fullSlot) slot = d.cap;
+        (bool ok, bytes memory ret) = _phase(this.entryFromEvent.selector, args, slot);
+        if (ok) {
+            bool stop;
+            int256 equity;
+            (acted, stop, equity) = abi.decode(ret, (bool, bool, int256));
+            if (acted || d.theme) spent = start - gasleft();
+            if (stop) spent += _stopFromEvent(d.sourceId, follower, equity, reserve);
+            return (true, spent, acted);
+        }
+        if (!_outOfGas(ret, start, slot)) {
+            emit Refused(follower, d.sourceId, d.pool, Reason.VenueRejected, ret);
+        } else if (fullSlot) {
+            emit Deferred(follower, d.sourceId);
+        } else {
+            // the handler ran short, not the member: it and the rest wait for catchUp, unbilled
+            emit GroupDeferred(d.sourceId, d.group, i);
+            return (false, 0, false);
+        }
+        return (true, start - gasleft(), true);
+    }
+
+    /// @notice Exit half of one member's share of an event: every reduction it calls for, never gated. Only
+    /// callable by the hub itself, from onSourceEvent.
+    /// @return acted false when the follower no longer follows this source, its theme book already matches
+    /// this version, or nothing needed reducing
+    function exitFromEvent(
+        bytes32 sourceId,
+        address follower,
+        address pool,
+        int256 sourceSize,
+        Leg[] calldata legs,
+        uint32 version
+    ) external onlySelf returns (bool) {
         CopyEngine.Follow storage f = _books.follows[follower];
-        if (f.sourceId != sourceId || _themeCurrent(f, version)) return false;
-        return CopyEngine.syncTheme(_books, _env(follower), legs, version);
+        if (!_eventFor(f, sourceId, version)) return false;
+        if (f.kind == SourceKind.Theme) return CopyEngine.exitTheme(_books, _env(follower), legs);
+        return CopyEngine.exitTrader(_books, _env(follower), pool, sourceSize);
+    }
+
+    /// @notice Entry half of one member's share of an event: its increases, behind every gate. An equity stop
+    /// is reported, not acted on: onSourceEvent pauses the follow and closes it. Only callable by the hub
+    /// itself, from onSourceEvent.
+    function entryFromEvent(
+        bytes32 sourceId,
+        address follower,
+        address pool,
+        int256 sourceSize,
+        Leg[] calldata legs,
+        uint32 version
+    ) external onlySelf returns (bool acted, bool stop, int256 equity) {
+        CopyEngine.Follow storage f = _books.follows[follower];
+        if (!_eventFor(f, sourceId, version)) return (false, false, 0);
+        if (f.kind == SourceKind.Theme) return CopyEngine.entryTheme(_books, _env(follower), legs, version);
+        return CopyEngine.entryTrader(_books, _env(follower), pool, sourceSize);
+    }
+
+    /// @notice The closes of an equity stop raised inside onSourceEvent. Only callable by the hub itself.
+    function flattenFromEvent(bytes32 sourceId, address follower) external onlySelf {
+        if (_books.follows[follower].sourceId == sourceId) CopyEngine.flatten(_books, _env(follower));
     }
 
     /// @notice A theme sync's increase set. Only callable by the hub itself: every leg fills completely
@@ -499,14 +596,19 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
     // reserve, and repairs subscriptions. Nothing here moves follower margin, calls a target of the
     // owner's choosing with data, or touches a tank.
 
-    /// @notice The gate consulted before every increase (address(0): none). Reductions never ask it.
+    /// @notice The gate consulted before every increase (address(0): none); it must be a contract. Reductions
+    /// never ask it, and a gate that does not answer `true` within its fixed budget only refuses increases.
     function setRiskGate(address gate) external onlyOwner {
+        if (gate != address(0) && gate.code.length == 0) revert InvalidParam(1);
         riskGate = gate;
         emit RiskGateSet(gate);
     }
 
-    /// @notice Subscription settings for groups opened or subscribed again from now on; live subscriptions
-    /// keep theirs. Gas limits 1..200M; maxFeePerGas at least the priority fee plus Somnia's 6 gwei base fee.
+    /// @notice Subscription settings for groups opened or subscribed again from now on (by a new member,
+    /// ensureSubscribed or forceResubscribe); live subscriptions keep theirs. maxFeePerGas at most
+    /// MAX_FEE_PER_GAS and at least the priority fee plus Somnia's 6 gwei base fee: handler fees come out of
+    /// the balance that backs the tanks. Each gas limit at most 200M and enough for the handler's floor and
+    /// tail reserve (see gasParams).
     function setSubParams(
         uint64 priorityFeePerGas,
         uint64 maxFeePerGas,
@@ -514,32 +616,45 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
         uint64 themeGasLimit,
         bool guaranteed
     ) external onlyOwner {
-        if (maxFeePerGas < uint256(priorityFeePerGas) + MIN_CHARGE_GAS_PRICE) {
+        if (maxFeePerGas > MAX_FEE_PER_GAS || maxFeePerGas < MIN_CHARGE_GAS_PRICE) {
             revert InvalidParam(2);
         }
-        if (traderGasLimit == 0 || traderGasLimit > MAX_HANDLER_GAS) revert InvalidParam(3);
-        if (themeGasLimit == 0 || themeGasLimit > MAX_HANDLER_GAS) revert InvalidParam(4);
+        if (priorityFeePerGas > maxFeePerGas - MIN_CHARGE_GAS_PRICE) revert InvalidParam(1);
+        if (traderGasLimit > MAX_HANDLER_GAS) revert InvalidParam(3);
+        if (themeGasLimit > MAX_HANDLER_GAS) revert InvalidParam(4);
+        GasParams memory gp = gasParams;
+        _checkFits(gp.floor, gp.tailBase, gp.perDefer, traderGasLimit, themeGasLimit);
         subParams = SubParams(priorityFeePerGas, maxFeePerGas, traderGasLimit, themeGasLimit, guaranteed);
         emit SubParamsSet(priorityFeePerGas, maxFeePerGas, traderGasLimit, themeGasLimit, guaranteed);
     }
 
     /// @notice The group handler's budget (see GasParams), used from the next event on. `floor` at least 1M;
     /// both caps between `floor` and 200M; `tailBase` at least 1M (Somnia's cold-key cost, so the handler can
-    /// always report a deferral); `perDefer` at least 20k.
+    /// always report a deferral); `perDefer` at least 20k; `chargeOverhead` 20k..2M. The subscription gas
+    /// limits in subParams must still fund the floor and the tail reserve.
     function setGasParams(
         uint64 floor,
         uint64 perFollowerCap,
         uint64 themePerFollowerCap,
         uint64 tailBase,
-        uint64 perDefer
+        uint64 perDefer,
+        uint64 chargeOverhead
     ) external onlyOwner {
         if (floor < MIN_SLOT_GAS) revert InvalidParam(1);
         if (perFollowerCap < floor || perFollowerCap > MAX_HANDLER_GAS) revert InvalidParam(2);
         if (themePerFollowerCap < floor || themePerFollowerCap > MAX_HANDLER_GAS) revert InvalidParam(3);
         if (tailBase < COLD_KEY_GAS) revert InvalidParam(4);
         if (perDefer < MIN_PER_DEFER) revert InvalidParam(5);
-        gasParams = GasParams(floor, perFollowerCap, themePerFollowerCap, tailBase, perDefer);
-        emit GasParamsSet(floor, perFollowerCap, themePerFollowerCap, tailBase, perDefer);
+        if (chargeOverhead < MIN_CHARGE_OVERHEAD || chargeOverhead > MAX_CHARGE_OVERHEAD) revert InvalidParam(6);
+        SubParams memory s = subParams;
+        _checkFits(floor, tailBase, perDefer, s.traderGasLimit, s.themeGasLimit);
+        gasParams = GasParams(floor, perFollowerCap, themePerFollowerCap, tailBase, perDefer, chargeOverhead);
+        emit GasParamsSet(floor, perFollowerCap, themePerFollowerCap, tailBase, perDefer, chargeOverhead);
+    }
+
+    /// @notice Disabled: the admin surface (risk gate, budgets, subscription repair) must stay reachable.
+    function renounceOwnership() public pure override {
+        revert RenounceDisabled();
     }
 
     /// @notice Stops new follows. Existing follows are untouched: they keep syncing both ways and can
@@ -572,7 +687,8 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
 
     /// @notice Recovery for a group whose subscription the chain dropped when ensureSubscribed cannot tell
     /// (the precompile reverts reading a removed id, so it fails closed): cancels the group's current id
-    /// (best effort, recorded as an orphan when that fails) and subscribes the group again with its relay.
+    /// (best effort, recorded as an orphan when that fails) and subscribes the group again with its relay and
+    /// the current subParams.
     function forceResubscribe(bytes32 sourceId, uint32 group) external nonReentrant onlyOwner {
         address[] storage members = _members[sourceId][group];
         if (members.length == 0) revert NoMembers();
@@ -663,7 +779,62 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
         uint256 id = ISomniaReactivityPrecompile(REACTIVITY).subscribe(d);
         subscriptionOf[sourceId][g] = id;
         subscribed[sourceId][g] = true;
+        // a live group's id is never an orphan
+        delete orphanSubs[id];
         emit GroupOpened(sourceId, g, relay, id);
+    }
+
+    /// @dev Every subscription's gas limit must fund the handler's floor and tail reserve for one member, with
+    /// room for its own dispatch; otherwise every event would defer the whole group.
+    function _checkFits(uint256 floor, uint256 tailBase, uint256 perDefer, uint256 traderGas, uint256 themeGas)
+        internal
+        pure
+    {
+        uint256 need = floor + tailBase + perDefer + HANDLER_MARGIN_GAS;
+        if (traderGas < need || themeGas < need) revert GasLimitTooLow();
+    }
+
+    // ---------------------------------------------------------------- event plumbing
+
+    /// @dev One phase of a member's share of an event, as a self-call on `gas`.
+    function _phase(bytes4 selector, bytes memory args, uint256 gas) internal returns (bool, bytes memory) {
+        return address(this).call{gas: gas}(abi.encodePacked(selector, args));
+    }
+
+    /// @dev Whether a phase that reverted ran out of gas, rather than answering.
+    function _outOfGas(bytes memory err, uint256 before, uint256 slot) internal view returns (bool) {
+        return (err.length == 4 && bytes4(err) == OutOfGasInSync.selector) || CopyEngine.starved(err, before, slot);
+    }
+
+    /// @dev Whether an event still concerns this follow: it follows the source, and for a theme its book does
+    /// not match this version yet.
+    function _eventFor(CopyEngine.Follow storage f, bytes32 sourceId, uint32 version) internal view returns (bool) {
+        return f.sourceId == sourceId && (f.kind != SourceKind.Theme || !_themeCurrent(f, version));
+    }
+
+    /// @dev An equity stop reported inside the handler. The pause is written here, in the handler's own frame,
+    /// so it stands even if the closes run out of gas; the closes get everything above the reserve, and when
+    /// that is not enough the member is Deferred (that part unbilled) and poke finishes them.
+    /// @return spent the gas of the closes, to bill
+    function _stopFromEvent(bytes32 sourceId, address follower, int256 equity, uint256 reserve)
+        internal
+        returns (uint256 spent)
+    {
+        CopyEngine.Follow storage f = _books.follows[follower];
+        f.paused = true;
+        f.lastSyncComplete = false;
+        emit Stopped(follower, equity);
+        uint256 start = gasleft();
+        if (start > reserve) {
+            (bool ok, bytes memory ret) =
+                address(this).call{gas: start - reserve}(abi.encodeCall(this.flattenFromEvent, (sourceId, follower)));
+            if (ok) return start - gasleft();
+            if (!_outOfGas(ret, start, start - reserve)) {
+                emit Refused(follower, sourceId, address(0), Reason.VenueRejected, ret);
+                return start - gasleft();
+            }
+        }
+        emit Deferred(follower, sourceId);
     }
 
     // ---------------------------------------------------------------- sync plumbing

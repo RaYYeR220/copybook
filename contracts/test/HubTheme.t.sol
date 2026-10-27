@@ -89,6 +89,12 @@ contract HubThemeTest is Base {
 
     // ---------- helpers ----------
 
+    /// The fixed gas added to every member's bill.
+    function _overhead() internal view returns (uint256) {
+        (,,,,, uint64 o) = hub.gasParams();
+        return o;
+    }
+
     function _f(uint256 i) internal pure returns (address) {
         return address(uint160(0xF000 + i));
     }
@@ -145,7 +151,9 @@ contract HubThemeTest is Base {
     }
 
     function _fire(uint32 group, Vm.Log memory ev) internal {
-        reactivity.fire(hub.subscriptionOf(tsid, group), ev.emitter, ev.topics, ev.data);
+        uint256 id = hub.subscriptionOf(tsid, group);
+        vm.prank(address(this), address(hub)); // the hub's own subscription: the hub is the origin
+        reactivity.fire(id, ev.emitter, ev.topics, ev.data);
     }
 
     function _prep(address who) internal {
@@ -280,7 +288,7 @@ contract HubThemeTest is Base {
     function test_theme_groupsOfTwo_gasDefaults() public {
         assertEq(hub.themeGroupSize(), 2);
         assertEq(hub.groupSize(), 8);
-        (, uint64 cap, uint64 themeCap,,) = hub.gasParams();
+        (, uint64 cap, uint64 themeCap,,,) = hub.gasParams();
         assertEq(cap, 20_000_000);
         assertEq(themeCap, 90_000_000);
 
@@ -340,10 +348,11 @@ contract HubThemeTest is Base {
             )
         );
         vm.expectCall(address(eth), ethOrder, 1);
-        vm.expectEmit(true, true, true, true, address(hub));
-        emit CopybookHub.Refused(follower, tsid, address(sol), Reason.LegFailed, _fok());
+        // the trim lands in the exit phase, before the increase set is tried
         vm.expectEmit(true, true, true, true, address(hub));
         emit CopybookHub.Copied(follower, tsid, address(btc), BTC_5K, BTC_2K, BTC_EXIT_SELL, false);
+        vm.expectEmit(true, true, true, true, address(hub));
+        emit CopybookHub.Refused(follower, tsid, address(sol), Reason.LegFailed, _fok());
         vm.recordLogs();
         _fire(0, ev);
         logs = vm.getRecordedLogs();
@@ -382,9 +391,9 @@ contract HubThemeTest is Base {
         Vm.Log memory ev = _rebalance(_legs3(btc, 2_000, eth, -7_000, sol, 2_000));
         vm.mockCallRevert(address(eth), abi.encodeWithSignature("getMarkPrice()"), stale);
         vm.expectEmit(true, true, true, true, address(hub));
-        emit CopybookHub.Refused(follower, tsid, address(eth), Reason.VenueRejected, stale);
-        vm.expectEmit(true, true, true, true, address(hub));
         emit CopybookHub.Copied(follower, tsid, address(btc), BTC_5K, BTC_2K, BTC_EXIT_SELL, false);
+        vm.expectEmit(true, true, true, true, address(hub));
+        emit CopybookHub.Refused(follower, tsid, address(eth), Reason.VenueRejected, stale);
         _fire(0, ev);
         vm.clearMockedCalls();
         assertEq(_size(btc, follower), BTC_2K);
@@ -407,10 +416,11 @@ contract HubThemeTest is Base {
         assertEq(_size(eth, b), -ETH_4K);
 
         Vm.Log memory ev = _rebalance(_legs(btc, 7_000, sol, -3_000));
-        vm.expectEmit(true, true, true, true, address(hub));
-        emit CopybookHub.Copied(a, tsid, address(btc), BTC_5K, BTC_7K, BTC_BUY, false);
+        // the exits first (the dropped leg), then the increase set
         vm.expectEmit(true, true, true, true, address(hub));
         emit CopybookHub.Copied(a, tsid, address(eth), -ETH_5K, 0, ETH_EXIT_BUY, false);
+        vm.expectEmit(true, true, true, true, address(hub));
+        emit CopybookHub.Copied(a, tsid, address(btc), BTC_5K, BTC_7K, BTC_BUY, false);
         vm.expectEmit(true, true, true, true, address(hub));
         emit CopybookHub.Copied(a, tsid, address(sol), 0, -SOL_3K, SOL_SELL, false);
         vm.recordLogs();
@@ -446,10 +456,15 @@ contract HubThemeTest is Base {
         _followTheme(follower, _policy(100e18));
         Vm.Log memory ev = _rebalance(_legs(btc, -5_000, eth, 5_000));
 
+        // the closes at the exit band, then the opens inside the band: one Copied per phase
         vm.expectEmit(true, true, true, true, address(hub));
-        emit CopybookHub.Copied(follower, tsid, address(btc), BTC_5K, -BTC_5K, BTC_SELL, false);
+        emit CopybookHub.Copied(follower, tsid, address(btc), BTC_5K, 0, BTC_EXIT_SELL, false);
         vm.expectEmit(true, true, true, true, address(hub));
-        emit CopybookHub.Copied(follower, tsid, address(eth), -ETH_5K, ETH_5K, ETH_BUY, false);
+        emit CopybookHub.Copied(follower, tsid, address(eth), -ETH_5K, 0, ETH_EXIT_BUY, false);
+        vm.expectEmit(true, true, true, true, address(hub));
+        emit CopybookHub.Copied(follower, tsid, address(btc), 0, -BTC_5K, BTC_SELL, false);
+        vm.expectEmit(true, true, true, true, address(hub));
+        emit CopybookHub.Copied(follower, tsid, address(eth), 0, ETH_5K, ETH_BUY, false);
         vm.recordLogs();
         _fire(0, ev);
         Vm.Log[] memory logs = vm.getRecordedLogs();
@@ -598,9 +613,9 @@ contract HubThemeTest is Base {
         hub.updatePolicy(p);
         Vm.Log memory ev = _rebalance(_legs(btc, 2_000, eth, -7_000));
         vm.expectEmit(true, true, true, true, address(hub));
-        emit CopybookHub.Refused(follower, tsid, address(0), Reason.TotalCap, "");
-        vm.expectEmit(true, true, true, true, address(hub));
         emit CopybookHub.Copied(follower, tsid, address(btc), BTC_5K, BTC_2K, BTC_EXIT_SELL, false);
+        vm.expectEmit(true, true, true, true, address(hub));
+        emit CopybookHub.Refused(follower, tsid, address(0), Reason.TotalCap, "");
         _fire(0, ev);
         assertEq(_size(btc, follower), BTC_2K);
         assertEq(_size(eth, follower), -ETH_5K);
@@ -618,12 +633,12 @@ contract HubThemeTest is Base {
         Vm.Log memory ev = _rebalance(_legs(btc, 7_000, eth, -7_000));
         vm.expectEmit(true, true, true, true, address(hub));
         emit CopybookHub.Refused(follower, tsid, address(0), Reason.EquityFloor, "");
+        vm.expectEmit(true, false, false, true, address(hub));
+        emit CopybookHub.Stopped(follower, 10e18);
         vm.expectEmit(true, true, true, true, address(hub));
         emit CopybookHub.Copied(follower, tsid, address(btc), BTC_5K, 0, BTC_EXIT_SELL, false);
         vm.expectEmit(true, true, true, true, address(hub));
         emit CopybookHub.Copied(follower, tsid, address(eth), -ETH_5K, 0, ETH_EXIT_BUY, false);
-        vm.expectEmit(true, false, false, true, address(hub));
-        emit CopybookHub.Stopped(follower, 10e18);
         _fire(0, ev);
         assertTrue(_paused(follower));
         assertEq(_size(btc, follower), 0);
@@ -667,9 +682,9 @@ contract HubThemeTest is Base {
         gate.set(true);
         Vm.Log memory ev = _rebalance(_legs(btc, 2_000, eth, -7_000));
         vm.expectEmit(true, true, true, true, address(hub));
-        emit CopybookHub.Refused(follower, tsid, address(0), Reason.RiskGate, "");
-        vm.expectEmit(true, true, true, true, address(hub));
         emit CopybookHub.Copied(follower, tsid, address(btc), BTC_5K, BTC_2K, BTC_EXIT_SELL, false);
+        vm.expectEmit(true, true, true, true, address(hub));
+        emit CopybookHub.Refused(follower, tsid, address(0), Reason.RiskGate, "");
         _fire(0, ev);
         assertEq(_size(eth, follower), -ETH_5K);
     }
@@ -727,9 +742,11 @@ contract HubThemeTest is Base {
         Vm.Log memory ev = _rebalance(_legs(btc, 7_000, sol, -3_000));
 
         // too little gas for any member: the group is deferred, nobody is charged
-        (uint64 floor,,,,) = hub.gasParams();
+        (uint64 floor,,,,,) = hub.gasParams();
+        uint256 subId = hub.subscriptionOf(tsid, 0);
         vm.recordLogs();
-        reactivity.fire{gas: floor}(hub.subscriptionOf(tsid, 0), ev.emitter, ev.topics, ev.data);
+        vm.prank(address(this), address(hub));
+        reactivity.fire{gas: floor}(subId, ev.emitter, ev.topics, ev.data);
         Vm.Log[] memory logs = vm.getRecordedLogs();
         uint256 deferred;
         for (uint256 i; i < logs.length; ++i) {
@@ -787,8 +804,8 @@ contract HubThemeTest is Base {
         assertEq(_size(btc, b), BTC_7K);
         assertEq(_size(eth, b), -ETH_7K);
 
-        (, uint64 traderCap, uint64 themeCap,,) = hub.gasParams();
-        uint256 gasBilled = (tank - hub.tankOf(a)) / 6 gwei - hub.CHARGE_OVERHEAD_GAS();
+        (, uint64 traderCap, uint64 themeCap,,,) = hub.gasParams();
+        uint256 gasBilled = (tank - hub.tankOf(a)) / 6 gwei - _overhead();
         assertGt(gasBilled, uint256(traderCap) * 4, "a theme slot, far beyond the trader cap");
         assertLe(gasBilled, themeCap + 100_000);
 
@@ -808,22 +825,22 @@ contract HubThemeTest is Base {
         bytes memory data = abi.encode(uint32(2));
 
         // another theme's rebalance
-        vm.prank(relay);
+        vm.prank(relay, address(hub));
         vm.expectRevert(CopybookHub.BadEvent.selector);
         hub.onSourceEvent(tsid, 0, address(themes), topics, data);
         // the right theme id from another emitter or with another signature
         topics[1] = bytes32(tid);
-        vm.prank(relay);
+        vm.prank(relay, address(hub));
         vm.expectRevert(CopybookHub.BadEvent.selector);
         hub.onSourceEvent(tsid, 0, address(bank), topics, data);
         topics[0] = keccak256("ThemeCreated(uint256,address,string)");
-        vm.prank(relay);
+        vm.prank(relay, address(hub));
         vm.expectRevert(CopybookHub.BadEvent.selector);
         hub.onSourceEvent(tsid, 0, address(themes), topics, data);
         // too few topics
         bytes32[] memory short = new bytes32[](1);
         short[0] = THEME_REBALANCED;
-        vm.prank(relay);
+        vm.prank(relay, address(hub));
         vm.expectRevert(CopybookHub.BadEvent.selector);
         hub.onSourceEvent(tsid, 0, address(themes), short, data);
 
@@ -840,9 +857,12 @@ contract HubThemeTest is Base {
         hub.applyIncreases(follower, orders);
         address relay = hub.relayOf(tsid, 0);
         Leg[] memory legs = themes.legsOf(tid);
-        vm.prank(relay);
+        vm.prank(relay, address(hub));
         vm.expectRevert(CopybookHub.NotSelf.selector);
-        hub.syncThemeFromEvent(tsid, follower, legs, 1);
+        hub.exitFromEvent(tsid, follower, address(0), 0, legs, 2);
+        vm.prank(relay, address(hub));
+        vm.expectRevert(CopybookHub.NotSelf.selector);
+        hub.entryFromEvent(tsid, follower, address(0), 0, legs, 2);
         assertEq(_size(btc, follower), BTC_5K);
     }
 
@@ -1030,8 +1050,8 @@ contract HubThemeTest is Base {
         Vm.Log[] memory logs = vm.getRecordedLogs();
         assertEq(_fills(logs, btc, a) + _fills(logs, eth, a) + _fills(logs, btc, b) + _fills(logs, eth, b), 0);
         assertEq(_hubLogs(logs), 0, "no TankCharged, no Copied");
-        uint256 overhead = hub.CHARGE_OVERHEAD_GAS();
-        (,, uint64 themeCap,,) = hub.gasParams();
+        uint256 overhead = _overhead();
+        (,, uint64 themeCap,,,) = hub.gasParams();
         uint256 paidA = ta - hub.tankOf(a);
         uint256 paidB = tb - hub.tankOf(b);
         assertEq(paidA % 6 gwei, 0);

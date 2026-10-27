@@ -68,6 +68,16 @@ contract MocksTest is Base {
         assertEq(bank.getPosition(user, address(btc)).size, 13_000);
     }
 
+    function test_askIocFillEmitsMockFillAndConsumesBidDepth() public {
+        _seedLiquidity(btc, 20_000, 10);
+        // ask fills only at or below mark * (1 - 10bps) = 79_920e18
+        vm.expectEmit(false, false, false, true, address(btc));
+        emit MockPerpPool.MockFill(user, false, 20_000, 79_920e18);
+        _order(btc, false, 79_900e18, 30_000, 2);
+        assertEq(btc.bidDepth(), 0);
+        assertEq(bank.getPosition(user, address(btc)).size, -20_000);
+    }
+
     function test_priceOutsideBandDoesNotFill() public {
         // bid below mark * (1 + 10bps) = 80_080e18
         vm.expectRevert(MockPerpPool.ImmediateOrCancelNoFill.selector);

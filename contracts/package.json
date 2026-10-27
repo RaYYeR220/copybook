@@ -6,6 +6,6 @@
   "dependencies": {
     "@openzeppelin/contracts": "5.4.0",
     "@somnia-chain/reactivity-contracts": "0.2.1",
-    "forge-std": "github:foundry-rs/forge-std#v1.10.0"
+    "forge-std": "https://codeload.github.com/foundry-rs/forge-std/tar.gz/refs/tags/v1.10.0"
   }
 }

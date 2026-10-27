@@ -30,6 +30,7 @@ contract MockMarginBank is IMarginBank {
         Position storage p = _positions[account][msg.sender];
         p.size = int128(int256(p.size) + delta);
         p.lastUpdatedTimestampNs = uint64(block.timestamp * 1e9);
+        // avgEntryPrice and realizedPnl are not modelled; both stay 0.
         emit PositionUpdated(account, msg.sender, p.size, p.avgEntryPrice, 0, p.entryFundingIndex);
     }
 }

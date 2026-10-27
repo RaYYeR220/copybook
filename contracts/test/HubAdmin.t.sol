@@ -379,6 +379,20 @@ contract HubAdminTest is Base {
         assertEq(address(hub).balance, hub.MIN_SUBSCRIPTION_BALANCE() + hub.totalTanks());
     }
 
+    // Plain transfers top up the subscription balance; they are surplus, never a tank.
+    function test_receive_addsSurplusOnly() public {
+        _follow(_f(1), trader);
+        uint256 tanks = hub.totalTanks();
+        uint256 before = address(hub).balance;
+        vm.deal(stranger, 1 ether);
+        vm.prank(stranger);
+        (bool ok,) = address(hub).call{value: 1 ether}("");
+        assertTrue(ok);
+        assertEq(address(hub).balance, before + 1 ether);
+        assertEq(hub.totalTanks(), tanks);
+        assertEq(hub.tankOf(stranger), 0);
+    }
+
     // ---------- orphaned subscriptions ----------
 
     // A cancel that fails when a group empties is recorded; only recorded ids can be cancelled by the owner,

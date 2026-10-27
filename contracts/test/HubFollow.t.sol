@@ -291,8 +291,7 @@ contract HubFollowTest is Base {
         vm.expectRevert(abi.encodeWithSelector(PolicyLib.InvalidPolicy.selector, uint8(4)));
         hub.follow{value: 0.5 ether}(SourceKind.Trader, uint256(uint160(trader)), p, _none());
 
-        MockPerpPool foreign = new MockPerpPool(bank, 1e18, 1, 1, 1, 1);
-        vm.mockCall(address(foreign), abi.encodeWithSignature("marginBank()"), abi.encode(address(0xDEAD)));
+        MockPerpPool foreign = new MockPerpPool(bank, 1e18, 1, 1, 1, 1); // never registered
         vm.expectRevert(CopybookHub.ForeignPool.selector);
         hub.follow{value: 0.5 ether}(SourceKind.Trader, uint256(uint160(trader)), _policy(), _one(foreign));
 
@@ -542,6 +541,13 @@ contract HubFollowTest is Base {
         vm.prank(follower);
         hub.updatePolicy(p);
         vm.mockCallRevert(address(btc), abi.encodeWithSignature("getMarkPrice()"), "");
+        vm.expectEmit(true, true, true, true, address(hub));
+        emit CopybookHub.Refused(follower, sid, address(eth), Reason.TotalCap, "");
+        hub.catchUp(follower, _one(eth));
+        vm.clearMockedCalls();
+
+        // so does a base unit that cannot be read
+        vm.mockCallRevert(address(btc), abi.encodeWithSignature("getOneBase()"), "");
         vm.expectEmit(true, true, true, true, address(hub));
         emit CopybookHub.Refused(follower, sid, address(eth), Reason.TotalCap, "");
         hub.catchUp(follower, _one(eth));

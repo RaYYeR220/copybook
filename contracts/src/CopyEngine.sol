@@ -113,14 +113,15 @@ library CopyEngine {
 
     // ---------------------------------------------------------------- entry points (delegatecall)
 
-    /// @notice Allowlists `pools` for a trader follow and copies the source's current positions there.
+    /// @notice Allowlists `pools` (each a perp market registered with the bank) for a trader follow and
+    /// copies the source's current positions there.
     function joinPools(Books storage b, Env memory e, address[] calldata pools) external {
         Follow storage f = b.follows[e.follower];
         mapping(address => bool) storage allowed = b.allowed[e.follower][b.epoch[e.follower]];
         for (uint256 i; i < pools.length; ++i) {
             address pool = pools[i];
             if (allowed[pool]) continue;
-            if (IPerpPool(pool).marginBank() != address(e.bank)) revert ForeignPool();
+            if (!e.bank.isPerpPoolRegistered(pool)) revert ForeignPool();
             allowed[pool] = true;
             _markSynced(b, e.follower, pool);
             _sync(b, e, f, pool, _target(e, f, pool));

@@ -5,6 +5,7 @@ import {Vm} from "forge-std/Vm.sol";
 import {Base} from "./Base.t.sol";
 import {MockMarginBank} from "./mocks/MockMarginBank.sol";
 import {MockPerpPool} from "./mocks/MockPerpPool.sol";
+import {FakePool} from "./mocks/FakePool.sol";
 import {ThemeRegistry} from "../src/ThemeRegistry.sol";
 import {Leg} from "../src/Types.sol";
 
@@ -97,6 +98,28 @@ contract ThemeRegistryTest is Base {
         legs[1].pool = address(foreign);
         vm.expectRevert(ThemeRegistry.ForeignPool.selector);
         reg.createTheme("n", "", legs);
+    }
+
+    // Regression (R24): a contract that only claims the bank is not one of its markets, at create and at
+    // rebalance; neither is a real pool the bank never registered.
+    function test_rejects_fakePoolClaimingBank() public {
+        FakePool fake = new FakePool(address(bank));
+        assertEq(fake.marginBank(), address(bank));
+        Leg[] memory legs = _two();
+        legs[1].pool = address(fake);
+        vm.expectRevert(ThemeRegistry.ForeignPool.selector);
+        reg.createTheme("n", "", legs);
+
+        legs[1].pool = address(new MockPerpPool(bank, 1e18, 1, 1, 1, 1));
+        vm.expectRevert(ThemeRegistry.ForeignPool.selector);
+        reg.createTheme("n", "", legs);
+
+        uint256 id = _create();
+        vm.warp(block.timestamp + reg.MIN_REBALANCE_INTERVAL());
+        legs[1].pool = address(fake);
+        vm.prank(alice);
+        vm.expectRevert(ThemeRegistry.ForeignPool.selector);
+        reg.rebalance(id, legs);
     }
 
     function test_rebalance_onlyCreator() public {

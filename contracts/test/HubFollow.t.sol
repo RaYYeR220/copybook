@@ -6,6 +6,7 @@ import {StdStorage, stdStorage} from "forge-std/StdStorage.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {Base} from "./Base.t.sol";
 import {MockPerpPool} from "./mocks/MockPerpPool.sol";
+import {FakePool} from "./mocks/FakePool.sol";
 import {MockReactivity} from "./mocks/MockReactivity.sol";
 import {CopybookHub} from "../src/CopybookHub.sol";
 import {GroupRelay} from "../src/GroupRelay.sol";
@@ -306,6 +307,23 @@ contract HubFollowTest is Base {
         vm.prank(follower);
         vm.expectRevert(CopybookHub.FollowsPaused.selector);
         hub.follow{value: 0.5 ether}(SourceKind.Trader, uint256(uint160(trader)), _policy(), _none());
+    }
+
+    // Regression (R24): joinPools takes only markets the bank itself registered. A contract that merely
+    // claims the bank, or a pool the bank never registered, is refused before anything is allowlisted.
+    function test_follow_fakePoolClaimingBank_rejected() public {
+        address[] memory pools = new address[](2);
+        pools[0] = address(btc);
+        pools[1] = address(new FakePool(address(bank)));
+        vm.startPrank(follower);
+        vm.expectRevert(CopybookHub.ForeignPool.selector);
+        hub.follow{value: 0.5 ether}(SourceKind.Trader, uint256(uint160(trader)), _policy(), pools);
+        pools[1] = address(new MockPerpPool(bank, 1e18, 1, 1, 1, 1));
+        vm.expectRevert(CopybookHub.ForeignPool.selector);
+        hub.follow{value: 0.5 ether}(SourceKind.Trader, uint256(uint160(trader)), _policy(), pools);
+        vm.stopPrank();
+        (bytes32 s,,,,,) = hub.followOf(follower);
+        assertEq(s, bytes32(0));
     }
 
     function test_unfollow_flatten_closesAll() public {

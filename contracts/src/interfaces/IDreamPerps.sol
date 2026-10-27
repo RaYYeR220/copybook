@@ -55,6 +55,9 @@ interface IMarginBank {
         external
         view
         returns (int256 equity, uint256 imReq, uint256 mmReq, uint256 cmReq);
+
+    /// @notice Whether `perpPool` is a perp market of this bank (the venue's own registry).
+    function isPerpPoolRegistered(address perpPool) external view returns (bool);
 }
 
 /// @notice Optional external gate consulted before a position-increasing copy.

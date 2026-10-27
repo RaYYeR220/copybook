@@ -24,6 +24,10 @@ contract MockMarginBank is IMarginBank {
         return (_equity[account], 0, 0, 0);
     }
 
+    function isPerpPoolRegistered(address pool) external view returns (bool) {
+        return isPool[pool];
+    }
+
     /// @dev Called by a registered pool; the position is keyed to the calling pool.
     function applyFill(address account, int256 delta) external {
         require(isPool[msg.sender], "MockMarginBank: not pool");

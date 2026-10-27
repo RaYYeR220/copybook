@@ -2,9 +2,9 @@
 pragma solidity ^0.8.30;
 
 import {Leg} from "./Types.sol";
-import {IPerpPool} from "./interfaces/IDreamPerps.sol";
+import {IMarginBank} from "./interfaces/IDreamPerps.sol";
 
-/// Creator-owned weight vectors over perp pools. Followers mirror a theme;
+/// Creator-owned weight vectors over perp markets the margin bank registered. Followers mirror a theme;
 /// subscribers watch ThemeRebalanced (indexed themeId) to resync. Every follower pays to re-check its
 /// book on a rebalance, so a rebalance must change the legs and comes at most once per
 /// MIN_REBALANCE_INTERVAL.
@@ -137,7 +137,7 @@ contract ThemeRegistry {
             for (uint256 j; j < i; ++j) {
                 if (legs[j].pool == pool) revert DuplicatePool();
             }
-            if (IPerpPool(pool).marginBank() != marginBank) revert ForeignPool();
+            if (!IMarginBank(marginBank).isPerpPoolRegistered(pool)) revert ForeignPool();
         }
         if (gross > MAX_GROSS_BPS) revert GrossTooHigh();
     }

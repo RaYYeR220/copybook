@@ -43,6 +43,12 @@ contract MockReactivity is ISomniaReactivityPrecompile {
         return getSubscriptionInfo(id);
     }
 
+    /// @dev Drops a subscription without its owner, as the chain may when it removes one.
+    function forceRemove(uint256 id) external {
+        delete _subs[id];
+        delete _owners[id];
+    }
+
     /// @dev Runs at 0x0100, so msg.sender seen by the handler is the precompile address.
     function fire(uint256 id, address emitter, bytes32[] calldata topics, bytes calldata data) external {
         address handler = _subs[id].handlerContractAddress;

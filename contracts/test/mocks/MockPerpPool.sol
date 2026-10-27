@@ -29,6 +29,7 @@ contract MockPerpPool is IPerpPool {
     mapping(address => mapping(address => bool)) public approved;
     mapping(address => bytes) internal _revertFor;
     bytes internal _revertAll;
+    mapping(address => bool) public bombFor;
 
     constructor(MockMarginBank bank_, uint256 mark_, uint256 tick_, uint256 minQty_, uint256 lot_, uint256 oneBase_) {
         bank = bank_;
@@ -59,6 +60,11 @@ contract MockPerpPool is IPerpPool {
     }
 
     /// @dev Makes calls for `owner` revert with exactly `data` (empty clears).
+    /// @dev Makes orders for `owner` burn all the gas they are given, as an order that runs out of gas.
+    function setBombFor(address owner, bool on) external {
+        bombFor[owner] = on;
+    }
+
     function setRevertFor(address owner, bytes calldata data) external {
         _revertFor[owner] = data;
     }
@@ -91,6 +97,11 @@ contract MockPerpPool is IPerpPool {
         address,
         uint96
     ) external payable returns (bool, uint128) {
+        if (bombFor[owner]) {
+            assembly {
+                invalid()
+            }
+        }
         _maybeRevert(_revertAll);
         _maybeRevert(_revertFor[owner]);
         if (!approved[owner][msg.sender]) revert OperatorNotApproved();

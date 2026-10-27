@@ -36,6 +36,7 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
     error NotSelf();
     error TankFloor();
     error UnsubscribeOutOfGas();
+    error OutOfGasInSync();
 
     event Followed(address indexed follower, bytes32 indexed sourceId, SourceKind kind, uint256 ref);
     event Unfollowed(address indexed follower, bytes32 indexed sourceId, bool flattened);
@@ -56,7 +57,7 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
     event Stopped(address indexed follower, int256 equity);
     event GroupOpened(bytes32 indexed sourceId, uint32 group, address relay, uint256 subscriptionId);
     event TankCharged(address indexed follower, uint256 amount);
-    event GroupClosed(bytes32 indexed sourceId, uint32 group, uint256 subscriptionId);
+    event GroupClosed(bytes32 indexed sourceId, uint32 group, uint256 subscriptionId, bool cancelled);
     event Deferred(address indexed follower, bytes32 indexed sourceId);
 
     struct Follow {
@@ -78,6 +79,16 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
         bool guaranteed;
     }
 
+    /// @dev Gas budget of a group handler. Each member runs in a slot of at least `floor` and at most
+    /// `perFollowerCap`; the handler always keeps `tailBase + perDefer * remainingMembers` back so it can
+    /// still report the rest of the group as Deferred.
+    struct GasParams {
+        uint64 floor;
+        uint64 perFollowerCap;
+        uint64 tailBase;
+        uint64 perDefer;
+    }
+
     struct Market {
         uint256 mark;
         uint256 tick;
@@ -93,13 +104,12 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
     uint256 public constant MAX_JOIN_POOLS = 32;
     bytes32 public constant POSITION_UPDATED_TOPIC = 0xf7816a375f0ca01053ed213b57908bff79f578810301d50971a5f685529b82de;
 
-    /// @dev Gas a group handler keeps in hand before each follower; below it the rest of the group is
-    /// deferred to catchUp.
-    uint256 public constant PER_FOLLOWER_GAS_FLOOR = 6_000_000;
     /// @dev Added to each follower's measured gas for the shared handler work around it.
     uint256 public constant CHARGE_OVERHEAD_GAS = 60_000;
     /// @dev Somnia's minimum base fee; handler gas is never charged below it.
     uint256 public constant MIN_CHARGE_GAS_PRICE = 6 gwei;
+    /// @dev Fixed budget for cancelling a subscription; an unfollow that empties a group must afford it.
+    uint256 public constant UNSUB_GAS = 2_000_000;
 
     address internal constant REACTIVITY = address(0x0100);
     uint8 internal constant FOK = 1;
@@ -130,6 +140,7 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
     /// @dev Groups ever opened per source. An emptied group keeps its relay and is reused.
     mapping(bytes32 => uint32) public groupCount;
     mapping(bytes32 => mapping(uint32 => bool)) public subscribed;
+    GasParams public gasParams;
 
     modifier onlySelf() {
         if (msg.sender != address(this)) revert NotSelf();
@@ -144,10 +155,11 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
         subParams = SubParams({
             priorityFeePerGas: 0,
             maxFeePerGas: 20 gwei,
-            traderGasLimit: 60_000_000,
-            themeGasLimit: 150_000_000,
+            traderGasLimit: 200_000_000,
+            themeGasLimit: 200_000_000,
             guaranteed: false
         });
+        gasParams = GasParams({floor: 8_000_000, perFollowerCap: 20_000_000, tailBase: 150_000, perDefer: 30_000});
     }
 
     /// @dev Funds the subscription balance the Reactivity precompile requires of the hub.
@@ -266,11 +278,30 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
         _stop(follower, f, equity);
     }
 
+    /// @notice Subscribes a group again, with its relay, if the chain dropped its subscription while the
+    /// group still has members. A live subscription, or a group without members, is left alone.
+    function ensureSubscribed(bytes32 sourceId, uint32 group) external nonReentrant {
+        address[] storage members = _members[sourceId][group];
+        if (members.length == 0) return;
+        // low-level: the precompile has no code; an unreadable answer counts as dropped
+        (bool ok, bytes memory ret) = REACTIVITY.staticcall(
+            abi.encodeCall(ISomniaReactivityPrecompile.getSubscriptionInfo, (subscriptionOf[sourceId][group]))
+        );
+        if (ok && ret.length >= 480) {
+            (, address subOwner) = abi.decode(ret, (ISomniaReactivityPrecompile.SubscriptionData, address));
+            if (subOwner == address(this)) return;
+        }
+        Follow storage f = _follows[members[0]];
+        _subscribe(sourceId, group, f.kind, f.ref);
+    }
+
     /// @notice Entry point for a group's relay. The event only names the pool; the size is the trader's
     /// live position, so a delayed or reordered event can never open what the trader no longer holds.
-    /// Each follower runs in its own self-call, so one failure stays with that follower. When gas runs
-    /// below PER_FOLLOWER_GAS_FLOOR the remaining followers are reported as Deferred for catchUp.
-    /// Every follower the handler acted for pays its own gas from its tank.
+    /// Each member runs in its own self-call with a bounded gas slot (see GasParams), so one failure stays
+    /// with that member, and the handler always keeps enough back to report the rest as Deferred for
+    /// catchUp: when the next slot cannot be funded, or when a member runs out of gas in a slot the
+    /// handler had to cut short. A member that runs out of a full slot is deferred alone. Members pay their
+    /// own gas from their tank; one with nothing to do pays only the overhead.
     function onSourceEvent(
         bytes32 sourceId,
         uint32 group,
@@ -289,25 +320,39 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
         address pool = address(uint160(uint256(topics[2])));
         int256 size = _size(address(uint160(uint256(topics[1]))), pool);
         uint256 rate = block.basefee > MIN_CHARGE_GAS_PRICE ? block.basefee : MIN_CHARGE_GAS_PRICE;
+        GasParams memory gp = gasParams;
 
         address[] storage members = _members[sourceId][group];
         uint256 n = members.length;
         for (uint256 i; i < n; ++i) {
-            if (gasleft() < PER_FOLLOWER_GAS_FLOOR) {
-                for (uint256 j = i; j < n; ++j) {
-                    emit Deferred(members[j], sourceId);
-                }
+            uint256 reserve = gp.tailBase + (n - i) * gp.perDefer;
+            uint256 start = gasleft();
+            if (start < gp.floor + reserve) {
+                _defer(members, i, sourceId);
                 return;
             }
+            uint256 slot = start - reserve;
+            bool fullSlot = slot >= gp.perFollowerCap;
+            if (fullSlot) slot = gp.perFollowerCap;
             address follower = members[i];
-            uint256 start = gasleft();
-            bool acted = true;
-            try this.syncFollowerFromEvent(sourceId, follower, pool, size) returns (bool a) {
-                acted = a;
+            try this.syncFollowerFromEvent{gas: slot}(sourceId, follower, pool, size) returns (bool acted) {
+                if (!acted) {
+                    _charge(follower, CHARGE_OVERHEAD_GAS * rate, false);
+                    continue;
+                }
             } catch (bytes memory err) {
-                emit Refused(follower, sourceId, pool, Reason.VenueRejected, err);
+                bool oog = (err.length == 4 && bytes4(err) == OutOfGasInSync.selector) || _starved(err, start, slot);
+                if (!oog) {
+                    emit Refused(follower, sourceId, pool, Reason.VenueRejected, err);
+                } else if (fullSlot) {
+                    emit Deferred(follower, sourceId);
+                } else {
+                    // the handler ran short, not the member: it and the rest wait for catchUp, unbilled
+                    _defer(members, i, sourceId);
+                    return;
+                }
             }
-            if (acted) _charge(follower, (start - gasleft() + CHARGE_OVERHEAD_GAS) * rate);
+            _charge(follower, (start - gasleft() + CHARGE_OVERHEAD_GAS) * rate, true);
         }
     }
 
@@ -381,16 +426,16 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
     }
 
     /// @dev Cancels an empty group's subscription so it stops costing the hub; the relay is kept for reuse.
-    /// The cancel is best effort so the precompile can never trap the last member in a follow, but a cancel
-    /// starved of gas reverts, so a tight gas estimate cannot leave the subscription running. It is a
-    /// low-level call: the precompile has no code, which a typed call without return data would reject.
+    /// The cancel runs on a fixed budget the caller must afford up front, so a tight gas estimate cannot
+    /// skip it; beyond that it is best effort, so the precompile can never trap the last member in a follow.
+    /// It is a low-level call: the precompile has no code, which a typed call without return data rejects.
     function _closeGroup(bytes32 sourceId, uint32 g) internal {
+        if (gasleft() < UNSUB_GAS * 64 / 63 + 50_000) revert UnsubscribeOutOfGas();
         uint256 id = subscriptionOf[sourceId][g];
         subscribed[sourceId][g] = false;
-        uint256 before = gasleft();
-        (bool ok,) = REACTIVITY.call(abi.encodeCall(ISomniaReactivityPrecompile.unsubscribe, (id)));
-        if (!ok && gasleft() <= before / 64) revert UnsubscribeOutOfGas();
-        emit GroupClosed(sourceId, g, id);
+        (bool cancelled,) =
+            REACTIVITY.call{gas: UNSUB_GAS}(abi.encodeCall(ISomniaReactivityPrecompile.unsubscribe, (id)));
+        emit GroupClosed(sourceId, g, id, cancelled);
     }
 
     function _subscribe(bytes32 sourceId, uint32 g, SourceKind kind, uint256 ref) internal {
@@ -529,9 +574,11 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
         Policy storage p = f.policy;
         if (f.paused) return (Reason.Paused, 0);
         if (p.equityFloor != 0) {
+            uint256 before = gasleft();
             try bank.getAccountHealth(follower) returns (int256 e, uint256, uint256, uint256) {
                 equity = e;
-            } catch {
+            } catch (bytes memory err) {
+                _revertIfStarved(err, before);
                 return (Reason.VenueRejected, 0);
             }
             if (equity < int256(uint256(p.equityFloor))) return (Reason.EquityFloor, equity);
@@ -542,9 +589,11 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
         if (tankOf[follower] < MIN_TANK_FOR_INCREASE) return (Reason.TankEmpty, equity);
         address gate = riskGate;
         if (gate != address(0)) {
+            uint256 before = gasleft();
             try IRiskGate(gate).allowIncrease(f.sourceId) returns (bool allowed) {
                 if (!allowed) return (Reason.RiskGate, equity);
-            } catch {
+            } catch (bytes memory err) {
+                _revertIfStarved(err, before);
                 return (Reason.RiskGate, equity);
             }
         }
@@ -561,15 +610,19 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
             int256 size = _size(follower, other);
             if (size == 0) continue;
             uint256 mark;
+            uint256 before = gasleft();
             try IPerpPool(other).getMarkPrice() returns (uint256 x) {
                 mark = x;
-            } catch {
+            } catch (bytes memory err) {
+                _revertIfStarved(err, before);
                 return false;
             }
             uint256 oneBase;
+            before = gasleft();
             try IPerpPool(other).getOneBase() returns (uint256 x) {
                 oneBase = x;
-            } catch {
+            } catch (bytes memory err) {
+                _revertIfStarved(err, before);
                 return false;
             }
             if (mark == 0 || oneBase == 0) return false;
@@ -599,24 +652,30 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
     /// and skips the pool.
     function _market(address follower, bytes32 sourceId, address pool) internal returns (bool, Market memory m) {
         bytes memory err;
+        uint256 before = gasleft();
         try IPerpPool(pool).getMarkPrice() returns (uint256 x) {
             m.mark = x;
         } catch (bytes memory e) {
+            _revertIfStarved(e, before);
             err = e;
         }
         if (m.mark != 0) {
+            before = gasleft();
             try IPerpPool(pool).getOrderBookParameters() returns (IPerpPool.OBParams memory ob) {
                 m.tick = ob.tickSize;
                 m.lot = ob.lotSize;
                 m.minQty = ob.minQuantity;
             } catch (bytes memory e) {
+                _revertIfStarved(e, before);
                 err = e;
             }
         }
         if (m.tick != 0) {
+            before = gasleft();
             try IPerpPool(pool).getOneBase() returns (uint256 x) {
                 m.oneBase = x;
             } catch (bytes memory e) {
+                _revertIfStarved(e, before);
                 err = e;
             }
         }
@@ -638,12 +697,14 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
         uint8 orderType
     ) internal returns (bool filled) {
         uint64 expiry = uint64((block.timestamp + ORDER_TTL) * 1e9);
+        uint256 before = gasleft();
         try IPerpPool(pool).placeOrderFor(follower, isBid, 0, price, qty, expiry, orderType, 0, address(0), 0) returns (
             bool success, uint128
         ) {
             if (success) return true;
             emit Refused(follower, sourceId, pool, Reason.BandUnfilled, "");
         } catch (bytes memory err) {
+            _revertIfStarved(err, before);
             bytes4 sel = bytes4(err);
             Reason r = sel == IOC_NO_FILL || sel == FOK_NO_FILL ? Reason.BandUnfilled : Reason.VenueRejected;
             emit Refused(follower, sourceId, pool, r, err);
@@ -651,15 +712,38 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
         return false;
     }
 
+    /// @dev True for a call that reverted without data after spending nearly all the gas it could get
+    /// (at most `cap`): it ran out of gas somewhere below (each nested frame keeps 1/64 back) rather
+    /// than answering.
+    function _starved(bytes memory err, uint256 before, uint256 cap) internal view returns (bool) {
+        if (err.length != 0) return false;
+        uint256 given = before - before / 64;
+        if (cap < given) given = cap;
+        return before - gasleft() >= given - given / 8;
+    }
+
+    /// @dev Out of gas is not a venue's answer: the sync aborts. In the reactive handler the member is
+    /// deferred; any other caller's transaction reverts, so its gas estimate always covers the venue calls.
+    function _revertIfStarved(bytes memory err, uint256 before) internal view {
+        if (_starved(err, before, type(uint256).max)) revert OutOfGasInSync();
+    }
+
+    function _defer(address[] storage members, uint256 from, bytes32 sourceId) internal {
+        uint256 n = members.length;
+        for (uint256 j = from; j < n; ++j) {
+            emit Deferred(members[j], sourceId);
+        }
+    }
+
     /// @dev Moves handler gas from the follower's tank to the hub's own balance, saturating at the tank.
     /// The STT never leaves the hub: it backs the handler fees the precompile draws from it.
-    function _charge(address follower, uint256 amount) internal {
+    function _charge(address follower, uint256 amount, bool reported) internal {
         uint256 tank = tankOf[follower];
         if (amount > tank) amount = tank;
         if (amount == 0) return;
         tankOf[follower] = tank - amount;
         totalTanks -= amount;
-        emit TankCharged(follower, amount);
+        if (reported) emit TankCharged(follower, amount);
     }
 
     function _markSynced(address follower, address pool) internal {

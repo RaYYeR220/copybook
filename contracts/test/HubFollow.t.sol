@@ -219,7 +219,7 @@ contract HubFollowTest is Base {
         assertEq(d.handlerFunctionSelector, ISomniaEventHandler.onEvent.selector);
         assertEq(d.priorityFeePerGas, 0);
         assertEq(d.maxFeePerGas, 20 gwei);
-        assertEq(d.gasLimit, 60_000_000);
+        assertEq(d.gasLimit, 200_000_000);
         assertFalse(d.isGuaranteed);
         assertFalse(d.isCoalesced);
 

@@ -170,8 +170,9 @@ contract HubReactiveTest is Base {
         assertGt(amount, 0, "charged");
         assertEq(amount % rate, 0, "whole gas units at the rate");
         uint256 gasUnits = amount / rate;
+        (, uint64 cap,,) = hub.gasParams();
         assertGt(gasUnits, hub.CHARGE_OVERHEAD_GAS(), "overhead plus measured gas");
-        assertLt(gasUnits, hub.CHARGE_OVERHEAD_GAS() + hub.PER_FOLLOWER_GAS_FLOOR(), "bounded by the floor");
+        assertLt(gasUnits, hub.CHARGE_OVERHEAD_GAS() + cap, "bounded by the slot");
     }
 
     // ---------- fan-out ----------
@@ -369,8 +370,9 @@ contract HubReactiveTest is Base {
         Vm.Log memory ev = _traderTo(btc, 50_000);
         uint256 subId = hub.subscriptionOf(sid, 0);
         address[] memory m = hub.membersOf(sid, 0);
-        uint256 floor = hub.PER_FOLLOWER_GAS_FLOOR();
-        assertEq(floor, 6_000_000);
+        (uint64 floor,, uint64 tailBase, uint64 perDefer) = hub.gasParams();
+        // what the handler must hold to start member #0: its slot plus the reserve for deferring all n
+        uint256 first = floor + tailBase + n * perDefer;
 
         // below the floor from the start: the whole group is deferred and nothing is sent
         vm.recordLogs();
@@ -385,7 +387,7 @@ contract HubReactiveTest is Base {
 
         // just above the floor: the first members are copied, every later one is deferred
         vm.recordLogs();
-        reactivity.fire{gas: floor * 105 / 100}(subId, ev.emitter, ev.topics, ev.data);
+        reactivity.fire{gas: first * 105 / 100}(subId, ev.emitter, ev.topics, ev.data);
         logs = vm.getRecordedLogs();
         uint256 copied;
         bool deferring;
@@ -493,7 +495,7 @@ contract HubReactiveTest is Base {
         // the last member leaves: the subscription is cancelled, the relay kept
         vm.expectCall(REACTIVITY, abi.encodeCall(ISomniaReactivityPrecompile.unsubscribe, (1)), 1);
         vm.expectEmit(true, false, false, true, address(hub));
-        emit CopybookHub.GroupClosed(sid, 0, 1);
+        emit CopybookHub.GroupClosed(sid, 0, 1, true);
         vm.prank(b);
         hub.unfollow(false);
 
@@ -546,7 +548,7 @@ contract HubReactiveTest is Base {
         );
 
         vm.expectEmit(true, false, false, true, address(hub));
-        emit CopybookHub.GroupClosed(sid, 0, 1);
+        emit CopybookHub.GroupClosed(sid, 0, 1, false);
         vm.prank(a);
         hub.unfollow(false);
         vm.clearMockedCalls();
@@ -556,17 +558,138 @@ contract HubReactiveTest is Base {
         assertFalse(hub.subscribed(sid, 0));
     }
 
-    // A cancel that ran out of gas reverts the unfollow, so a tight gas estimate cannot leak the subscription.
-    function test_unsubscribeStarvedOfGas_reverts() public {
+    // The cancel gets a fixed budget; one that burns all of it is reported, not fatal.
+    function test_unsubscribeBurningItsBudget_isBestEffort() public {
         address a = _f(1);
         _follow(a, 10_000);
         vm.etch(REACTIVITY, address(new GasSink()).code);
 
+        vm.expectEmit(true, false, false, true, address(hub));
+        emit CopybookHub.GroupClosed(sid, 0, 1, false);
         vm.prank(a);
-        vm.expectRevert(CopybookHub.UnsubscribeOutOfGas.selector);
         hub.unfollow(false);
         (bytes32 s,,,,,) = hub.followOf(a);
+        assertEq(s, bytes32(0));
+    }
+
+    // An unfollow that cannot fund the cancel's budget reverts, so a tight gas estimate cannot leak the
+    // subscription; with the budget covered the cancel goes through.
+    function test_unsubscribeNeedsItsBudgetUpFront() public {
+        address a = _f(1);
+        _follow(a, 10_000);
+        uint256 budget = hub.UNSUB_GAS();
+        assertEq(budget, 2_000_000);
+
+        vm.prank(a);
+        vm.expectRevert(CopybookHub.UnsubscribeOutOfGas.selector);
+        hub.unfollow{gas: budget}(false);
+        (bytes32 s,,,,,) = hub.followOf(a);
         assertEq(s, sid);
+
+        vm.expectEmit(true, false, false, true, address(hub));
+        emit CopybookHub.GroupClosed(sid, 0, 1, true);
+        vm.prank(a);
+        hub.unfollow{gas: budget * 64 / 63 + 150_000}(false);
+        assertFalse(hub.subscribed(sid, 0));
+    }
+
+    // ---------- dropped subscriptions ----------
+
+    function test_ensureSubscribed_resubscribesDroppedGroup() public {
+        address a = _f(1);
+        _follow(a, 10_000);
+        address relay = hub.relayOf(sid, 0);
+        reactivity.forceRemove(1); // the chain dropped it while the group still has a member
+
+        vm.expectEmit(true, false, false, true, address(hub));
+        emit CopybookHub.GroupOpened(sid, 0, relay, 2);
+        vm.prank(stranger);
+        hub.ensureSubscribed(sid, 0);
+        assertEq(hub.subscriptionOf(sid, 0), 2);
+        assertTrue(hub.subscribed(sid, 0));
+        (ISomniaReactivityPrecompile.SubscriptionData memory d, address subOwner) = reactivity.getSubscription(2);
+        assertEq(subOwner, address(hub));
+        assertEq(d.handlerContractAddress, relay);
+        assertEq(d.eventTopics[1], bytes32(uint256(uint160(trader))));
+
+        _fire(0, _traderTo(btc, 50_000));
+        assertEq(_size(btc, a), 50_000);
+
+        // a precompile that cannot answer counts as dropped too
+        vm.mockCallRevert(REACTIVITY, abi.encodeCall(ISomniaReactivityPrecompile.getSubscriptionInfo, (2)), bytes(""));
+        hub.ensureSubscribed(sid, 0);
+        vm.clearMockedCalls();
+        assertEq(hub.subscriptionOf(sid, 0), 3);
+    }
+
+    function test_ensureSubscribed_leavesLiveAndEmptyGroupsAlone() public {
+        address a = _f(1);
+        _follow(a, 10_000);
+
+        vm.recordLogs();
+        hub.ensureSubscribed(sid, 0); // live
+        hub.ensureSubscribed(sid, 1); // never opened
+        assertEq(vm.getRecordedLogs().length, 0);
+        assertEq(reactivity.count(), 1);
+
+        vm.prank(a);
+        hub.unfollow(false);
+        reactivity.forceRemove(1);
+        vm.recordLogs();
+        hub.ensureSubscribed(sid, 0); // closed and empty: nothing to keep alive
+        assertEq(vm.getRecordedLogs().length, 0);
+        assertFalse(hub.subscribed(sid, 0));
+    }
+
+    // ---------- gas parameters ----------
+
+    function test_gasParams_defaults() public view {
+        (uint64 floor, uint64 cap, uint64 tailBase, uint64 perDefer) = hub.gasParams();
+        assertEq(floor, 8_000_000);
+        assertEq(cap, 20_000_000);
+        assertEq(tailBase, 150_000);
+        assertEq(perDefer, 30_000);
+        (,, uint64 traderGas, uint64 themeGas,) = hub.subParams();
+        assertEq(traderGas, 200_000_000);
+        assertEq(themeGas, 200_000_000);
+    }
+
+    // An order that runs out of gas outside the reactive path reverts the call instead of being reported
+    // as a venue answer, so a gas estimate always covers the order.
+    function test_outOfGasOrder_revertsCatchUp() public {
+        address a = _f(1);
+        _follow(a, 10_000);
+        _traderTo(btc, 50_000);
+        btc.setBombFor(a, true);
+        vm.expectRevert(CopybookHub.OutOfGasInSync.selector);
+        hub.catchUp(a, _one(btc));
+
+        btc.setBombFor(a, false);
+        hub.catchUp(a, _one(btc));
+        assertEq(_size(btc, a), 50_000);
+    }
+
+    // Out of gas in the sync's own code (here a position read), not inside a venue call: still a deferral.
+    function test_outOfGasOutsideVenueCall_isDeferred() public {
+        address a = _f(1);
+        address b = _f(2);
+        address c = _f(3);
+        _follow(a, 10_000);
+        _follow(b, 10_000);
+        _follow(c, 10_000);
+        Vm.Log memory ev = _traderTo(btc, 50_000);
+        vm.mockFunction(
+            address(bank), address(new GasSink()), abi.encodeCall(IMarginBank.getPosition, (b, address(btc)))
+        );
+
+        vm.recordLogs();
+        _fire(0, ev);
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        vm.clearMockedCalls();
+        assertEq(_count(logs, CopybookHub.Deferred.selector, b), 1);
+        assertEq(_count(logs, CopybookHub.Refused.selector, b), 0);
+        assertEq(_size(btc, a), 50_000);
+        assertEq(_size(btc, c), 50_000);
     }
 
     // ---------- tank ----------
@@ -593,11 +716,13 @@ contract HubReactiveTest is Base {
         uint256 cb = _charged(logs, b);
         _assertCharge(ca, 10 gwei);
         _assertCharge(cb, 10 gwei);
+        uint256 overhead = hub.CHARGE_OVERHEAD_GAS();
         assertEq(hub.tankOf(a), TANK - ca);
         assertEq(hub.tankOf(b), TANK - cb);
-        assertEq(_count(logs, CopybookHub.TankCharged.selector, c), 0, "out of c's markets: free");
-        assertEq(hub.tankOf(c), TANK);
-        assertEq(hub.totalTanks(), total - ca - cb);
+        // outside c's markets: only the fixed overhead, without an event
+        assertEq(_count(logs, CopybookHub.TankCharged.selector, c), 0);
+        assertEq(hub.tankOf(c), TANK - overhead * 10 gwei);
+        assertEq(hub.totalTanks(), total - ca - cb - overhead * 10 gwei);
         assertEq(address(hub).balance, hubBalance, "charges stay in the hub");
 
         // basefee below the minimum: charged at 6 gwei
@@ -611,13 +736,19 @@ contract HubReactiveTest is Base {
         cb = _charged(logs, b);
         _assertCharge(ca, 6 gwei);
         _assertCharge(cb, 6 gwei);
-        assertEq(hub.totalTanks(), total - ca - cb);
+        assertEq(hub.totalTanks(), total - ca - cb - overhead * 6 gwei);
 
-        // already at target: nothing to do, nothing charged
+        // already at target: nothing to do, so only the overhead, silently
+        uint256 ta = hub.tankOf(a);
+        uint256 tb = hub.tankOf(b);
         vm.recordLogs();
         _fire(0, ev);
         logs = vm.getRecordedLogs();
-        assertEq(_charged(logs, a) + _charged(logs, b), 0);
+        assertEq(
+            _count(logs, CopybookHub.TankCharged.selector, a) + _count(logs, CopybookHub.TankCharged.selector, b), 0
+        );
+        assertEq(hub.tankOf(a), ta - overhead * 6 gwei);
+        assertEq(hub.tankOf(b), tb - overhead * 6 gwei);
 
         // the charge saturates at what is left in the tank
         _setTank(a, 1);
@@ -629,10 +760,14 @@ contract HubReactiveTest is Base {
         assertEq(_count(logs, CopybookHub.TankCharged.selector, a), 1);
         assertEq(_charged(logs, a), 1);
         assertEq(hub.tankOf(a), 0);
-        assertEq(hub.totalTanks(), total - 1 - _charged(logs, b));
+        assertEq(hub.totalTanks(), total - 1 - _charged(logs, b) - overhead * 6 gwei);
+
+        // an empty tank cannot go below zero
+        _fire(0, ev);
+        assertEq(hub.tankOf(a), 0);
 
         // catchUp is paid by its caller, not the tank
-        uint256 tb = hub.tankOf(b);
+        tb = hub.tankOf(b);
         _traderTo(btc, 80_000);
         hub.catchUp(b, _one(btc));
         assertEq(_size(btc, b), 40_000);

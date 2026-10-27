@@ -1,0 +1,3 @@
+@somnia-chain/reactivity-contracts/=node_modules/@somnia-chain/reactivity-contracts/contracts/
+@openzeppelin/contracts/=node_modules/@openzeppelin/contracts/
+forge-std/=node_modules/forge-std/src/

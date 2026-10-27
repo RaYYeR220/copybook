@@ -25,6 +25,16 @@ contract GasSink {
     }
 }
 
+/// Spends nearly all the gas it is given, then reverts with data of its own.
+contract GasBurner {
+    error Halted();
+
+    fallback() external {
+        while (gasleft() > 100_000) {}
+        revert Halted();
+    }
+}
+
 contract HubReactiveTest is Base {
     using stdStorage for StdStorage;
 
@@ -138,6 +148,20 @@ contract HubReactiveTest is Base {
                 logs[i].emitter == address(hub) && logs[i].topics[0] == sig
                     && logs[i].topics[1] == bytes32(uint256(uint160(who)))
             ) n++;
+        }
+    }
+
+    /// GroupDeferred logs for this source's `group`, and the last one's first deferred index.
+    function _groupDeferred(Vm.Log[] memory logs, uint32 group) internal view returns (uint256 n, uint256 from) {
+        for (uint256 i; i < logs.length; ++i) {
+            if (
+                logs[i].emitter != address(hub) || logs[i].topics[0] != CopybookHub.GroupDeferred.selector
+                    || logs[i].topics[1] != sid
+            ) continue;
+            (uint32 g, uint256 f) = abi.decode(logs[i].data, (uint32, uint256));
+            if (g != group) continue;
+            n++;
+            from = f;
         }
     }
 
@@ -374,39 +398,39 @@ contract HubReactiveTest is Base {
         // what the handler must hold to start member #0: its slot plus the reserve for deferring all n
         uint256 first = floor + tailBase + n * perDefer;
 
-        // below the floor from the start: the whole group is deferred and nothing is sent
+        // below the floor from the start: one GroupDeferred from index 0, nothing is sent
         vm.recordLogs();
         reactivity.fire{gas: floor}(subId, ev.emitter, ev.topics, ev.data);
         Vm.Log[] memory logs = vm.getRecordedLogs();
+        (uint256 bails, uint256 from) = _groupDeferred(logs, 0);
+        assertEq(bails, 1);
+        assertEq(from, 0);
         for (uint256 i; i < n; ++i) {
-            assertEq(_count(logs, CopybookHub.Deferred.selector, m[i]), 1);
+            assertEq(_count(logs, CopybookHub.Deferred.selector, m[i]), 0);
             assertEq(_count(logs, CopybookHub.Copied.selector, m[i]), 0);
             assertEq(_size(btc, m[i]), 0);
             assertEq(hub.tankOf(m[i]), TANK);
         }
 
-        // just above the floor: the first members are copied, every later one is deferred
+        // just above the floor: the first members are copied, the group is deferred from the next one
         vm.recordLogs();
         reactivity.fire{gas: first * 105 / 100}(subId, ev.emitter, ev.topics, ev.data);
         logs = vm.getRecordedLogs();
-        uint256 copied;
-        bool deferring;
+        (bails, from) = _groupDeferred(logs, 0);
+        assertEq(bails, 1);
+        assertGt(from, 0);
+        assertLt(from, n);
         for (uint256 i; i < n; ++i) {
-            uint256 c = _count(logs, CopybookHub.Copied.selector, m[i]);
-            uint256 d = _count(logs, CopybookHub.Deferred.selector, m[i]);
-            assertEq(c + d, 1, "copied or deferred");
-            if (d == 1) {
-                deferring = true;
+            if (i < from) {
+                assertEq(_count(logs, CopybookHub.Copied.selector, m[i]), 1);
+                assertEq(_size(btc, m[i]), 50_000);
+            } else {
+                assertEq(_count(logs, CopybookHub.Copied.selector, m[i]), 0);
                 assertEq(_size(btc, m[i]), 0);
                 assertEq(hub.tankOf(m[i]), TANK, "a deferred follower is not charged");
-            } else {
-                assertFalse(deferring, "deferral covers the rest of the group");
-                assertEq(_size(btc, m[i]), 50_000);
-                ++copied;
             }
         }
-        assertGt(copied, 0);
-        assertLt(copied, n);
+        uint256 copied = from;
 
         // catchUp converges the deferred followers
         for (uint256 i = copied; i < n; ++i) {
@@ -601,6 +625,8 @@ contract HubReactiveTest is Base {
         address relay = hub.relayOf(sid, 0);
         reactivity.forceRemove(1); // the chain dropped it while the group still has a member
 
+        // whatever is left of the old one is cancelled first (best effort), then the relay subscribes again
+        vm.expectCall(REACTIVITY, abi.encodeCall(ISomniaReactivityPrecompile.unsubscribe, (1)), 1);
         vm.expectEmit(true, false, false, true, address(hub));
         emit CopybookHub.GroupOpened(sid, 0, relay, 2);
         vm.prank(stranger);
@@ -615,11 +641,47 @@ contract HubReactiveTest is Base {
         _fire(0, _traderTo(btc, 50_000));
         assertEq(_size(btc, a), 50_000);
 
-        // a precompile that cannot answer counts as dropped too
-        vm.mockCallRevert(REACTIVITY, abi.encodeCall(ISomniaReactivityPrecompile.getSubscriptionInfo, (2)), bytes(""));
+        // the new subscription is live and hub-owned: calling again changes nothing
+        vm.prank(stranger);
         hub.ensureSubscribed(sid, 0);
+        assertEq(hub.subscriptionOf(sid, 0), 2);
+        assertEq(reactivity.count(), 2);
+    }
+
+    // Regression (review B): an unreadable answer for a live subscription must not let anyone mint
+    // duplicate hub-owned subscriptions on the same relay.
+    function test_ensureSubscribed_unreadableInfo_failsClosed() public {
+        address a = _f(1);
+        _follow(a, 10_000);
+        bytes4 unreadable = bytes4(keccak256("SubscriptionUnreadable()"));
+        bytes memory ensure = abi.encodeCall(CopybookHub.ensureSubscribed, (sid, 0));
+
+        vm.mockCallRevert(
+            REACTIVITY, abi.encodeWithSelector(ISomniaReactivityPrecompile.getSubscriptionInfo.selector), bytes("")
+        );
+        for (uint256 k; k < 5; ++k) {
+            vm.prank(stranger);
+            (bool ok, bytes memory ret) = address(hub).call(ensure);
+            assertFalse(ok, "a failed read reverts");
+            assertEq(bytes4(ret), unreadable);
+        }
         vm.clearMockedCalls();
-        assertEq(hub.subscriptionOf(sid, 0), 3);
+
+        // an answer too short to hold the owner fails closed too
+        vm.mockCall(
+            REACTIVITY,
+            abi.encodeWithSelector(ISomniaReactivityPrecompile.getSubscriptionInfo.selector),
+            abi.encode(address(hub))
+        );
+        (bool ok2, bytes memory ret2) = address(hub).call(ensure);
+        vm.clearMockedCalls();
+        assertFalse(ok2, "a short read reverts");
+        assertEq(bytes4(ret2), unreadable);
+
+        assertEq(reactivity.count(), 1, "no duplicate subscription");
+        assertEq(hub.subscriptionOf(sid, 0), 1);
+        _fire(0, _traderTo(btc, 50_000));
+        assertEq(_size(btc, a), 50_000);
     }
 
     function test_ensureSubscribed_leavesLiveAndEmptyGroupsAlone() public {
@@ -647,7 +709,7 @@ contract HubReactiveTest is Base {
         (uint64 floor, uint64 cap, uint64 tailBase, uint64 perDefer) = hub.gasParams();
         assertEq(floor, 8_000_000);
         assertEq(cap, 20_000_000);
-        assertEq(tailBase, 150_000);
+        assertEq(tailBase, 1_200_000);
         assertEq(perDefer, 30_000);
         (,, uint64 traderGas, uint64 themeGas,) = hub.subParams();
         assertEq(traderGas, 200_000_000);
@@ -667,6 +729,40 @@ contract HubReactiveTest is Base {
         btc.setBombFor(a, false);
         hub.catchUp(a, _one(btc));
         assertEq(_size(btc, a), 50_000);
+    }
+
+    // A member that spends almost all of a short slot and then reverts on its own leaves too little above
+    // the next reserve to touch its tank (a cold or missing key on Somnia): it is refused, but not billed.
+    function test_tailCharge_skippedWithoutColdKeyHeadroom() public {
+        address b = _f(1);
+        _follow(b, 10_000);
+        Vm.Log memory ev = _traderTo(btc, 50_000);
+        bytes memory halted = abi.encodeWithSelector(GasBurner.Halted.selector);
+        vm.mockFunction(
+            address(bank), address(new GasBurner()), abi.encodeCall(IMarginBank.getPosition, (b, address(btc)))
+        );
+        uint256 subId = hub.subscriptionOf(sid, 0);
+
+        // with gas to spare the refusal is billed as usual
+        vm.recordLogs();
+        reactivity.fire(subId, ev.emitter, ev.topics, ev.data);
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        assertEq(_count(logs, CopybookHub.Refused.selector, b), 1);
+        assertEq(_count(logs, CopybookHub.TankCharged.selector, b), 1);
+
+        // in a slot cut to the handler's budget there is no headroom left: no charge, no event
+        uint256 tank = hub.tankOf(b);
+        uint256 total = hub.totalTanks();
+        (uint64 floor,, uint64 tailBase, uint64 perDefer) = hub.gasParams();
+        vm.expectEmit(true, true, true, true, address(hub));
+        emit CopybookHub.Refused(b, sid, address(btc), Reason.VenueRejected, halted);
+        vm.recordLogs();
+        reactivity.fire{gas: (floor + tailBase + perDefer) * 11 / 10}(subId, ev.emitter, ev.topics, ev.data);
+        logs = vm.getRecordedLogs();
+        vm.clearMockedCalls();
+        assertEq(_count(logs, CopybookHub.TankCharged.selector, b), 0);
+        assertEq(hub.tankOf(b), tank);
+        assertEq(hub.totalTanks(), total);
     }
 
     // Out of gas in the sync's own code (here a position read), not inside a venue call: still a deferral.

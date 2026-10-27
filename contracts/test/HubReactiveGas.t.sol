@@ -10,7 +10,7 @@ import {Policy, SourceKind} from "../src/Types.sol";
 import {IMarginBank} from "../src/interfaces/IDreamPerps.sol";
 
 /// A group member whose order runs out of gas, in groups of 8 and 64. The handler must survive it,
-/// report the member as Deferred rather than refused, and not bill it for a slot it could not finish.
+/// defer the member rather than refuse it, and not bill it for a slot it could not finish.
 contract HubReactiveGasTest is Base {
     bytes32 internal constant POSITION_UPDATED = 0xf7816a375f0ca01053ed213b57908bff79f578810301d50971a5f685529b82de;
     uint256 internal constant TANK = 0.5 ether;
@@ -71,6 +71,22 @@ contract HubReactiveGasTest is Base {
         }
     }
 
+    /// Asserts the handler bailed out exactly once, deferring the group from `from` on, with no per-member
+    /// Deferred events.
+    function _assertGroupDeferred(Vm.Log[] memory logs, uint256 from) internal view {
+        uint256 n;
+        for (uint256 i; i < logs.length; ++i) {
+            if (logs[i].emitter != address(hub) || logs[i].topics[0] != CopybookHub.GroupDeferred.selector) continue;
+            assertEq(logs[i].topics[1], sid);
+            (uint32 g, uint256 f) = abi.decode(logs[i].data, (uint32, uint256));
+            assertEq(g, 0);
+            assertEq(f, from, "deferred from");
+            n++;
+        }
+        assertEq(n, 1, "one GroupDeferred");
+        assertEq(_count(logs, CopybookHub.Deferred.selector), 0, "no per-member Deferred");
+    }
+
     function _countFor(Vm.Log[] memory logs, bytes32 sig, address who) internal view returns (uint256 n) {
         for (uint256 i; i < logs.length; ++i) {
             if (
@@ -91,7 +107,7 @@ contract HubReactiveGasTest is Base {
         (bool ok,) = _fire(6_300_000, ev);
         Vm.Log[] memory logs = vm.getRecordedLogs();
         assertTrue(ok, "handler survives");
-        assertEq(_count(logs, CopybookHub.Deferred.selector), 8);
+        _assertGroupDeferred(logs, 0);
         assertEq(_count(logs, CopybookHub.Refused.selector), 0);
         assertEq(_count(logs, CopybookHub.Copied.selector), 0);
 
@@ -103,8 +119,7 @@ contract HubReactiveGasTest is Base {
         logs = vm.getRecordedLogs();
         assertTrue(ok, "handler survives");
         assertGt(used, 8_000_000, "member #0 spent its slot");
-        assertEq(_count(logs, CopybookHub.Deferred.selector), 8);
-        assertEq(_countFor(logs, CopybookHub.Deferred.selector, _f(1)), 1);
+        _assertGroupDeferred(logs, 0);
         assertEq(_count(logs, CopybookHub.Refused.selector), 0);
         assertEq(_count(logs, CopybookHub.TankCharged.selector), 0);
         assertEq(hub.tankOf(_f(1)), TANK, "no charge for the burned slot");
@@ -124,7 +139,7 @@ contract HubReactiveGasTest is Base {
         (bool ok,) = _fire(6_300_000, ev);
         Vm.Log[] memory logs = vm.getRecordedLogs();
         assertTrue(ok, "handler survives");
-        assertEq(_count(logs, CopybookHub.Deferred.selector), 64);
+        _assertGroupDeferred(logs, 0);
 
         vm.recordLogs();
         uint256 used;
@@ -132,7 +147,7 @@ contract HubReactiveGasTest is Base {
         logs = vm.getRecordedLogs();
         assertTrue(ok, "one member's out-of-gas does not abort the handler");
         assertGt(used, 8_000_000, "member #0 spent its slot");
-        assertEq(_count(logs, CopybookHub.Deferred.selector), 64);
+        _assertGroupDeferred(logs, 0);
         assertEq(_count(logs, CopybookHub.Refused.selector), 0);
         assertEq(_count(logs, CopybookHub.Copied.selector), 0);
         assertEq(hub.tankOf(_f(1)), TANK);
@@ -169,6 +184,9 @@ contract HubReactiveGasTest is Base {
         assertTrue(ok);
         uint256 copied = _count(logs, CopybookHub.Copied.selector);
         assertGt(copied, 0);
-        assertEq(copied + _count(logs, CopybookHub.Deferred.selector), 64);
+        _assertGroupDeferred(logs, copied);
+        for (uint256 i = 1; i <= copied; ++i) {
+            assertEq(_countFor(logs, CopybookHub.Copied.selector, _f(i)), 1, "copied in member order");
+        }
     }
 }

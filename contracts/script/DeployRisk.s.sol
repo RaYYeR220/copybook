@@ -15,6 +15,8 @@ import {IAgentRequester} from "../src/risk/interfaces/IAgentRequester.sol";
 ///   is not the broadcaster, the owner calls `setReviewer` instead).
 /// Wiring that needs the other side's address afterwards: `reviewer.setGate(gate)` on Shannon and the hub's
 /// `setRiskGate(gate)` on Hideki.
+/// Replacing the reviewer of a live gate: run on Shannon only, with GATE set to that gate, then `setReviewer(new)`
+/// on the gate; the old reviewer's balance moves with its owner-only `withdraw`.
 contract DeployRisk is Script {
     uint256 internal constant SHANNON = 50312;
     uint256 internal constant HIDEKI = 50383;
@@ -43,6 +45,7 @@ contract DeployRisk is Script {
         console.log("owner       ", owner);
         console.log("gate        ", gate);
         console.log("baseUrl     ", baseUrl);
+        console.log("field       ", reviewer.summarySelector());
     }
 
     function deployGate() public returns (RiskGate gate) {

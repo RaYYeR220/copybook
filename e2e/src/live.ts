@@ -70,16 +70,36 @@ async function traderSourceId() {
 
 async function gasParams() {
   const g = await hubRead<readonly bigint[]>("gasParams");
-  return { floor: g[0], perFollowerCap: g[1], themePerFollowerCap: g[2], tailBase: g[3], perDefer: g[4], chargeOverhead: g[5] };
+  return {
+    floor: g[0],
+    perFollowerCap: g[1],
+    themePerFollowerCap: g[2],
+    tailBase: g[3],
+    perDefer: g[4],
+    chargeOverhead: g[5],
+    riskGateGas: g[6],
+  };
 }
 
 // ---------------------------------------------------------------- leader trades and the hub's reaction
 
 async function leaderTrade(s: Scenario, label: string, pool: Address, isBid: boolean, qty: bigint): Promise<TransactionReceipt> {
+  return ownTrade(leaderMk, s, label, pool, isBid, qty);
+}
+
+/** An IOC 1% through mark, placed by the account behind `mk` itself (not through the hub). */
+async function ownTrade(
+  mk: ReturnType<typeof markets>,
+  s: Scenario,
+  label: string,
+  pool: Address,
+  isBid: boolean,
+  qty: bigint,
+): Promise<TransactionReceipt> {
   const m = await market(pool);
   const raw = isBid ? (m.mark * 10_100n) / 10_000n : (m.mark * 9_900n) / 10_000n;
   const price = isBid ? ((raw + m.tick - 1n) / m.tick) * m.tick : (raw / m.tick) * m.tick;
-  const r = (await leaderMk.trader.placePerpOrder({ pool, isBid, price, quantity: qty, orderType: 2, gas: 20_000_000n })) as {
+  const r = (await mk.trader.placePerpOrder({ pool, isBid, price, quantity: qty, orderType: 2, gas: 20_000_000n })) as {
     hash: Hex;
     receipt: TransactionReceipt;
   };
@@ -188,7 +208,7 @@ async function setup(s: Scenario) {
     bal[k] = { stt: formatEther(await pub.getBalance({ address: a })), margin: formatEther(await equity(a)) };
   }
   note(s, "balances", bal);
-  check(s, (await pub.getBalance({ address: OWNER })) >= parseEther("45"), "hub owner keeps >= 45 STT");
+  check(s, (await pub.getBalance({ address: OWNER })) >= parseEther("50"), "hub owner keeps >= 50 STT");
 }
 
 async function approvals(s: Scenario) {
@@ -259,6 +279,41 @@ async function moreTrades(s: Scenario) {
     await copied(s, label, t, FOLLOWER, isCopy(pools.BTC, target));
     check(s, (await size(FOLLOWER, pools.BTC)) === target, `follower BTC = ${target}`);
   }
+}
+
+/**
+ * A flip whose close fills only in part can leave the follower a residue on the old side below the venue minimum,
+ * which no close can take. The live book cannot be made to fill the hub's close in part on demand, so the follower
+ * builds that state with two orders of its own (buy minimum + residue, sell minimum). The leader then opens on the
+ * other side: the hub's one sell of residue + target crosses zero, in the leader's block.
+ */
+async function residueCross(s: Scenario) {
+  const m = await market(pools.BTC);
+  const dust = m.minQty - 3n * m.lot; // 0.0001 BTC: below the 0.00013 minimum, so no close can take it
+  check(s, dust > 0n && dust < m.minQty, `residue ${dust} is below the venue minimum ${m.minQty}`);
+  check(s, (await size(FOLLOWER, pools.BTC)) === 0n && (await size(LEADER, pools.BTC)) === 0n, "follower and leader flat on BTC");
+  const own = markets("FOLLOWER");
+  await ownTrade(own, s, `follower's own buy of ${m.minQty + dust} BTC units`, pools.BTC, true, m.minQty + dust);
+  await ownTrade(own, s, `follower's own sell of ${m.minQty}`, pools.BTC, false, m.minQty);
+  const left = await size(FOLLOWER, pools.BTC);
+  note(s, "follower BTC residue", left);
+  check(s, left === dust, `follower holds ${dust} long (is ${left})`);
+
+  const t = await leaderTrade(s, "leader sells 0.0005 BTC (opens short)", pools.BTC, false, 50_000n);
+  const rx = await copied(s, "residue crossed in one order", t, FOLLOWER, isCopy(pools.BTC, -50_000n));
+  const copies = rx?.events.filter((e) => e.eventName === "Copied") ?? [];
+  check(
+    s,
+    copies.length === 1 && copies[0].args.fromSize === dust && copies[0].args.toSize === -50_000n,
+    `one Copied ${dust} -> -50000 (the exit half sent nothing for the residue)`,
+  );
+  check(s, !rx?.events.some((e) => e.eventName === "Refused"), "no refusal");
+  check(s, (await size(FOLLOWER, pools.BTC)) === -50_000n, "follower short 0.0005 BTC");
+  if (rx) proof.measurements.residueCross = { handlerGas: Number(rx.receipt.gasUsed), memberGas: await memberGas(rx.events, rx.receipt.blockNumber) };
+
+  const c = await leaderTrade(s, "leader buys 0.0005 BTC (closes)", pools.BTC, true, 50_000n);
+  await copied(s, "close after the cross", c, FOLLOWER, isCopy(pools.BTC, 0n));
+  check(s, (await size(FOLLOWER, pools.BTC)) === 0n, "follower flat");
 }
 
 /** The thinnest market our accounts can trade where nothing rests within 5 bps of mark on the ask side. */
@@ -597,7 +652,7 @@ async function gasTuning(s: Scenario) {
     address: HUB,
     abi: hubAbi,
     functionName: "setGasParams",
-    args: [floor, gp.perFollowerCap, gp.themePerFollowerCap, gp.tailBase, gp.perDefer, overhead],
+    args: [floor, gp.perFollowerCap, gp.themePerFollowerCap, gp.tailBase, gp.perDefer, overhead, gp.riskGateGas],
   });
   const after = await gasParams();
   note(s, "gasParams after", after);
@@ -654,6 +709,7 @@ const ALL: [string, (s: Scenario) => Promise<void>][] = [
   ["open", (s) => openClose(s, "open")],
   ["close", (s) => openClose(s, "close")],
   ["sameblock", moreTrades],
+  ["residue", residueCross],
   ["band", bandRefusal],
   ["theme", theme],
   ["floor", equityFloor],

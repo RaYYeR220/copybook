@@ -118,7 +118,7 @@ function basePolicy(a: { maxNotionalUsdso: string | number; maxTotalNotionalUsds
 const APPROVAL_NOTE =
   "The first live call also sends a one-time operator approval to dreamDEX's operator registry: setOperatorApprovalGlobal(hub, [placeOrderFor], true). " +
   "This grant is GLOBAL: it covers every perps market for this wallet, not just this follow or trader, and it PERSISTS after unfollow until revoked (revoke_operator). " +
-  "It lets the Copybook hub place, cancel and reduce orders in this wallet's dreamDEX account; it can never withdraw funds. " +
+  "It lets the Copybook hub place orders for this wallet's perps account (opening, increasing, reducing or closing positions); it cannot withdraw or move funds, and it cannot cancel orders. " +
   "It is skipped when already granted, and a re-run after a partial failure resumes from the first undone step.";
 
 /** Sends one transaction and waits for it. The hash is recorded BEFORE the wait, so a timeout while waiting still reports it. */
@@ -129,7 +129,7 @@ async function step<O>(sent: string[], label: string, send: () => Promise<{ hash
 }
 
 /** Runs a write sequence; every failure after the first send, of any kind, reports what is already on chain. */
-async function sequence<T>(what: string, sent: string[], fn: () => Promise<T>): Promise<T> {
+async function sequence<T>(what: string, sent: string[], fn: () => Promise<T>, multiStep = false): Promise<T> {
   try {
     return await guard(what, fn);
   } catch (e) {
@@ -138,7 +138,9 @@ async function sequence<T>(what: string, sent: string[], fn: () => Promise<T>): 
     throw new Refusal(`${what} after sending ${sent.length} transaction(s): ${reason}`, {
       ...(e instanceof Refusal ? e.details : {}),
       alreadySent: [...sent],
-      resume: "Call again: steps already on chain are skipped, so the flow resumes at the first undone step. Check the hashes on the explorer before retrying.",
+      resume: multiStep
+        ? "Re-run the same call: steps already on chain are skipped, so the flow resumes at the first undone step."
+        : "Check alreadySent on the explorer before retrying: re-running sends a new transaction (a second thesis, another review fee, a repeated revoke or unfollow).",
     });
   }
 }
@@ -208,7 +210,7 @@ async function runFollow(
   const outcome = await sequence("Follow not completed", sent, async () => {
     if (!approve.done) await step(sent, "approveOperator", () => copybook.approveOperator(true));
     return step(sent, "follow", () => copybook.follow({ target, policy: input.policy, tank: input.tank }));
-  });
+  }, true);
   return {
     dryRun: false,
     sent: true,
@@ -525,7 +527,7 @@ export function buildTools(deps: Deps): ToolDef[] {
         write: true,
         description:
           "Withdraws the global operator grant (setOperatorApprovalGlobal(hub, [placeOrderFor], false)) that follow_trader and follow_thesis send. The grant covers every perps market for this wallet and persists after unfollow, so revoke it once the agent is done following. " +
-          "While it stands the hub can place, cancel and reduce orders in this wallet's dreamDEX account (never withdraw). Refused while the wallet still follows something, since the hub could no longer copy: unfollow first. DRY-RUN BY DEFAULT.",
+          "While it stands the grant lets the Copybook hub place orders for this wallet's perps account (opening, increasing, reducing or closing positions); it cannot withdraw or move funds, and it cannot cancel orders. Refused while the wallet still follows something, since the hub could no longer copy: unfollow first. DRY-RUN BY DEFAULT.",
         inputSchema: { dryRun: dryRunField },
       },
       async ({ dryRun }) => {

@@ -387,6 +387,16 @@ describe("zero cap", () => {
   });
 });
 
+describe("zero cap, thesis", () => {
+  it("rejects maxNotionalUsdso 0 for follow_thesis before any chain call", async () => {
+    const { deps, copybook } = fakeDeps();
+    const r = await call(deps, "follow_thesis", { themeId: 1, allocationUsdso: "200", maxNotionalUsdso: "0", tankStt: "0.5" });
+    expect(r.isError).toBe(true);
+    expect(r.body.reason).toMatch(/above 0/);
+    expect(copybook.preflightFollow).not.toHaveBeenCalled();
+  });
+});
+
 describe("partial failures", () => {
   it("approve succeeds, follow rejects with a non-SDK error: alreadySent carries the approve hash and a resume hint", async () => {
     const { deps, copybook } = fakeDeps();
@@ -394,7 +404,7 @@ describe("partial failures", () => {
     const { isError, body } = await call(deps, "follow_trader", { trader: TRADER, ...policyArgs, dryRun: false });
     expect(isError).toBe(true);
     expect(body.alreadySent).toEqual(["approveOperator 0xaaa"]);
-    expect(body.resume).toMatch(/resumes/);
+    expect(body.resume).toMatch(/Re-run the same call: steps already on chain are skipped/);
   });
 
   it("a timeout while waiting still reports the hash that was sent", async () => {
@@ -409,6 +419,9 @@ describe("partial failures", () => {
     copybook.createTheme.mockResolvedValue({ hash: "0xeee", wait: vi.fn(async () => { throw new Error("rpc down"); }) });
     const { body } = await call(deps, "create_thesis", { name: "x", legs: [{ pool: POOL, weightBps: 5000 }], dryRun: false });
     expect(body.alreadySent).toEqual(["createTheme 0xeee"]);
+    expect(body.resume).toMatch(/Check alreadySent on the explorer before retrying/);
+    expect(body.resume).toMatch(/second thesis/);
+    expect(body.resume).not.toMatch(/skipped/);
   });
 });
 
@@ -419,8 +432,9 @@ describe("approval scope disclosure and revoke_operator", () => {
       const d = find(buildTools(deps), name).description;
       expect(d).toMatch(/GLOBAL/);
       expect(d).toMatch(/PERSISTS after unfollow/);
-      expect(d).toMatch(/place, cancel and reduce orders/);
-      expect(d).toMatch(/never withdraw/);
+      expect(d).toMatch(/place orders for this wallet's perps account/);
+      expect(d).toMatch(/cannot cancel orders/);
+      expect(d).toMatch(/cannot withdraw or move funds/);
     }
     const { body } = await call(deps, "follow_trader", { trader: TRADER, ...policyArgs });
     expect(body.note).toMatch(/GLOBAL/);

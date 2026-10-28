@@ -128,3 +128,7 @@ and the block delta; `measurements` holds gas figures and venue behaviour. When 
 the previous hub's proof is kept beside it as `out/proof-<hub>.json`.
 
 `npm run typecheck` checks the TypeScript.
+
+## After a fresh deploy
+
+Before the first follow, the owner applies the gas parameters measured on Hideki (handler floor, charge overhead, risk-gate budget) with `setGasParams`, and the subscription parameters (fees, gas limits, guaranteed delivery) with `setSubParams`. The current deployment uses: `setGasParams` floor 12,000,000 · per-follower cap 20,000,000 · theme per-follower cap 90,000,000 · tail base 1,200,000 · per-deferral 30,000 · charge overhead 150,000 · risk-gate budget 2,000,000; `setSubParams` priority fee 0 · max fee 20 gwei · trader and theme gas limits 200,000,000 · guaranteed delivery on.

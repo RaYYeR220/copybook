@@ -36,7 +36,7 @@ contract AllowGate is IRiskGate {
 
 /// Hardening: gas exhaustion inside the handler, latches, hostile gates and subscriptions, and venue edge cases.
 /// Each test pins a behaviour the hub must keep where the happy-path suites do not reach.
-contract HubAuditTest is Base {
+contract HubEdgeCasesTest is Base {
     using stdStorage for StdStorage;
 
     StdStorage internal _store;

@@ -1,12 +1,18 @@
-// The published risk rubric. The validators on Shannon apply it to a trader's 30-day summary (the key=value line
-// served by /api/risk/<trader>); this file applies the same rules in code, so every verdict can be checked.
+// The published risk rubric. The validators on Shannon apply it to a trader's 30-day key=value line served by
+// /api/risk/<trader> (the full `summary` in run v2, the `rubric` field with only the rule inputs from run v3 on); this
+// file applies the same rules in code, so every verdict can be checked.
 //
 //   BLOCK   if liquidations30d >= 2, or maxDrawdownPct30d is present and >= 50.
 //   CAUTION if (not BLOCK and) any of: liquidations30d == 1; trades30d < 10; history=none; partial=1;
 //           maxDrawdownPct30d present and >= 25.
 //   OK      otherwise.
 //
-// n/a means unknown, not safe: a rule input that is n/a or missing never yields OK on its own (it is read as CAUTION).
+// Unknown is not safe, and what an absent key means depends on the key:
+// - liquidations30d, trades30d: written as n/a, or missing, the input counts as CAUTION;
+// - maxDrawdownPct30d: written as n/a it counts as CAUTION; absent, the drawdown rules do not apply (the endpoint
+//   leaves it out when it cannot be estimated);
+// - history, partial: flags; only history=none and partial=1 fire, and an absent flag means the trader has history
+//   and the data is complete (partial=0).
 
 export type Tier = "OK" | "CAUTION" | "BLOCK";
 export const TIERS: readonly Tier[] = ["OK", "CAUTION", "BLOCK"];

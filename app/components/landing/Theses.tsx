@@ -128,7 +128,7 @@ function Asterism() {
 
 const pct = (bps: number) => `${Math.abs(bps) / 100}`;
 
-/** Plate III: a thesis is a basket that opens whole, with the live rebalance as proof. */
+/** Plate III: a thesis is a basket whose new legs open together, with a live rebalance copied in its own block. */
 export function Theses() {
   const t = thesisRebalance;
   const before = t.before.map((l) => pct(l.weightBps)).join("/");
@@ -141,7 +141,7 @@ export function Theses() {
             Plate <b>III</b> · Theses
           </>
         }
-        tabEnd="One basket · one transaction"
+        tabEnd="One basket · opens in one transaction"
       >
         <div className={`${n.two} ${n.wide}`}>
           <div className="reveal">
@@ -150,7 +150,7 @@ export function Theses() {
               A thesis opens <em>whole.</em>
             </h2>
             <p className={`lead ${n.leadSm}`}>
-              Follow a basket of legs with weights. Every leg settles in the same transaction — or none of them do.
+              Follow a basket of legs with weights. Every new leg opens in one transaction — or none do. Exits always go through.
             </p>
             <p className={n.listHead}>Example thesis · {EXAMPLE.name}</p>
             <ul className={styles.legs} aria-label={`Example thesis legs: ${EXAMPLE.name}`}>
@@ -166,10 +166,10 @@ export function Theses() {
               ))}
             </ul>
             <p className={styles.whole}>Opens every leg in one transaction, or none.</p>
-            <p className={styles.none}>If one leg can’t fill inside its band, the whole basket reverts — nothing half-open.</p>
+            <p className={styles.none}>If one leg can’t fill inside its band, the whole opening reverts — nothing half-open.</p>
             <p className={n.live}>
-              Live run · thesis <b>“{t.name}”</b> rebalanced {before} → {after}, both legs resized in one transaction,
-              same block <b>#{fmtInt(t.block)}</b> ·{" "}
+              Live run · thesis <b>“{t.name}”</b> rebalanced {before} → {after}; the copy followed in the rebalance’s own
+              block <b>#{fmtInt(t.block)}</b> ·{" "}
               <a className="lnk" href={links.rebalanceCopyTx} target="_blank" rel="noopener noreferrer">
                 tx ↗
               </a>

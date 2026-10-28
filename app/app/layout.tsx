@@ -32,7 +32,7 @@ const fragmentMono = Fragment_Mono({
 export const metadata: Metadata = {
   title: { default: "Copybook", template: "%s · Copybook" },
   description:
-    "Follow a trader or a thesis on dreamDEX perps. Somnia validators copy every change into your own account in the same block.",
+    "Follow a trader or a thesis on dreamDEX perps. Somnia validators run your copy in your own account, in the same block as the move.",
   applicationName: "Copybook",
 };
 

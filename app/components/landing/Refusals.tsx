@@ -14,7 +14,7 @@ import styles from "./Refusals.module.css";
 const POLICY_REASONS: [RefusalReason, string][] = [
   ["BandUnfilled", "The fill would land outside your price band."],
   ["TotalCap", "The copy would push your total exposure past your cap."],
-  ["EquityFloor", "Your equity fell under your floor; copying pauses until you top up."],
+  ["EquityFloor", "Equity fell under your floor: your copied positions are closed and copying stops until you resume."],
   ["TankEmpty", "The gas tank can’t pay for the copy."],
   ["RiskGate", "Your AI guard returned BLOCK for this trader."],
   ["BelowMinimum", "Your scaled size rounds below one lot or the venue minimum."],

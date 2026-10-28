@@ -67,7 +67,7 @@ export function Closing() {
               Open the app
             </Button>
           </div>
-          <p className={styles.small}>Somnia testnet · no server · exits always copied</p>
+          <p className={styles.small}>Somnia testnet · copies run on-chain · exits always copied</p>
         </div>
       </Frame>
     </section>

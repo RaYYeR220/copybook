@@ -57,6 +57,7 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
     event Unfollowed(address indexed follower, bytes32 indexed sourceId, bool flattened);
     event PolicyUpdated(address indexed follower);
     event Resumed(address indexed follower);
+    /// @param price the limit price of the order that moved the position (its band edge), not the fill price
     event Copied(
         address indexed follower,
         bytes32 indexed sourceId,
@@ -89,7 +90,8 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
         uint64 themePerFollowerCap,
         uint64 tailBase,
         uint64 perDefer,
-        uint64 chargeOverhead
+        uint64 chargeOverhead,
+        uint64 riskGateGas
     );
     event NewFollowsPaused(bool paused);
     event SurplusWithdrawn(address indexed to, uint256 amount);
@@ -111,8 +113,10 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
     /// the reserve, then its increases in a second one of at least `floor` and at most `perFollowerCap`
     /// (`themePerFollowerCap` for a theme member, which syncs every leg). The handler always keeps
     /// `tailBase + perDefer * remainingMembers` (plus a fixed allowance for one Deferred and its latch) back so
-    /// it can still report the rest of the group as deferred. Each member is billed its measured gas plus `chargeOverhead` for the shared work around it
-    /// (the tank write, a cold key on Somnia).
+    /// it can still report the rest of the group as deferred. Each member is billed its measured gas plus
+    /// `chargeOverhead` for the shared work around it (the tank write, a cold key on Somnia). `riskGateGas` is
+    /// the fixed budget the risk gate answers in, on every gated increase (a trader market or a theme's set):
+    /// a gate that needs more, or burns it, refuses the increase.
     struct GasParams {
         uint64 floor;
         uint64 perFollowerCap;
@@ -120,6 +124,7 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
         uint64 tailBase;
         uint64 perDefer;
         uint64 chargeOverhead;
+        uint64 riskGateGas;
     }
 
     /// @dev One event as every member's phases see it: the trader's pool and live size, or the theme's legs.
@@ -163,6 +168,9 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
     uint256 internal constant MIN_PER_DEFER = 20_000;
     uint256 internal constant MIN_CHARGE_OVERHEAD = 20_000;
     uint256 internal constant MAX_CHARGE_OVERHEAD = 2_000_000;
+    /// @dev Bounds of the risk gate's budget.
+    uint256 internal constant MIN_RISK_GATE_GAS = 200_000;
+    uint256 internal constant MAX_RISK_GATE_GAS = 5_000_000;
     /// @dev Room a subscription's gas limit keeps above the handler's floor and tail reserve for its own
     /// dispatch and the event checks.
     uint256 internal constant HANDLER_MARGIN_GAS = 2_000_000;
@@ -233,7 +241,8 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
             themePerFollowerCap: 90_000_000,
             tailBase: 1_200_000,
             perDefer: 30_000,
-            chargeOverhead: 300_000
+            chargeOverhead: 300_000,
+            riskGateGas: 2_000_000
         });
         themeGroupSize = 2;
     }
@@ -246,7 +255,8 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
     /// @notice Follow a source. Trader, `joinPools` non-empty: the hub manages only those markets and
     /// copies the source's current positions there now; every other market of the follower is never
     /// touched. Empty (`allowAll`): the hub manages every market the source trades, including any position
-    /// the follower already holds there, and nothing is opened until the source moves.
+    /// the follower already holds there. Nothing is opened in this call, but anyone's catchUp opens the
+    /// source's existing book (every market it holds now), as the source's next move would.
     /// Theme (`ref` = themeId, `joinPools` empty): the hub manages every pool that is or becomes a leg of
     /// the theme while followed, sized from `p.allocation`, including a position the follower opened there
     /// by hand; use a dedicated wallet per source. The whole basket opens now, all legs or none.
@@ -361,8 +371,9 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
         if (pending) f.exitPending = false;
     }
 
-    /// @notice Equity-floor check. Below the floor the follow is paused and every synced position closed.
-    /// A stop raised in the handler whose closes did not finish (see pendingOf) is finished here, on this
+    /// @notice Equity-floor check. Below the floor the follow is paused and every synced position closed;
+    /// Stopped is emitted only when this call pauses it, while the closes are tried on every call. A stop
+    /// raised in the handler whose closes did not finish (see pendingOf) is finished here, on this
     /// call's gas, whatever the floor says now. Once a pass has run to the end (out of gas reverts it) the
     /// follow is released from pendingOf; any position still open (dust the venue cannot take, or a market
     /// it cannot price now) is reported with FlattenIncomplete.
@@ -406,7 +417,9 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
     /// @notice Entry point for a group's relay, run by the hub's own subscription only (Somnia makes the
     /// subscription owner the transaction origin). The event only names the pool (trader) or the theme; the
     /// source is read live (the trader's position, the theme's legs), so a delayed or reordered event can
-    /// never open what the source no longer holds.
+    /// never open what the source no longer holds. It is read once per delivery, before the first member: if
+    /// a member's order fills against the source's own resting order, later members of the same delivery
+    /// still act on the size read before it (the next event brings them to the new size).
     /// Each member runs in two self-calls (see GasParams), so one member's failure stays with it. First its
     /// exits, on everything above the reserve: they only reduce and stand whatever follows; if they run out
     /// of gas the member is Deferred, unbilled, and latched (pendingOf). Then its increases in a bounded slot;
@@ -499,9 +512,11 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
         } else if (_outOfGas(ret, start, exitSlot)) {
             // never billed: a source must not drain tanks with exits too heavy to finish. Latched, so the next
             // events skip the member instead of burning the handler on the same exits again. A trader's event
-            // market joins its synced set (an all-markets follow may not have it yet), so the catchUp that
-            // releases the latch runs this exit first.
-            if (!d.theme) CopyEngine._markSynced(_books, follower, d.pool);
+            // market joins its synced set when the follow manages it (an all-markets follow may not have it
+            // yet), so the catchUp that releases the latch runs this exit first.
+            if (!d.theme && CopyEngine._inFollow(_books, f, follower, d.pool)) {
+                CopyEngine._markSynced(_books, follower, d.pool);
+            }
             f.exitPending = true;
             emit Deferred(follower, d.sourceId);
             return true;
@@ -661,14 +676,26 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
         return (f.group, f.index);
     }
 
+    /// @notice STT above the followers' tanks and the precompile's MIN_SUBSCRIPTION_BALANCE (0 when below):
+    /// what withdrawSurplus can send. The precompile pays every handler run out of the hub's balance, and
+    /// members' tanks pay it back afterwards (TankCharged); gas no member is billed for (a run deferred or
+    /// cut short before its charge, shared work beyond chargeOverhead) comes out of this surplus, and once
+    /// it is gone, out of the reserve that keeps subscriptions alive.
+    function surplus() public view returns (uint256) {
+        uint256 locked = MIN_SUBSCRIPTION_BALANCE + totalTanks;
+        uint256 balance = address(this).balance;
+        return balance > locked ? balance - locked : 0;
+    }
+
     // ---------------------------------------------------------------- admin
     // Bounded: the owner tunes the risk gate and the subscription and handler budgets within the
     // precompile's limits, pauses new follows, takes out STT above the tanks and the subscription
     // reserve, and repairs subscriptions. Nothing here moves follower margin, calls a target of the
     // owner's choosing with data, or touches a tank.
 
-    /// @notice The gate consulted before every increase (address(0): none); it must be a contract. Reductions
-    /// never ask it, and a gate that does not answer `true` within its fixed budget only refuses increases.
+    /// @notice The gate consulted before every increase (address(0): none); it must be a contract. It is asked
+    /// allowIncrease(sourceId, follower). Reductions never ask it, and a gate that does not answer `true` within
+    /// its budget (gasParams.riskGateGas) only refuses increases.
     function setRiskGate(address gate) external onlyOwner {
         if (gate != address(0) && gate.code.length == 0) revert InvalidParam(1);
         riskGate = gate;
@@ -701,15 +728,16 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
 
     /// @notice The group handler's budget (see GasParams), used from the next event on. `floor` at least 1M;
     /// both caps between `floor` and 200M; `tailBase` at least 1.1M (Somnia's cold-key cost, so the handler can
-    /// always report a deferral); `perDefer` at least 20k; `chargeOverhead` 20k..2M. The subscription gas
-    /// limits in subParams must still fund the floor and the tail reserve.
+    /// always report a deferral); `perDefer` at least 20k; `chargeOverhead` 20k..2M; `riskGateGas` 200k..5M.
+    /// The subscription gas limits in subParams must still fund the floor and the tail reserve.
     function setGasParams(
         uint64 floor,
         uint64 perFollowerCap,
         uint64 themePerFollowerCap,
         uint64 tailBase,
         uint64 perDefer,
-        uint64 chargeOverhead
+        uint64 chargeOverhead,
+        uint64 riskGateGas
     ) external onlyOwner {
         if (floor < MIN_SLOT_GAS) revert InvalidParam(1);
         if (perFollowerCap < floor || perFollowerCap > MAX_HANDLER_GAS) revert InvalidParam(2);
@@ -717,10 +745,12 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
         if (tailBase < MIN_TAIL_BASE) revert InvalidParam(4);
         if (perDefer < MIN_PER_DEFER) revert InvalidParam(5);
         if (chargeOverhead < MIN_CHARGE_OVERHEAD || chargeOverhead > MAX_CHARGE_OVERHEAD) revert InvalidParam(6);
+        if (riskGateGas < MIN_RISK_GATE_GAS || riskGateGas > MAX_RISK_GATE_GAS) revert InvalidParam(7);
         SubParams memory s = subParams;
         _checkFits(floor, tailBase, perDefer, s.traderGasLimit, s.themeGasLimit);
-        gasParams = GasParams(floor, perFollowerCap, themePerFollowerCap, tailBase, perDefer, chargeOverhead);
-        emit GasParamsSet(floor, perFollowerCap, themePerFollowerCap, tailBase, perDefer, chargeOverhead);
+        gasParams =
+            GasParams(floor, perFollowerCap, themePerFollowerCap, tailBase, perDefer, chargeOverhead, riskGateGas);
+        emit GasParamsSet(floor, perFollowerCap, themePerFollowerCap, tailBase, perDefer, chargeOverhead, riskGateGas);
     }
 
     /// @notice Disabled: the admin surface (risk gate, budgets, subscription repair) must stay reachable.
@@ -735,7 +765,8 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
         emit NewFollowsPaused(paused);
     }
 
-    /// @notice Sends STT the hub holds above the followers' tanks and the precompile's subscription reserve.
+    /// @notice Sends STT the hub holds above the followers' tanks and the precompile's subscription reserve
+    /// (see surplus).
     function withdrawSurplus(address to, uint256 amount) external nonReentrant onlyOwner {
         if (to == address(0)) revert InvalidParam(1);
         uint256 balance = address(this).balance;
@@ -916,7 +947,13 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
 
     /// @dev What CopyEngine reads for one follower besides its books.
     function _env(address follower) internal view returns (CopyEngine.Env memory) {
-        return CopyEngine.Env({bank: bank, follower: follower, riskGate: riskGate, tank: tankOf[follower]});
+        return CopyEngine.Env({
+            bank: bank,
+            follower: follower,
+            riskGate: riskGate,
+            tank: tankOf[follower],
+            riskGateGas: gasParams.riskGateGas
+        });
     }
 
     /// @dev Syncs a theme follower against the theme's live legs and version; with `ifBehind`, only when

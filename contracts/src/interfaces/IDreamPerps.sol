@@ -61,5 +61,7 @@ interface IMarginBank {
 /// @notice Optional external gate consulted before a position-increasing copy.
 /// The hub treats address(0) as "no gate".
 interface IRiskGate {
-    function allowIncrease(bytes32 sourceId) external view returns (bool);
+    /// @param sourceId the source the increase copies
+    /// @param follower the account the increase is for, so a gate can apply per follower or to everyone
+    function allowIncrease(bytes32 sourceId, address follower) external view returns (bool);
 }

@@ -19,7 +19,7 @@ import {ISomniaEventHandler} from "@somnia-chain/reactivity-contracts/interfaces
 
 /// A risk gate that spends every bit of gas it is given.
 contract BurnGate is IRiskGate {
-    function allowIncrease(bytes32) external view returns (bool) {
+    function allowIncrease(bytes32, address) external view returns (bool) {
         uint256 x;
         while (gasleft() > 0) {
             x = uint256(keccak256(abi.encode(x)));
@@ -29,7 +29,7 @@ contract BurnGate is IRiskGate {
 }
 
 contract AllowGate is IRiskGate {
-    function allowIncrease(bytes32) external pure returns (bool) {
+    function allowIncrease(bytes32, address) external pure returns (bool) {
         return true;
     }
 }
@@ -208,7 +208,7 @@ contract HubAuditTest is Base {
         assertEq(_size(address(btc), follower), 0, "the close stands");
         assertEq(_count(logs, CopybookHub.Deferred.selector, follower), 0);
         assertEq(_count(logs, CopybookHub.Refused.selector, follower), 1, "RiskGate on the increase");
-        (,,,,, uint64 overhead) = hub.gasParams();
+        (,,,,, uint64 overhead,) = hub.gasParams();
         assertLt(t0 - hub.tankOf(follower), (4_000_000 + uint256(overhead)) * 6 gwei, "the gate's budget, not a slot");
     }
 
@@ -319,7 +319,7 @@ contract HubAuditTest is Base {
         // stopped: the next event changes nothing and costs little
         uint256 t0 = hub.tankOf(follower);
         assertTrue(_deliverHub(hub.subscriptionOf(sid, 0), address(bank), topics, HANDLER_GAS));
-        (,,,,, uint64 overhead) = hub.gasParams();
+        (,,,,, uint64 overhead,) = hub.gasParams();
         assertLt(t0 - hub.tankOf(follower), (1_000_000 + uint256(overhead)) * 6 gwei);
     }
 
@@ -338,7 +338,7 @@ contract HubAuditTest is Base {
         assertEq(_size(address(a), follower), 0, "the flip's close stands");
         assertEq(_size(address(b), follower), 50_000);
         assertEq(_size(address(c), follower), 50_000);
-        (,,,,, uint64 overhead) = hub.gasParams();
+        (,,,,, uint64 overhead,) = hub.gasParams();
         assertLt(t0 - hub.tankOf(follower), (10_000_000 + uint256(overhead)) * 6 gwei, "the closes unbilled");
 
         vm.prank(stranger);
@@ -392,7 +392,7 @@ contract HubAuditTest is Base {
     function test_themeIncreasesOutOfSlot_reductionsStand() public {
         (HeavyPerpPool[] memory ps, bytes32 tsid, bytes32[] memory topics) = _heavyFlip();
         vm.prank(owner);
-        hub.setGasParams(8_000_000, 20_000_000, 30_000_000, 1_200_000, 30_000, 300_000);
+        hub.setGasParams(8_000_000, 20_000_000, 30_000_000, 1_200_000, 30_000, 300_000, 2_000_000);
         vm.recordLogs();
         assertTrue(_deliverHub(hub.subscriptionOf(tsid, 0), address(themes), topics, HANDLER_GAS));
         assertEq(_count(vm.getRecordedLogs(), CopybookHub.Deferred.selector, follower), 1);
@@ -733,7 +733,7 @@ contract HubAuditTest is Base {
         _move(btc, trader, 0);
         btc.setBombFor(follower, true);
         vm.prank(owner);
-        hub.setGasParams(1_000_000, 1_000_000, 1_000_000, 1_100_000, 20_000, 20_000);
+        hub.setGasParams(1_000_000, 1_000_000, 1_000_000, 1_100_000, 20_000, 20_000, 2_000_000);
 
         uint256 latched;
         uint256 mateDeferred;
@@ -829,6 +829,41 @@ contract HubAuditTest is Base {
         (ep,) = _pending(follower);
         assertFalse(ep);
         assertEq(_size(address(btc), follower), 0, "the exit the latch stood for ran first");
+    }
+
+    // An exit that runs out of gas on an event for a market outside the follow's allowlist (on Somnia, cold keys
+    // alone can do it) adds nothing to the synced set, so a later stop does not report the follower's own
+    // position there as one it left open.
+    function test_exitOOG_outsideAllowlist_staysUnsynced() public {
+        Policy memory p = _policy();
+        p.equityFloor = 100e18;
+        bank.setEquity(follower, 1_000e18);
+        _prep(follower);
+        vm.prank(follower);
+        hub.follow{value: 1 ether}(SourceKind.Trader, uint256(uint160(trader)), p, _one(address(eth)));
+        btc.approve(follower, address(this));
+        _move(btc, follower, 20_000); // by hand, outside the follow
+        _move(btc, trader, 50_000);
+
+        vm.mockCallRevert(
+            address(hub),
+            abi.encodePacked(CopybookHub.exitFromEvent.selector),
+            abi.encodeWithSelector(CopybookHub.OutOfGasInSync.selector)
+        );
+        assertTrue(_deliverHub(hub.subscriptionOf(sid, 0), address(bank), _topics(trader, address(btc)), HANDLER_GAS));
+        vm.clearMockedCalls();
+        (bool ep,) = hub.pendingOf(follower);
+        assertTrue(ep, "latched");
+        address[] memory synced = hub.syncedPools(follower);
+        assertEq(synced.length, 1);
+        assertEq(synced[0], address(eth));
+
+        bank.setEquity(follower, 50e18);
+        vm.recordLogs();
+        vm.prank(stranger);
+        hub.poke(follower);
+        assertEq(_count(vm.getRecordedLogs(), CopybookHub.FlattenIncomplete.selector, follower), 0);
+        assertEq(_size(address(btc), follower), 20_000, "the follower's own position");
     }
 
     // Poc7c B (R38). Before: a stop's closes that left dust the venue cannot take kept flattenPending forever:
@@ -1063,7 +1098,7 @@ contract HubAuditTest is Base {
         CopyEngine.LegOrder[] memory orders = new CopyEngine.LegOrder[](0);
         (bool ok,) = lib.call(abi.encodeWithSelector(CopyEngine.applyIncreases.selector, bank, follower, orders));
         assertFalse(ok, "applyIncreases");
-        CopyEngine.Env memory e = CopyEngine.Env(IMarginBank(address(bank)), follower, address(0), 1 ether);
+        CopyEngine.Env memory e = CopyEngine.Env(IMarginBank(address(bank)), follower, address(0), 1 ether, 2_000_000);
         (ok,) = lib.call(abi.encodeWithSelector(CopyEngine.joinPools.selector, uint256(11), e, _one(address(btc))));
         assertFalse(ok, "joinPools");
         (ok,) = lib.call(abi.encodeWithSelector(CopyEngine.flatten.selector, uint256(11), e));

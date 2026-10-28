@@ -16,7 +16,11 @@ enum Reason {
     RiskGate,
     BandUnfilled,
     VenueRejected,
-    LegFailed
+    LegFailed,
+    /// the increase rounds below one lot or the venue minimum, so no order can carry it
+    BelowMinimum,
+    /// the position already sits at the follower's maxNotional
+    AtCap
 }
 
 struct Policy {

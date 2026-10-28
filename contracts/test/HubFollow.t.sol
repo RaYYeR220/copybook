@@ -29,7 +29,7 @@ contract FlagGate is IRiskGate {
         broken = broken_;
     }
 
-    function allowIncrease(bytes32) external view returns (bool) {
+    function allowIncrease(bytes32, address) external view returns (bool) {
         require(!broken, "gate down");
         return allow;
     }
@@ -517,11 +517,13 @@ contract HubFollowTest is Base {
         _follow(follower, p, _one(btc));
         assertEq(_size(btc, follower), 25_000);
 
-        // the source adds more: the follower is already at the cap, nothing is sent
+        // the source adds more: the follower is already at the cap, nothing is sent and the refusal says why
         _traderTo(btc, 90_000);
         vm.recordLogs();
+        vm.expectEmit(true, true, true, true, address(hub));
+        emit CopybookHub.Refused(follower, sid, address(btc), Reason.AtCap, "");
         hub.catchUp(follower, _one(btc));
-        assertEq(_hubLogs(vm.getRecordedLogs()), 0);
+        assertEq(_hubLogs(vm.getRecordedLogs()), 1);
         assertEq(_size(btc, follower), 25_000);
     }
 
@@ -1116,5 +1118,189 @@ contract HubFollowTest is Base {
         assertEq(hub.tankOf(address(attacker)), 0.5 ether);
         assertEq(hub.totalTanks(), 0.5 ether);
         assertEq(address(attacker).balance, 0.5 ether);
+    }
+
+    // ---------- flips that leave dust, increases that cannot be sent ----------
+
+    function _fillsOf(Vm.Log[] memory logs, MockPerpPool pool, address who)
+        internal
+        pure
+        returns (uint256 n, uint256 qty)
+    {
+        for (uint256 i; i < logs.length; ++i) {
+            if (logs[i].emitter != address(pool) || logs[i].topics[0] != MockPerpPool.MockFill.selector) continue;
+            (address o,, uint256 q,) = abi.decode(logs[i].data, (address, bool, uint256, uint256));
+            if (o == who) {
+                ++n;
+                qty += q;
+            }
+        }
+    }
+
+    /// A long copy whose source flipped short, closed in part by thin bids: 10_000 is left, below the 13_000
+    /// venue minimum, so no close can take it.
+    function _flipLeavingDust() internal {
+        _follow(follower, _policy(), _one(btc));
+        _traderTo(btc, 50_000);
+        hub.catchUp(follower, _one(btc));
+        assertEq(_size(btc, follower), 50_000);
+        _traderTo(btc, -50_000);
+        btc.setLiquidity(40_000, DEPTH_BTC, 10);
+    }
+
+    // The flip's close fills 40_000 of 50_000. The new side's order is sized residue + target and crosses zero,
+    // fill-or-kill inside the band: refused on-chain while the bids are gone, one order once they return.
+    function test_flipResidueBelowMinimum_crossesInOneOrder() public {
+        _flipLeavingDust();
+        vm.expectEmit(true, true, true, true, address(hub));
+        emit CopybookHub.Copied(follower, sid, address(btc), 50_000, 10_000, BTC_EXIT_SELL, false);
+        vm.expectEmit(true, true, true, true, address(hub));
+        emit CopybookHub.Refused(
+            follower,
+            sid,
+            address(btc),
+            Reason.BandUnfilled,
+            abi.encodeWithSelector(MockPerpPool.FillOrKillNotFillable.selector)
+        );
+        hub.catchUp(follower, _one(btc));
+        assertEq(_size(btc, follower), 10_000, "the residue below the venue minimum");
+
+        btc.setLiquidity(DEPTH_BTC, DEPTH_BTC, 10);
+        vm.recordLogs();
+        vm.expectEmit(true, true, true, true, address(hub));
+        emit CopybookHub.Copied(follower, sid, address(btc), 10_000, -50_000, BTC_SELL, false);
+        hub.catchUp(follower, _one(btc));
+        (uint256 n, uint256 qty) = _fillsOf(vm.getRecordedLogs(), btc, follower);
+        assertEq(n, 1, "one order");
+        assertEq(qty, 60_000, "residue + the new side");
+        assertEq(_size(btc, follower), -50_000);
+    }
+
+    // The crossing order is an increase: a gate that refuses it says so on-chain, and the residue waits.
+    function test_flipResidueBelowMinimum_gateRefusalReported() public {
+        _flipLeavingDust();
+        hub.catchUp(follower, _one(btc));
+        btc.setLiquidity(DEPTH_BTC, DEPTH_BTC, 10);
+        _setTank(follower, 0);
+        vm.recordLogs();
+        vm.expectEmit(true, true, true, true, address(hub));
+        emit CopybookHub.Refused(follower, sid, address(btc), Reason.TankEmpty, "");
+        hub.catchUp(follower, _one(btc));
+        (uint256 n,) = _fillsOf(vm.getRecordedLogs(), btc, follower);
+        assertEq(n, 0);
+        assertEq(_size(btc, follower), 10_000);
+    }
+
+    // A residue the venue can still take is a close that did not complete: the new side waits for it.
+    function test_flipCloseIncomplete_newSideWaits() public {
+        _follow(follower, _policy(), _one(btc));
+        _traderTo(btc, 50_000);
+        hub.catchUp(follower, _one(btc));
+        _traderTo(btc, -50_000);
+        btc.setLiquidity(20_000, DEPTH_BTC, 10); // 30_000 left: closable
+        vm.recordLogs();
+        hub.catchUp(follower, _one(btc));
+        (uint256 n, uint256 qty) = _fillsOf(vm.getRecordedLogs(), btc, follower);
+        assertEq(n, 1, "the close only");
+        assertEq(qty, 20_000);
+        assertEq(_size(btc, follower), 30_000);
+
+        btc.setLiquidity(DEPTH_BTC, DEPTH_BTC, 10);
+        hub.catchUp(follower, _one(btc));
+        assertEq(_size(btc, follower), -50_000);
+    }
+
+    // An increase that rounds below the venue minimum or one lot is refused with a reason, not skipped.
+    function test_increaseBelowMinimum_reported() public {
+        Policy memory p = _policy();
+        p.scaleBps = 2_500;
+        _follow(follower, p, _one(btc));
+        _traderTo(btc, 50_000); // target 12_500 < 13_000
+        vm.expectEmit(true, true, true, true, address(hub));
+        emit CopybookHub.Refused(follower, sid, address(btc), Reason.BelowMinimum, "");
+        hub.catchUp(follower, _one(btc));
+        assertEq(_size(btc, follower), 0);
+
+        // open, then a top-up below the minimum once rounded to lots
+        _traderTo(btc, 100_000);
+        hub.catchUp(follower, _one(btc));
+        assertEq(_size(btc, follower), 25_000);
+        _traderTo(btc, 114_000); // target 28_500: 3_500 more, 3_000 in lots
+        vm.expectEmit(true, true, true, true, address(hub));
+        emit CopybookHub.Refused(follower, sid, address(btc), Reason.BelowMinimum, "");
+        hub.catchUp(follower, _one(btc));
+        assertEq(_size(btc, follower), 25_000);
+    }
+
+    // A source that adds while the copy already sits at maxNotional gets a refusal saying so.
+    function test_increaseAtCap_reported() public {
+        Policy memory p = _policy();
+        p.maxNotional = 20e18; // 25_000 units at 80_000
+        _traderTo(btc, 50_000);
+        _follow(follower, p, _one(btc));
+        assertEq(_size(btc, follower), 25_000);
+
+        _traderTo(btc, 90_000);
+        vm.recordLogs();
+        vm.expectEmit(true, true, true, true, address(hub));
+        emit CopybookHub.Refused(follower, sid, address(btc), Reason.AtCap, "");
+        hub.catchUp(follower, _one(btc));
+        (uint256 n,) = _fillsOf(vm.getRecordedLogs(), btc, follower);
+        assertEq(n, 0);
+        assertEq(_size(btc, follower), 25_000);
+    }
+
+    // A stranger's poke on a follow it already stopped does not announce the stop again.
+    function test_poke_stoppedOnlyOnTheTransition() public {
+        Policy memory p = _policy();
+        p.equityFloor = 10e18;
+        _follow(follower, p, _one(btc));
+        bank.setEquity(follower, 5e18);
+        vm.recordLogs();
+        vm.prank(stranger);
+        hub.poke(follower);
+        assertEq(_count(vm.getRecordedLogs(), CopybookHub.Stopped.selector), 1);
+        for (uint256 i; i < 3; ++i) {
+            vm.prank(stranger);
+            hub.poke(follower);
+        }
+        assertEq(_count(vm.getRecordedLogs(), CopybookHub.Stopped.selector), 0);
+        assertTrue(_paused(follower));
+    }
+
+    // The gate is asked about the follower the increase is for, so it can apply per follower.
+    function test_riskGate_seesTheFollower() public {
+        FollowerGate gate = new FollowerGate(follower2, sid);
+        vm.prank(owner);
+        hub.setRiskGate(address(gate));
+        _traderTo(btc, 50_000);
+
+        vm.expectEmit(true, true, true, true, address(hub));
+        emit CopybookHub.Refused(follower, sid, address(btc), Reason.RiskGate, "");
+        _follow(follower, _policy(), _one(btc));
+        _follow(follower2, _policy(), _one(btc));
+        assertEq(_size(btc, follower), 0);
+        assertEq(_size(btc, follower2), 50_000);
+    }
+
+    function _count(Vm.Log[] memory logs, bytes32 sig) internal view returns (uint256 n) {
+        for (uint256 i; i < logs.length; ++i) {
+            if (logs[i].emitter == address(hub) && logs[i].topics[0] == sig) n++;
+        }
+    }
+}
+
+/// Allows increases for one follower of one source only.
+contract FollowerGate {
+    address public immutable only;
+    bytes32 public immutable source;
+
+    constructor(address only_, bytes32 source_) {
+        only = only_;
+        source = source_;
+    }
+
+    function allowIncrease(bytes32 sourceId, address follower) external view returns (bool) {
+        return follower == only && sourceId == source;
     }
 }

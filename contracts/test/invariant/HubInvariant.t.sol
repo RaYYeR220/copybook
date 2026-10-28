@@ -20,7 +20,7 @@ contract SwitchableGate is IRiskGate {
         mode = mode_;
     }
 
-    function allowIncrease(bytes32) external view returns (bool) {
+    function allowIncrease(bytes32, address) external view returns (bool) {
         uint8 m = mode;
         if (m == 2) {
             uint256 x;
@@ -437,8 +437,10 @@ contract HubHandler is Test {
         uint64 floor = uint64(bound(seed, 1_000_000, 8_000_000));
         uint64 cap = uint64(bound(seed >> 64, floor, 40_000_000));
         uint64 themeCap = uint64(bound(seed >> 128, floor, 150_000_000));
+        uint64 overhead = uint64(bound(seed >> 192, 20_000, 2_000_000));
+        uint64 gateGas = uint64(bound(uint256(keccak256(abi.encode(seed))), 200_000, 5_000_000));
         vm.prank(owner);
-        hub.setGasParams(floor, cap, themeCap, 1_200_000, 30_000, uint64(bound(seed >> 192, 20_000, 2_000_000)));
+        hub.setGasParams(floor, cap, themeCap, 1_200_000, 30_000, overhead, gateGas);
     }
 
     function ownerResubscribe(uint256 sSeed, uint256 gSeed) external {

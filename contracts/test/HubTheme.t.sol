@@ -23,7 +23,7 @@ contract DenyGate is IRiskGate {
         deny = deny_;
     }
 
-    function allowIncrease(bytes32) external view returns (bool) {
+    function allowIncrease(bytes32, address) external view returns (bool) {
         return !deny;
     }
 }
@@ -91,7 +91,7 @@ contract HubThemeTest is Base {
 
     /// The fixed gas added to every member's bill.
     function _overhead() internal view returns (uint256) {
-        (,,,,, uint64 o) = hub.gasParams();
+        (,,,,, uint64 o,) = hub.gasParams();
         return o;
     }
 
@@ -288,7 +288,7 @@ contract HubThemeTest is Base {
     function test_theme_groupsOfTwo_gasDefaults() public {
         assertEq(hub.themeGroupSize(), 2);
         assertEq(hub.groupSize(), 8);
-        (, uint64 cap, uint64 themeCap,,,) = hub.gasParams();
+        (, uint64 cap, uint64 themeCap,,,,) = hub.gasParams();
         assertEq(cap, 20_000_000);
         assertEq(themeCap, 90_000_000);
 
@@ -742,7 +742,7 @@ contract HubThemeTest is Base {
         Vm.Log memory ev = _rebalance(_legs(btc, 7_000, sol, -3_000));
 
         // too little gas for any member: the group is deferred, nobody is charged
-        (uint64 floor,,,,,) = hub.gasParams();
+        (uint64 floor,,,,,,) = hub.gasParams();
         uint256 subId = hub.subscriptionOf(tsid, 0);
         vm.recordLogs();
         vm.prank(address(this), address(hub));
@@ -804,7 +804,7 @@ contract HubThemeTest is Base {
         assertEq(_size(btc, b), BTC_7K);
         assertEq(_size(eth, b), -ETH_7K);
 
-        (, uint64 traderCap, uint64 themeCap,,,) = hub.gasParams();
+        (, uint64 traderCap, uint64 themeCap,,,,) = hub.gasParams();
         uint256 gasBilled = (tank - hub.tankOf(a)) / 6 gwei - _overhead();
         assertGt(gasBilled, uint256(traderCap) * 4, "a theme slot, far beyond the trader cap");
         assertLe(gasBilled, themeCap + 100_000);
@@ -879,7 +879,7 @@ contract HubThemeTest is Base {
         _prep(follower);
         vm.recordLogs();
         vm.expectEmit(true, true, true, true, address(hub));
-        emit CopybookHub.Refused(follower, tsid, address(btc), Reason.LegFailed, "");
+        emit CopybookHub.Refused(follower, tsid, address(btc), Reason.BelowMinimum, "");
         vm.prank(follower);
         hub.follow{value: TANK}(SourceKind.Theme, tid, _policy(20e18), _none()); // BTC 12_500 < 13_000 minimum
         Vm.Log[] memory logs = vm.getRecordedLogs();
@@ -1051,7 +1051,7 @@ contract HubThemeTest is Base {
         assertEq(_fills(logs, btc, a) + _fills(logs, eth, a) + _fills(logs, btc, b) + _fills(logs, eth, b), 0);
         assertEq(_hubLogs(logs), 0, "no TankCharged, no Copied");
         uint256 overhead = _overhead();
-        (,, uint64 themeCap,,,) = hub.gasParams();
+        (,, uint64 themeCap,,,,) = hub.gasParams();
         uint256 paidA = ta - hub.tankOf(a);
         uint256 paidB = tb - hub.tankOf(b);
         assertEq(paidA % 6 gwei, 0);
@@ -1115,6 +1115,32 @@ contract HubThemeTest is Base {
         assertEq(_size(sol, follower), 3e18, "not a leg yet");
         _fire(0, _rebalance(_legs3(btc, 5_000, eth, -3_000, sol, -2_000)));
         assertEq(_size(sol, follower), -SOL_2K);
+    }
+
+    // A flip whose close fills all but a residue below the venue minimum (no close can take it): that leg's
+    // increase crosses the residue in one order instead of holding the basket back for good. The set stays
+    // all-or-nothing: while the crossing order cannot fill nothing opens, and the refusal names the leg.
+    function test_theme_flipResidueBelowMinimum_crossesInTheSet() public {
+        _followTheme(follower, _policy(100e18));
+        assertEq(_size(btc, follower), BTC_5K);
+        btc.setLiquidity(uint256(BTC_5K) - 10_000, 10_000_000, 10); // the close leaves 10_000 (< 13_000)
+        Vm.Log memory ev = _rebalance(_legs(btc, -5_000, eth, 5_000));
+        vm.expectEmit(true, true, true, true, address(hub));
+        emit CopybookHub.Refused(follower, tsid, address(btc), Reason.LegFailed, _fok());
+        _fire(0, ev);
+        assertEq(_size(btc, follower), 10_000, "BTC residue long");
+        assertEq(_size(eth, follower), 0, "the set rolled back: no naked ETH long");
+
+        btc.setLiquidity(10_000_000, 10_000_000, 10);
+        vm.recordLogs();
+        vm.prank(follower);
+        hub.resync();
+        assertEq(_fills(vm.getRecordedLogs(), btc, follower), 1, "one BTC order crosses the residue");
+        assertEq(_size(btc, follower), -BTC_5K);
+        assertEq(_size(eth, follower), ETH_5K);
+        (uint32 v, bool complete) = hub.themeSyncOf(follower);
+        assertEq(v, 2);
+        assertTrue(complete);
     }
 
     function _traderPolicy() internal pure returns (Policy memory p) {

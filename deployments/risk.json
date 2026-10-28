@@ -24,7 +24,8 @@
     "baseUrl": "https://copybook-eosin.vercel.app/api/risk/",
     "summarySelector": "rubric",
     "systemPrompt": "You review perpetual-futures traders for people who copy their positions automatically. Apply this rubric exactly to the 30-day stats (key=value; n/a means unknown, not safe). BLOCK if liquidations30d is 2 or more, or maxDrawdownPct30d is present and at least 50. Otherwise CAUTION if liquidations30d is 1, or trades30d is below 10, or history=none, or partial=1, or maxDrawdownPct30d is present and at least 25. Otherwise OK. Answer with exactly one word: OK, CAUTION or BLOCK.",
-    "balance": "10",
+    "balance": "5.6926863724",
+    "balanceAsOf": "2026-10-28T15:07:08Z",
     "explorer": "https://shannon-explorer.somnia.network/address/0xc999B6924179a0dc9649DA7eBa8F3aC8b7CF7c25",
     "verification": {
       "verifier": "blockscout",
@@ -57,7 +58,8 @@
       "result": "Pass - Verified",
       "readBack": "not possible: the explorer API answers 'Not available' / 'Not found'"
     },
-    "balance": "1.5"
+    "balance": "21.5",
+    "balanceAsOf": "2026-10-28T15:07:08Z"
   },
   "endpoint": {
     "status": "public",
@@ -7232,16 +7234,6 @@
             "https://copybook-eosin.vercel.app/api/risk/0xfc2fb08cccf87bfc472cded8e7ebef588fcf7fd2",
             "rubric"
           ]
-        },
-        {
-          "agentId": "13174292974160097713",
-          "committee": 3,
-          "threshold": 2,
-          "call": "fetchString",
-          "args": [
-            "https://copybook-eosin.vercel.app/api/risk/0xfc2fb08cccf87bfc472cded8e7ebef588fcf7fd2",
-            "rubric"
-          ]
         }
       ],
       "shannonEvents": [
@@ -7365,22 +7357,6 @@
                   "BLOCK"
                 ]
               ]
-            },
-            {
-              "agentId": "12847293847561029384",
-              "committee": 3,
-              "threshold": 2,
-              "call": "inferString",
-              "args": [
-                "Stats: liquidations30d=0 trades30d=113 history=yes partial=0",
-                "You review perpetual-futures traders for people who copy their positions automatically. Apply this rubric exactly to the 30-day stats (key=value; n/a means unknown, not safe). BLOCK if liquidations30d is 2 or more, or maxDrawdownPct30d is present and at least 50. Otherwise CAUTION if liquidations30d is 1, or trades30d is below 10, or history=none, or partial=1, or maxDrawdownPct30d is present and at least 25. Otherwise OK. Answer with exactly one word: OK, CAUTION or BLOCK.",
-                false,
-                [
-                  "OK",
-                  "CAUTION",
-                  "BLOCK"
-                ]
-              ]
             }
           ]
         },
@@ -7450,16 +7426,6 @@
       "messageToShannon": "0xb529957b3324d27c08962255a8cab97a5f01ea48caf132229ee9b08380123119",
       "deliveryToShannon": "0xe92c74f04f0d1c512a4bfb37b2acd08d156a365d45c44e65caa0cfc444186a7c",
       "summaryRequest": [
-        {
-          "agentId": "13174292974160097713",
-          "committee": 3,
-          "threshold": 2,
-          "call": "fetchString",
-          "args": [
-            "https://copybook-eosin.vercel.app/api/risk/0xa14d4561f2697859ab6c2d5eb62e1172a6cc3d14",
-            "rubric"
-          ]
-        },
         {
           "agentId": "13174292974160097713",
           "committee": 3,
@@ -7592,22 +7558,6 @@
                   "BLOCK"
                 ]
               ]
-            },
-            {
-              "agentId": "12847293847561029384",
-              "committee": 3,
-              "threshold": 2,
-              "call": "inferString",
-              "args": [
-                "Stats: liquidations30d=3 trades30d=115 maxDrawdownPct30d=92.2 history=yes partial=0",
-                "You review perpetual-futures traders for people who copy their positions automatically. Apply this rubric exactly to the 30-day stats (key=value; n/a means unknown, not safe). BLOCK if liquidations30d is 2 or more, or maxDrawdownPct30d is present and at least 50. Otherwise CAUTION if liquidations30d is 1, or trades30d is below 10, or history=none, or partial=1, or maxDrawdownPct30d is present and at least 25. Otherwise OK. Answer with exactly one word: OK, CAUTION or BLOCK.",
-                false,
-                [
-                  "OK",
-                  "CAUTION",
-                  "BLOCK"
-                ]
-              ]
             }
           ]
         },
@@ -7678,16 +7628,6 @@
       "messageToShannon": "0xf9be460cb10ca2a68048c39d23d92fdee6c76a534621b33a4258e6f85f817392",
       "deliveryToShannon": "0x31d84e8cf5f86fb51e8de7f76978d09e6eacbc3a1480fe1d28cae4d4470f36cf",
       "summaryRequest": [
-        {
-          "agentId": "13174292974160097713",
-          "committee": 3,
-          "threshold": 2,
-          "call": "fetchString",
-          "args": [
-            "https://copybook-eosin.vercel.app/api/risk/0x220c695efb9a6914a334ac7b783012f43c0baf00",
-            "rubric"
-          ]
-        },
         {
           "agentId": "13174292974160097713",
           "committee": 3,
@@ -7820,22 +7760,6 @@
                   "BLOCK"
                 ]
               ]
-            },
-            {
-              "agentId": "12847293847561029384",
-              "committee": 3,
-              "threshold": 2,
-              "call": "inferString",
-              "args": [
-                "Stats: liquidations30d=6 trades30d=633 history=yes partial=0",
-                "You review perpetual-futures traders for people who copy their positions automatically. Apply this rubric exactly to the 30-day stats (key=value; n/a means unknown, not safe). BLOCK if liquidations30d is 2 or more, or maxDrawdownPct30d is present and at least 50. Otherwise CAUTION if liquidations30d is 1, or trades30d is below 10, or history=none, or partial=1, or maxDrawdownPct30d is present and at least 25. Otherwise OK. Answer with exactly one word: OK, CAUTION or BLOCK.",
-                false,
-                [
-                  "OK",
-                  "CAUTION",
-                  "BLOCK"
-                ]
-              ]
             }
           ]
         },
@@ -7906,16 +7830,6 @@
       "messageToShannon": "0xeceeb66ebcc49c450ac3ef62eb0d2824024b8bb9f192af395686d27d35e47f1e",
       "deliveryToShannon": "0x17c8a1e1616afb8ee8473ab50a2fefc23aee14fa985c1c74b40c2e208b4165f8",
       "summaryRequest": [
-        {
-          "agentId": "13174292974160097713",
-          "committee": 3,
-          "threshold": 2,
-          "call": "fetchString",
-          "args": [
-            "https://copybook-eosin.vercel.app/api/risk/0x5521160e05bb130783e003f746f03d9d31ea1e69",
-            "rubric"
-          ]
-        },
         {
           "agentId": "13174292974160097713",
           "committee": 3,
@@ -8048,22 +7962,6 @@
                   "BLOCK"
                 ]
               ]
-            },
-            {
-              "agentId": "12847293847561029384",
-              "committee": 3,
-              "threshold": 2,
-              "call": "inferString",
-              "args": [
-                "Stats: liquidations30d=3 trades30d=337 history=yes partial=0",
-                "You review perpetual-futures traders for people who copy their positions automatically. Apply this rubric exactly to the 30-day stats (key=value; n/a means unknown, not safe). BLOCK if liquidations30d is 2 or more, or maxDrawdownPct30d is present and at least 50. Otherwise CAUTION if liquidations30d is 1, or trades30d is below 10, or history=none, or partial=1, or maxDrawdownPct30d is present and at least 25. Otherwise OK. Answer with exactly one word: OK, CAUTION or BLOCK.",
-                false,
-                [
-                  "OK",
-                  "CAUTION",
-                  "BLOCK"
-                ]
-              ]
             }
           ]
         },
@@ -8134,16 +8032,6 @@
       "messageToShannon": "0x192277a01f51e6a7b11152d1873e00d9d40652739e925dc46599dd8eb129a2ef",
       "deliveryToShannon": "0x722dbdb1722967dab7e58ee468b8bf0fb4b757cd44e679068889a8eeba319faa",
       "summaryRequest": [
-        {
-          "agentId": "13174292974160097713",
-          "committee": 3,
-          "threshold": 2,
-          "call": "fetchString",
-          "args": [
-            "https://copybook-eosin.vercel.app/api/risk/0x1faed318fced713cc5764bd7b4974b39ddf5bfc7",
-            "rubric"
-          ]
-        },
         {
           "agentId": "13174292974160097713",
           "committee": 3,
@@ -8276,22 +8164,6 @@
                   "BLOCK"
                 ]
               ]
-            },
-            {
-              "agentId": "12847293847561029384",
-              "committee": 3,
-              "threshold": 2,
-              "call": "inferString",
-              "args": [
-                "Stats: liquidations30d=3 trades30d=38 history=yes partial=0",
-                "You review perpetual-futures traders for people who copy their positions automatically. Apply this rubric exactly to the 30-day stats (key=value; n/a means unknown, not safe). BLOCK if liquidations30d is 2 or more, or maxDrawdownPct30d is present and at least 50. Otherwise CAUTION if liquidations30d is 1, or trades30d is below 10, or history=none, or partial=1, or maxDrawdownPct30d is present and at least 25. Otherwise OK. Answer with exactly one word: OK, CAUTION or BLOCK.",
-                false,
-                [
-                  "OK",
-                  "CAUTION",
-                  "BLOCK"
-                ]
-              ]
             }
           ]
         },
@@ -8362,16 +8234,6 @@
       "messageToShannon": "0x1fc82f4287237bb5cdf0212b2d87b9e957b178b54fbe276708270635ba267d87",
       "deliveryToShannon": "0x54b36df76b9b77a11b8607f02c359726d3e830968a829b8de8f035380c321694",
       "summaryRequest": [
-        {
-          "agentId": "13174292974160097713",
-          "committee": 3,
-          "threshold": 2,
-          "call": "fetchString",
-          "args": [
-            "https://copybook-eosin.vercel.app/api/risk/0x7c30179b81212f592f7d24d37acbec408e905b96",
-            "rubric"
-          ]
-        },
         {
           "agentId": "13174292974160097713",
           "committee": 3,
@@ -8504,22 +8366,6 @@
                   "BLOCK"
                 ]
               ]
-            },
-            {
-              "agentId": "12847293847561029384",
-              "committee": 3,
-              "threshold": 2,
-              "call": "inferString",
-              "args": [
-                "Stats: liquidations30d=3 trades30d=60 history=yes partial=0",
-                "You review perpetual-futures traders for people who copy their positions automatically. Apply this rubric exactly to the 30-day stats (key=value; n/a means unknown, not safe). BLOCK if liquidations30d is 2 or more, or maxDrawdownPct30d is present and at least 50. Otherwise CAUTION if liquidations30d is 1, or trades30d is below 10, or history=none, or partial=1, or maxDrawdownPct30d is present and at least 25. Otherwise OK. Answer with exactly one word: OK, CAUTION or BLOCK.",
-                false,
-                [
-                  "OK",
-                  "CAUTION",
-                  "BLOCK"
-                ]
-              ]
             }
           ]
         },
@@ -8594,16 +8440,6 @@
       },
       "deliveryToShannon": "0x125d0413b50cf6c45892f3d872598827359ccac299ff596d549be27624c98be7",
       "summaryRequest": [
-        {
-          "agentId": "13174292974160097713",
-          "committee": 3,
-          "threshold": 2,
-          "call": "fetchString",
-          "args": [
-            "https://copybook-eosin.vercel.app/api/risk/0x2e6c0cd1c011ec7e7a2d22fb464d7c63d53842b7",
-            "rubric"
-          ]
-        },
         {
           "agentId": "13174292974160097713",
           "committee": 3,
@@ -8736,22 +8572,6 @@
                   "BLOCK"
                 ]
               ]
-            },
-            {
-              "agentId": "12847293847561029384",
-              "committee": 3,
-              "threshold": 2,
-              "call": "inferString",
-              "args": [
-                "Stats: liquidations30d=4 trades30d=9 history=yes partial=0",
-                "You review perpetual-futures traders for people who copy their positions automatically. Apply this rubric exactly to the 30-day stats (key=value; n/a means unknown, not safe). BLOCK if liquidations30d is 2 or more, or maxDrawdownPct30d is present and at least 50. Otherwise CAUTION if liquidations30d is 1, or trades30d is below 10, or history=none, or partial=1, or maxDrawdownPct30d is present and at least 25. Otherwise OK. Answer with exactly one word: OK, CAUTION or BLOCK.",
-                false,
-                [
-                  "OK",
-                  "CAUTION",
-                  "BLOCK"
-                ]
-              ]
             }
           ]
         },
@@ -8822,16 +8642,6 @@
       "messageToShannon": "0x009e301dfdb7d76a8513703f9fb1f0715f1180c7f317631178b6349c2417f357",
       "deliveryToShannon": "0x5f820951fe56d1750c61733ff8f34c36adcf86536e827c68b8e3d6032041d04c",
       "summaryRequest": [
-        {
-          "agentId": "13174292974160097713",
-          "committee": 3,
-          "threshold": 2,
-          "call": "fetchString",
-          "args": [
-            "https://copybook-eosin.vercel.app/api/risk/0xb8700e8d07bd029f7dd3ce6cc97fe936d70c50a8",
-            "rubric"
-          ]
-        },
         {
           "agentId": "13174292974160097713",
           "committee": 3,
@@ -8964,22 +8774,6 @@
                   "BLOCK"
                 ]
               ]
-            },
-            {
-              "agentId": "12847293847561029384",
-              "committee": 3,
-              "threshold": 2,
-              "call": "inferString",
-              "args": [
-                "Stats: liquidations30d=1 trades30d=695 history=yes partial=0",
-                "You review perpetual-futures traders for people who copy their positions automatically. Apply this rubric exactly to the 30-day stats (key=value; n/a means unknown, not safe). BLOCK if liquidations30d is 2 or more, or maxDrawdownPct30d is present and at least 50. Otherwise CAUTION if liquidations30d is 1, or trades30d is below 10, or history=none, or partial=1, or maxDrawdownPct30d is present and at least 25. Otherwise OK. Answer with exactly one word: OK, CAUTION or BLOCK.",
-                false,
-                [
-                  "OK",
-                  "CAUTION",
-                  "BLOCK"
-                ]
-              ]
             }
           ]
         },
@@ -9050,16 +8844,6 @@
       "messageToShannon": "0x67622404a084136996031518a2f4cdd3c30acd57534653d99372fe7424577710",
       "deliveryToShannon": "0xa74ae7c56cc2da81c9d5e159450395ce3897270be98e10fcffb46e537d20dbd1",
       "summaryRequest": [
-        {
-          "agentId": "13174292974160097713",
-          "committee": 3,
-          "threshold": 2,
-          "call": "fetchString",
-          "args": [
-            "https://copybook-eosin.vercel.app/api/risk/0xcd509d80cdb707dd1871a8ad10b8a399696a2d7f",
-            "rubric"
-          ]
-        },
         {
           "agentId": "13174292974160097713",
           "committee": 3,
@@ -9192,22 +8976,6 @@
                   "BLOCK"
                 ]
               ]
-            },
-            {
-              "agentId": "12847293847561029384",
-              "committee": 3,
-              "threshold": 2,
-              "call": "inferString",
-              "args": [
-                "Stats: liquidations30d=1 trades30d=5 history=yes partial=0",
-                "You review perpetual-futures traders for people who copy their positions automatically. Apply this rubric exactly to the 30-day stats (key=value; n/a means unknown, not safe). BLOCK if liquidations30d is 2 or more, or maxDrawdownPct30d is present and at least 50. Otherwise CAUTION if liquidations30d is 1, or trades30d is below 10, or history=none, or partial=1, or maxDrawdownPct30d is present and at least 25. Otherwise OK. Answer with exactly one word: OK, CAUTION or BLOCK.",
-                false,
-                [
-                  "OK",
-                  "CAUTION",
-                  "BLOCK"
-                ]
-              ]
             }
           ]
         },
@@ -9278,16 +9046,6 @@
       "messageToShannon": "0x3f2e8aa0d3a3f59d5efa6ed7168ac018960ef08a0c888a43832610b8a9af8ce6",
       "deliveryToShannon": "0x430c1c08bafc02cacd6df5e15898bcd04213e05b5593863689d7a371da09f629",
       "summaryRequest": [
-        {
-          "agentId": "13174292974160097713",
-          "committee": 3,
-          "threshold": 2,
-          "call": "fetchString",
-          "args": [
-            "https://copybook-eosin.vercel.app/api/risk/0x8b834ce8f8d18d4247f600fbf91c74a8f0abe1e4",
-            "rubric"
-          ]
-        },
         {
           "agentId": "13174292974160097713",
           "committee": 3,
@@ -9420,22 +9178,6 @@
                   "BLOCK"
                 ]
               ]
-            },
-            {
-              "agentId": "12847293847561029384",
-              "committee": 3,
-              "threshold": 2,
-              "call": "inferString",
-              "args": [
-                "Stats: liquidations30d=1 trades30d=5 history=yes partial=0",
-                "You review perpetual-futures traders for people who copy their positions automatically. Apply this rubric exactly to the 30-day stats (key=value; n/a means unknown, not safe). BLOCK if liquidations30d is 2 or more, or maxDrawdownPct30d is present and at least 50. Otherwise CAUTION if liquidations30d is 1, or trades30d is below 10, or history=none, or partial=1, or maxDrawdownPct30d is present and at least 25. Otherwise OK. Answer with exactly one word: OK, CAUTION or BLOCK.",
-                false,
-                [
-                  "OK",
-                  "CAUTION",
-                  "BLOCK"
-                ]
-              ]
             }
           ]
         },
@@ -9506,16 +9248,6 @@
       "messageToShannon": "0x2560324865ba469dd58687032a793b1d81f65874262f40d405c86012a9b810d1",
       "deliveryToShannon": "0x1bbab7c05b97aadcffd7f5f3bf6bb16906ae6869b20a62f49e2a9ea653735bda",
       "summaryRequest": [
-        {
-          "agentId": "13174292974160097713",
-          "committee": 3,
-          "threshold": 2,
-          "call": "fetchString",
-          "args": [
-            "https://copybook-eosin.vercel.app/api/risk/0xf3ed3f5b90a13b39f30759e9800ec638711008f8",
-            "rubric"
-          ]
-        },
         {
           "agentId": "13174292974160097713",
           "committee": 3,
@@ -9648,22 +9380,6 @@
                   "BLOCK"
                 ]
               ]
-            },
-            {
-              "agentId": "12847293847561029384",
-              "committee": 3,
-              "threshold": 2,
-              "call": "inferString",
-              "args": [
-                "Stats: liquidations30d=1 trades30d=555 history=yes partial=0",
-                "You review perpetual-futures traders for people who copy their positions automatically. Apply this rubric exactly to the 30-day stats (key=value; n/a means unknown, not safe). BLOCK if liquidations30d is 2 or more, or maxDrawdownPct30d is present and at least 50. Otherwise CAUTION if liquidations30d is 1, or trades30d is below 10, or history=none, or partial=1, or maxDrawdownPct30d is present and at least 25. Otherwise OK. Answer with exactly one word: OK, CAUTION or BLOCK.",
-                false,
-                [
-                  "OK",
-                  "CAUTION",
-                  "BLOCK"
-                ]
-              ]
             }
           ]
         },
@@ -9734,16 +9450,6 @@
       "messageToShannon": "0xfdf94a8a61a4533851818c01b09de3df262be0563c7f4c03639062d04fe10efc",
       "deliveryToShannon": "0xef3c6b3f05fee7221fd2e94541ca9a263ceba117260095d596562a07d2398f6b",
       "summaryRequest": [
-        {
-          "agentId": "13174292974160097713",
-          "committee": 3,
-          "threshold": 2,
-          "call": "fetchString",
-          "args": [
-            "https://copybook-eosin.vercel.app/api/risk/0x857387a56f7cee3246860a8a470123c31bb0d02c",
-            "rubric"
-          ]
-        },
         {
           "agentId": "13174292974160097713",
           "committee": 3,
@@ -9876,22 +9582,6 @@
                   "BLOCK"
                 ]
               ]
-            },
-            {
-              "agentId": "12847293847561029384",
-              "committee": 3,
-              "threshold": 2,
-              "call": "inferString",
-              "args": [
-                "Stats: liquidations30d=0 trades30d=2000 history=yes partial=1",
-                "You review perpetual-futures traders for people who copy their positions automatically. Apply this rubric exactly to the 30-day stats (key=value; n/a means unknown, not safe). BLOCK if liquidations30d is 2 or more, or maxDrawdownPct30d is present and at least 50. Otherwise CAUTION if liquidations30d is 1, or trades30d is below 10, or history=none, or partial=1, or maxDrawdownPct30d is present and at least 25. Otherwise OK. Answer with exactly one word: OK, CAUTION or BLOCK.",
-                false,
-                [
-                  "OK",
-                  "CAUTION",
-                  "BLOCK"
-                ]
-              ]
             }
           ]
         },
@@ -9962,16 +9652,6 @@
       "messageToShannon": "0xcdca1aecd8a1b3b3ed0960323de2c48895c1d497dca3fac46bfabb57d139f6c7",
       "deliveryToShannon": "0x2a33b4deca24b460844a7ff7739903bdf60af32c3061b18bde33969f9102c245",
       "summaryRequest": [
-        {
-          "agentId": "13174292974160097713",
-          "committee": 3,
-          "threshold": 2,
-          "call": "fetchString",
-          "args": [
-            "https://copybook-eosin.vercel.app/api/risk/0x0a72b2e45fb68a8ff4b0945ee8104cb5a97d8ff4",
-            "rubric"
-          ]
-        },
         {
           "agentId": "13174292974160097713",
           "committee": 3,
@@ -10104,22 +9784,6 @@
                   "BLOCK"
                 ]
               ]
-            },
-            {
-              "agentId": "12847293847561029384",
-              "committee": 3,
-              "threshold": 2,
-              "call": "inferString",
-              "args": [
-                "Stats: liquidations30d=0 trades30d=2000 history=yes partial=1",
-                "You review perpetual-futures traders for people who copy their positions automatically. Apply this rubric exactly to the 30-day stats (key=value; n/a means unknown, not safe). BLOCK if liquidations30d is 2 or more, or maxDrawdownPct30d is present and at least 50. Otherwise CAUTION if liquidations30d is 1, or trades30d is below 10, or history=none, or partial=1, or maxDrawdownPct30d is present and at least 25. Otherwise OK. Answer with exactly one word: OK, CAUTION or BLOCK.",
-                false,
-                [
-                  "OK",
-                  "CAUTION",
-                  "BLOCK"
-                ]
-              ]
             }
           ]
         },
@@ -10189,16 +9853,6 @@
       "messageToShannon": "0x83e22fff66322f78b542b0af5e5ce8fcb51ab97365d24512e71e8c9c734af612",
       "deliveryToShannon": "0xcefb23310ffa68065724b490c05c191ee6a9f5f1dfd1210a45444c0b1820b6a9",
       "summaryRequest": [
-        {
-          "agentId": "13174292974160097713",
-          "committee": 3,
-          "threshold": 2,
-          "call": "fetchString",
-          "args": [
-            "https://copybook-eosin.vercel.app/api/risk/0x20a0d517f1b60fd3041b49d7b97b529964c7ba88",
-            "rubric"
-          ]
-        },
         {
           "agentId": "13174292974160097713",
           "committee": 3,
@@ -10331,22 +9985,6 @@
                   "BLOCK"
                 ]
               ]
-            },
-            {
-              "agentId": "12847293847561029384",
-              "committee": 3,
-              "threshold": 2,
-              "call": "inferString",
-              "args": [
-                "Stats: liquidations30d=0 trades30d=15 history=yes partial=0",
-                "You review perpetual-futures traders for people who copy their positions automatically. Apply this rubric exactly to the 30-day stats (key=value; n/a means unknown, not safe). BLOCK if liquidations30d is 2 or more, or maxDrawdownPct30d is present and at least 50. Otherwise CAUTION if liquidations30d is 1, or trades30d is below 10, or history=none, or partial=1, or maxDrawdownPct30d is present and at least 25. Otherwise OK. Answer with exactly one word: OK, CAUTION or BLOCK.",
-                false,
-                [
-                  "OK",
-                  "CAUTION",
-                  "BLOCK"
-                ]
-              ]
             }
           ]
         },
@@ -10416,16 +10054,6 @@
       "messageToShannon": "0xc49cb7b84cf3c2df1667db9a5ea408961409addcbc97ead48689b4badf278153",
       "deliveryToShannon": "0xe7c885c3798aea0e0bfd49b12429b76898e076612c38fa76778805fb15150216",
       "summaryRequest": [
-        {
-          "agentId": "13174292974160097713",
-          "committee": 3,
-          "threshold": 2,
-          "call": "fetchString",
-          "args": [
-            "https://copybook-eosin.vercel.app/api/risk/0xfed46fe76ac5e98f1c969bc10efb96014dc17749",
-            "rubric"
-          ]
-        },
         {
           "agentId": "13174292974160097713",
           "committee": 3,
@@ -10558,22 +10186,6 @@
                   "BLOCK"
                 ]
               ]
-            },
-            {
-              "agentId": "12847293847561029384",
-              "committee": 3,
-              "threshold": 2,
-              "call": "inferString",
-              "args": [
-                "Stats: liquidations30d=0 trades30d=16 history=yes partial=0",
-                "You review perpetual-futures traders for people who copy their positions automatically. Apply this rubric exactly to the 30-day stats (key=value; n/a means unknown, not safe). BLOCK if liquidations30d is 2 or more, or maxDrawdownPct30d is present and at least 50. Otherwise CAUTION if liquidations30d is 1, or trades30d is below 10, or history=none, or partial=1, or maxDrawdownPct30d is present and at least 25. Otherwise OK. Answer with exactly one word: OK, CAUTION or BLOCK.",
-                false,
-                [
-                  "OK",
-                  "CAUTION",
-                  "BLOCK"
-                ]
-              ]
             }
           ]
         },
@@ -10644,16 +10256,6 @@
       "messageToShannon": "0xeb17e9ead7d082d1c4a874102ff67cb58221d531988e26584f5f572ba76e3613",
       "deliveryToShannon": "0x3cf94872ab42a64b43b7ef9913a5e240786280b76d95cb64c1461ced14649c20",
       "summaryRequest": [
-        {
-          "agentId": "13174292974160097713",
-          "committee": 3,
-          "threshold": 2,
-          "call": "fetchString",
-          "args": [
-            "https://copybook-eosin.vercel.app/api/risk/0xe46cd08b8921afd922051ee4d11701aef68d9999",
-            "rubric"
-          ]
-        },
         {
           "agentId": "13174292974160097713",
           "committee": 3,
@@ -10786,22 +10388,6 @@
                   "BLOCK"
                 ]
               ]
-            },
-            {
-              "agentId": "12847293847561029384",
-              "committee": 3,
-              "threshold": 2,
-              "call": "inferString",
-              "args": [
-                "Stats: liquidations30d=0 trades30d=127 history=yes partial=0",
-                "You review perpetual-futures traders for people who copy their positions automatically. Apply this rubric exactly to the 30-day stats (key=value; n/a means unknown, not safe). BLOCK if liquidations30d is 2 or more, or maxDrawdownPct30d is present and at least 50. Otherwise CAUTION if liquidations30d is 1, or trades30d is below 10, or history=none, or partial=1, or maxDrawdownPct30d is present and at least 25. Otherwise OK. Answer with exactly one word: OK, CAUTION or BLOCK.",
-                false,
-                [
-                  "OK",
-                  "CAUTION",
-                  "BLOCK"
-                ]
-              ]
             }
           ]
         },
@@ -10872,16 +10458,6 @@
       "messageToShannon": "0x186831ae597a143aeeff673ffbe26fba6f01f4aa61e1b3db05f3d876101ca20a",
       "deliveryToShannon": "0xa81196585f56f47f290e6c2ce57c84192c3ebf8282b49fe4f21e8c5d2d0f8187",
       "summaryRequest": [
-        {
-          "agentId": "13174292974160097713",
-          "committee": 3,
-          "threshold": 2,
-          "call": "fetchString",
-          "args": [
-            "https://copybook-eosin.vercel.app/api/risk/0x2c12a7432362e335b7a0b2acca2f6ae17a1f2fd8",
-            "rubric"
-          ]
-        },
         {
           "agentId": "13174292974160097713",
           "committee": 3,
@@ -11014,22 +10590,6 @@
                   "BLOCK"
                 ]
               ]
-            },
-            {
-              "agentId": "12847293847561029384",
-              "committee": 3,
-              "threshold": 2,
-              "call": "inferString",
-              "args": [
-                "Stats: liquidations30d=0 trades30d=3 history=yes partial=0",
-                "You review perpetual-futures traders for people who copy their positions automatically. Apply this rubric exactly to the 30-day stats (key=value; n/a means unknown, not safe). BLOCK if liquidations30d is 2 or more, or maxDrawdownPct30d is present and at least 50. Otherwise CAUTION if liquidations30d is 1, or trades30d is below 10, or history=none, or partial=1, or maxDrawdownPct30d is present and at least 25. Otherwise OK. Answer with exactly one word: OK, CAUTION or BLOCK.",
-                false,
-                [
-                  "OK",
-                  "CAUTION",
-                  "BLOCK"
-                ]
-              ]
             }
           ]
         },
@@ -11100,16 +10660,6 @@
       "messageToShannon": "0xb4360251300d146e17b6b4e352f389c1e7e048575e46049e71f6384ec8be2ccd",
       "deliveryToShannon": "0x4cc0da46b3068594235d5ca8c04be1bc240182b21381e9ef1f04d03750ccc318",
       "summaryRequest": [
-        {
-          "agentId": "13174292974160097713",
-          "committee": 3,
-          "threshold": 2,
-          "call": "fetchString",
-          "args": [
-            "https://copybook-eosin.vercel.app/api/risk/0xb9c0424b350be6bb438ee3fdda981212d42037f3",
-            "rubric"
-          ]
-        },
         {
           "agentId": "13174292974160097713",
           "committee": 3,
@@ -11242,22 +10792,6 @@
                   "BLOCK"
                 ]
               ]
-            },
-            {
-              "agentId": "12847293847561029384",
-              "committee": 3,
-              "threshold": 2,
-              "call": "inferString",
-              "args": [
-                "Stats: liquidations30d=0 trades30d=7 history=yes partial=0",
-                "You review perpetual-futures traders for people who copy their positions automatically. Apply this rubric exactly to the 30-day stats (key=value; n/a means unknown, not safe). BLOCK if liquidations30d is 2 or more, or maxDrawdownPct30d is present and at least 50. Otherwise CAUTION if liquidations30d is 1, or trades30d is below 10, or history=none, or partial=1, or maxDrawdownPct30d is present and at least 25. Otherwise OK. Answer with exactly one word: OK, CAUTION or BLOCK.",
-                false,
-                [
-                  "OK",
-                  "CAUTION",
-                  "BLOCK"
-                ]
-              ]
             }
           ]
         },
@@ -11328,16 +10862,6 @@
       "messageToShannon": "0x4b9499ae4b9a7e7a9108059cc5e25eb7e02305e200510ba0035dd93bbba13888",
       "deliveryToShannon": "0x34f0f09d93c5edf215daa4dcfee8206d94df7c30ec71b962e8a780a4fc1989b8",
       "summaryRequest": [
-        {
-          "agentId": "13174292974160097713",
-          "committee": 3,
-          "threshold": 2,
-          "call": "fetchString",
-          "args": [
-            "https://copybook-eosin.vercel.app/api/risk/0x10eae18964db8ee7981b51fd93b3b163e8df2e90",
-            "rubric"
-          ]
-        },
         {
           "agentId": "13174292974160097713",
           "committee": 3,
@@ -11470,22 +10994,6 @@
                   "BLOCK"
                 ]
               ]
-            },
-            {
-              "agentId": "12847293847561029384",
-              "committee": 3,
-              "threshold": 2,
-              "call": "inferString",
-              "args": [
-                "Stats: liquidations30d=0 trades30d=5 history=yes partial=0",
-                "You review perpetual-futures traders for people who copy their positions automatically. Apply this rubric exactly to the 30-day stats (key=value; n/a means unknown, not safe). BLOCK if liquidations30d is 2 or more, or maxDrawdownPct30d is present and at least 50. Otherwise CAUTION if liquidations30d is 1, or trades30d is below 10, or history=none, or partial=1, or maxDrawdownPct30d is present and at least 25. Otherwise OK. Answer with exactly one word: OK, CAUTION or BLOCK.",
-                false,
-                [
-                  "OK",
-                  "CAUTION",
-                  "BLOCK"
-                ]
-              ]
             }
           ]
         },
@@ -11556,16 +11064,6 @@
       "messageToShannon": "0xce91aefa68eb86d76ec5d02d6c5cf8e088ccb04b0ab19026fe6dd5cb177f410a",
       "deliveryToShannon": "0xd0fb5831837fdd82efa69872ba0e672ff988625eaa62b4f626cc9dc68515b797",
       "summaryRequest": [
-        {
-          "agentId": "13174292974160097713",
-          "committee": 3,
-          "threshold": 2,
-          "call": "fetchString",
-          "args": [
-            "https://copybook-eosin.vercel.app/api/risk/0xa1d0cb85c869e534fe1e0c22af3b238301157b5d",
-            "rubric"
-          ]
-        },
         {
           "agentId": "13174292974160097713",
           "committee": 3,
@@ -11698,22 +11196,6 @@
                   "BLOCK"
                 ]
               ]
-            },
-            {
-              "agentId": "12847293847561029384",
-              "committee": 3,
-              "threshold": 2,
-              "call": "inferString",
-              "args": [
-                "Stats: liquidations30d=0 trades30d=45 history=yes partial=0",
-                "You review perpetual-futures traders for people who copy their positions automatically. Apply this rubric exactly to the 30-day stats (key=value; n/a means unknown, not safe). BLOCK if liquidations30d is 2 or more, or maxDrawdownPct30d is present and at least 50. Otherwise CAUTION if liquidations30d is 1, or trades30d is below 10, or history=none, or partial=1, or maxDrawdownPct30d is present and at least 25. Otherwise OK. Answer with exactly one word: OK, CAUTION or BLOCK.",
-                false,
-                [
-                  "OK",
-                  "CAUTION",
-                  "BLOCK"
-                ]
-              ]
             }
           ]
         },
@@ -11799,7 +11281,7 @@
       },
       "baseUrl": "https://copybook-eosin.vercel.app/api/risk/",
       "systemPrompt": "You review perpetual-futures traders for people who copy their positions automatically. Apply this rubric exactly to the 30-day stats (key=value; n/a means unknown, not safe). BLOCK if liquidations30d is 2 or more, or maxDrawdownPct30d is present and at least 50. Otherwise CAUTION if liquidations30d is 1, or trades30d is below 10, or history=none, or partial=1, or maxDrawdownPct30d is present and at least 25. Otherwise OK. Answer with exactly one word: OK, CAUTION or BLOCK.",
-      "balance": "11.3533936752",
+      "balanceBeforeRunV2": "11.3533936752",
       "explorer": "https://shannon-explorer.somnia.network/address/0x45b46d39697Cfd191BfEb215512d012d28E6ECc3",
       "verification": {
         "verifier": "blockscout",
@@ -11808,7 +11290,8 @@
       },
       "previousSystemPrompt": "You review perpetual-futures traders for people who copy their positions automatically. Read the 30-day stats (key=value). n/a means unknown, not safe. partial=1 means only the most recent activity was read. history=none means no trades. Answer with exactly one word: BLOCK if a follower copying this trader is likely to be wiped out (repeated liquidations or a drawdown near or above the margin), CAUTION if risk is elevated or the data is too thin to judge, OK otherwise.",
       "replacedAt": "2026-10-28T14:27:35.504Z",
-      "withdrawn": "7.014741015"
+      "withdrawn": "7.014741015",
+      "balanceAfterSwap": "0"
     }
   ]
 }

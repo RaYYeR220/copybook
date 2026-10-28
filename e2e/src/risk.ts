@@ -412,7 +412,9 @@ async function settings() {
     baseUrl: await readReviewer("baseUrl"),
     summarySelector: await readReviewer("summarySelector"),
     systemPrompt: await readReviewer("systemPrompt"),
+    // a snapshot: the balance moves with every review, so it carries the time it was read
     balance: formatEther(await shannonPub.getBalance({ address: reviewer })),
+    balanceAsOf: new Date().toISOString(),
     explorer: `https://shannon-explorer.somnia.network/address/${reviewer}`,
   });
   Object.assign(rec.hideki, {
@@ -642,7 +644,9 @@ const agentAbi = parseAbi([
 function agentRequests(t: CallFrame | undefined) {
   const reviewer = reviewerAddr().toLowerCase();
   const out: Record<string, unknown>[] = [];
-  for (const f of frames(t, (c) => c.from?.toLowerCase() === reviewer && c.input.length > 10)) {
+  // The platform is a proxy: Shannon's tracer reports its inner DELEGATECALL with the reviewer as `from` too, so only
+  // the reviewer's own calls are read, or every request would be counted twice.
+  for (const f of frames(t, (c) => c.from?.toLowerCase() === reviewer && c.type !== "DELEGATECALL" && c.input.length > 10)) {
     try {
       const d = decodeFunctionData({ abi: platformAbi, data: f.input as Hex });
       const [agentId, , , payload, size, threshold] = d.args;

@@ -1,6 +1,6 @@
 import { APP_PATH } from "@/content/site";
 import { rng } from "@/lib/flock";
-import { f1, rad } from "@/lib/motion";
+import { f1, rad, segmentsPath } from "@/lib/motion";
 import { Button } from "../Button";
 import { Frame } from "../Frame";
 import n from "./Night.module.css";
@@ -20,11 +20,16 @@ function Limb() {
     <svg className={styles.limb} viewBox="-550 -550 1100 1100">
       <circle className={styles.ring} r="500" />
       <circle className={styles.ring} r="530" />
-      {ticks.map((deg) => {
-        const a = rad(deg);
-        const L = deg % 15 === 0 ? 30 : deg % 5 === 0 ? 14 : 6;
-        return <line key={deg} className={styles.tick} x1={f1(500 * Math.cos(a))} y1={f1(500 * Math.sin(a))} x2={f1((500 + L) * Math.cos(a))} y2={f1((500 + L) * Math.sin(a))} />;
-      })}
+      <path
+        className={styles.tick}
+        d={segmentsPath(
+          ticks.map((deg) => {
+            const a = rad(deg);
+            const L = deg % 15 === 0 ? 30 : deg % 5 === 0 ? 14 : 6;
+            return [500 * Math.cos(a), 500 * Math.sin(a), (500 + L) * Math.cos(a), (500 + L) * Math.sin(a)] as const;
+          }),
+        )}
+      />
       {stars.map((s, i) => (
         <circle key={i} className={styles.star} cx={s.x} cy={s.y} r={s.r} opacity={s.o} />
       ))}

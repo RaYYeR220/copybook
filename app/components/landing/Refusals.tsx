@@ -1,5 +1,6 @@
 import { bandRefusal, links } from "@/content/proof";
 import { fmtInt } from "@/lib/format";
+import { segmentsPath } from "@/lib/motion";
 import type { RefusalReason } from "@/lib/reasons";
 import { delay } from "@/lib/style";
 import { Frame } from "../Frame";
@@ -38,9 +39,7 @@ function HorizonDiagram() {
         </clipPath>
       </defs>
       <g clipPath="url(#refusal-below)">
-        {hatch.map((x) => (
-          <line key={x} className={d.hh} x1={x} y1="232" x2={x + 104} y2="128" />
-        ))}
+        <path className={d.hh} d={segmentsPath(hatch.map((x) => [x, 232, x + 104, 128] as const))} />
       </g>
       <line className={d.h} x1="20" y1="128" x2="420" y2="128" />
       <text className={d.t} x="20" y="118">

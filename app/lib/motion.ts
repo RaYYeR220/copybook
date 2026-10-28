@@ -15,6 +15,13 @@ export const rad = (deg: number) => (deg * Math.PI) / 180;
 /** One decimal, for SVG path data. */
 export const f1 = (n: number) => n.toFixed(1);
 
+/** Many straight segments as one SVG path (one element instead of one `<line>` each). */
+export const segmentsPath = (segs: Iterable<readonly [number, number, number, number]>) => {
+  let d = "";
+  for (const [x1, y1, x2, y2] of segs) d += `M${f1(x1)} ${f1(y1)}L${f1(x2)} ${f1(y2)}`;
+  return d;
+};
+
 /** Cyclic index into a list (negative indices wrap). */
 export const cyc = <T>(list: readonly T[], k: number): T => list[((k % list.length) + list.length) % list.length];
 

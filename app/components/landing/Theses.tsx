@@ -2,7 +2,7 @@ import type { CSSProperties } from "react";
 import { links, thesisRebalance } from "@/content/proof";
 import { chevronPath, gauss, rng } from "@/lib/flock";
 import { fmtInt } from "@/lib/format";
-import { f1 } from "@/lib/motion";
+import { f1, segmentsPath } from "@/lib/motion";
 import { delay } from "@/lib/style";
 import { Frame } from "../Frame";
 import d from "./diagram.module.css";
@@ -70,9 +70,7 @@ function Asterism() {
         </clipPath>
       </defs>
       <g clipPath="url(#thesis-below)">
-        {hatch.map((x) => (
-          <line key={x} className={d.hh} x1={x} y1="460" x2={x + 148} y2="312" />
-        ))}
+        <path className={d.hh} d={segmentsPath(hatch.map((x) => [x, 460, x + 148, 312] as const))} />
       </g>
       <g stroke="rgba(230,223,204,.42)" strokeWidth="1">
         {segment(stars[0], stars[1], 30, 22)}

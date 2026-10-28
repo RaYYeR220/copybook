@@ -1,7 +1,7 @@
 import { guardReview, links } from "@/content/proof";
 import { riskCommittee } from "@/lib/deployments";
 import { shortHex } from "@/lib/format";
-import { f1, rad } from "@/lib/motion";
+import { f1, rad, segmentsPath } from "@/lib/motion";
 import { delay } from "@/lib/style";
 import { Frame } from "../Frame";
 import { VerdictBlock, VerdictCaution, VerdictOk } from "../glyphs";
@@ -51,12 +51,16 @@ function Committee() {
 
       <path d={arcPath(VR, ARC_FROM, ARC_TO)} fill="none" stroke="rgba(230,223,204,.35)" />
       <path d={arcPath(VR - 10, ARC_FROM, ARC_TO)} fill="none" stroke="rgba(230,223,204,.14)" />
-      {ticks.map((deg) => {
-        const L = (deg - ARC_FROM) % 35 === 0 ? 10 : 4;
-        const [x1, y1] = polar(VR, deg);
-        const [x2, y2] = polar(VR - L, deg);
-        return <line key={deg} x1={x1} y1={y1} x2={x2} y2={y2} stroke="rgba(230,223,204,.32)" />;
-      })}
+      <path
+        stroke="rgba(230,223,204,.32)"
+        d={segmentsPath(
+          ticks.map((deg) => {
+            const L = (deg - ARC_FROM) % 35 === 0 ? 10 : 4;
+            const a = rad(deg);
+            return [CX + VR * Math.cos(a), CY + VR * Math.sin(a), CX + (VR - L) * Math.cos(a), CY + (VR - L) * Math.sin(a)] as const;
+          }),
+        )}
+      />
       {(
         [
           ["OK", -142],

@@ -2,21 +2,23 @@
 
 Trader statistics for Copybook, computed from the dreamDEX indexer (Hasura GraphQL). Two consumers:
 
-- the on-chain risk review: validators fetch `riskSummary(stats)` and classify the trader OK / CAUTION / BLOCK;
+- the on-chain risk review: validators fetch `riskRubric(stats)`, the published rubric's inputs and nothing else, and classify the trader OK / CAUTION / BLOCK (`riskSummary(stats)` is the fuller line for people);
 - the Discover page: `topTraders` ranks real traders worth following.
 
 ```ts
-import { getTraderStats, riskSummary, topTraders } from "@copybook/stats";
+import { getTraderStats, riskRubric, riskSummary, topTraders } from "@copybook/stats";
 
 const stats = await getTraderStats("0x...");
 riskSummary(stats);
 // trades30d=412 activeDays30d=14 markets=6 realizedPnl30d=+812.4 liquidations30d=3 maxDrawdown30d=240.5 maxDrawdownPct30d=31.2 avgLeverage=12.4 lastActive=2026-10-27
+riskRubric(stats);
+// liquidations30d=3 trades30d=412 maxDrawdownPct30d=31.2 history=yes partial=0
 
 const { traders, skipped } = await topTraders(10, 30, { exclude: [hub, ...demoWallets] });
 ```
 
 Everything is read-only, sequential (one request at a time, 100 ms apart by default, 500-row pages) and uses no authentication.
-Unknown values are `null` (and `n/a` in the summary), never a guess. Indexer failures throw `IndexerError` (with `status`, `graphqlErrors`, `operationName`); malformed trader addresses throw `TypeError`.
+Unknown values are `null` (and `n/a` in the summary), never a guess. In both lines the drawdown percentage is left out when it is unknown, so the rubric's "present and at least 25 / 50" rules never fire on a guess. Indexer failures throw `IndexerError` (with `status`, `graphqlErrors`, `operationName`); malformed trader addresses throw `TypeError`.
 
 ## Indexer fields used
 

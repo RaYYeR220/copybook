@@ -66,6 +66,29 @@ describe("GET /api/risk/[trader]", () => {
     expect(typeof body.asOf).toBe("string");
   });
 
+  it("200 with the rubric line: only the keys the rubric reads, beside the full summary", async () => {
+    const res = await call(TRADER);
+    const body = await res.json();
+    expect(body.rubric).toBe("liquidations30d=0 trades30d=12 history=yes partial=0");
+    expect(body.summary).toBe(
+      "trades30d=12 activeDays30d=4 markets=2 realizedPnl30d=+10.5 liquidations30d=0 maxDrawdown30d=3.0 avgLeverage=n/a lastActive=2026-10-27",
+    );
+  });
+
+  it("the rubric line carries the drawdown percentage and the flags when they apply", async () => {
+    impl = async () => ({ ...stats, liquidations30d: 2, maxDrawdownPct30d: 61.04, truncated: true });
+    const body = await (await call(TRADER)).json();
+    expect(body.rubric).toBe("liquidations30d=2 trades30d=12 maxDrawdownPct30d=61.0 history=yes partial=1");
+  });
+
+  it("no rubric line on errors", async () => {
+    const { IndexerError } = await import("@copybook/stats");
+    impl = async () => {
+      throw new IndexerError("down", { operationName: "x" });
+    };
+    expect((await (await call(TRADER)).json()).rubric).toBeUndefined();
+  });
+
   it("502 on indexer failure, no summary", async () => {
     const { IndexerError } = await import("@copybook/stats");
     impl = async () => {

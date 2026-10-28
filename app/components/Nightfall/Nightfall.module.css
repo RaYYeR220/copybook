@@ -138,6 +138,13 @@
   letter-spacing: 0.015em;
 }
 
+/* the kicker is set as the scene was approved: at the intro's size and spacing, and hidden on narrow screens */
+.head :global(.kicker) {
+  margin-top: 18px;
+  font-size: 16.5px;
+  line-height: 1.6;
+}
+
 .head p:not(:global(.kicker)) {
   margin-top: 18px;
   font-size: 16.5px;
@@ -224,7 +231,7 @@
     right: var(--gut);
   }
 
-  .head p:not(:global(.kicker)) {
+  .head p {
     display: none;
   }
 

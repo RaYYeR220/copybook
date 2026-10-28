@@ -34,7 +34,7 @@ export function Hero() {
           </h1>
           <p className={`${styles.sub} rise`} style={delay(0.18)} data-flock-clear>
             Link Copybook as a bot. When the trader moves, Somnia validators move your account with them — in the same
-            block, every leg or none.
+            block.
           </p>
           <div className={`${styles.actions} rise`} style={delay(0.24)} data-flock-clear>
             <Button href={APP_PATH} prefetch={false} arrow>

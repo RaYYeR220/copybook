@@ -1,0 +1,222 @@
+import type { Address, Hex } from "viem";
+import { eventKey, type CopybookEvent } from "@copybook/sdk";
+
+/**
+ * How a copy or refusal reached the chain. `handler`: the hub's reactive handler sent it, inside the block of the
+ * move it answers (the same-block path). `call`: someone called the hub directly (catchUp, resync, poke).
+ */
+export type Via = "handler" | "call";
+
+/** A Copybook event as the history route serves it: copies and refusals carry how they were sent. */
+export type LoggedEvent = CopybookEvent & { via?: Via };
+
+export type Contract = "hub" | "gate";
+
+export interface MissingRange {
+  contract: Contract;
+  from: bigint;
+  to: bigint;
+}
+
+export interface HubLogRead {
+  /** Chain order, no duplicates. */
+  events: LoggedEvent[];
+  /** First block the log covers (the requested `fromBlock`, or the hub's deploy block). */
+  fromBlock: bigint;
+  /** The chain head this read went up to. */
+  toBlock: bigint;
+  /** False when some ranges could not be read in time or failed; they are listed in `missing`. */
+  complete: boolean;
+  missing: MissingRange[];
+}
+
+export interface HubLogDeps {
+  head(): Promise<bigint>;
+  /** Every Copybook event one contract logged over [from, to] (the SDK's chunked history). */
+  scan(contract: Contract, from: bigint, to: bigint): Promise<CopybookEvent[]>;
+  /** The sender of a transaction. */
+  senderOf(hash: Hex): Promise<Address>;
+  hub: Address;
+  gate: Address;
+  /** First block worth reading per contract: its deploy block. */
+  starts: Record<Contract, bigint>;
+  /** Blocks per cached segment. */
+  segmentBlocks?: bigint;
+  /** A segment ending at least this far below the head is final and cached for good. */
+  sealMargin?: bigint;
+  /** Segments read at once. */
+  concurrency?: number;
+  /** A long-lived store for sealed segments (the Next data cache in production). */
+  persist?: (key: string, load: () => Promise<LoggedEvent[]>) => Promise<LoggedEvent[]>;
+}
+
+/** Bump when what a cached segment holds changes shape. */
+const VERSION = "v1";
+
+const byChain = (a: CopybookEvent, b: CopybookEvent) =>
+  Number((a.log.blockNumber ?? 0n) - (b.log.blockNumber ?? 0n)) ||
+  (a.log.transactionIndex ?? 0) - (b.log.transactionIndex ?? 0) ||
+  (a.log.logIndex ?? 0) - (b.log.logIndex ?? 0);
+
+/** `handler` when the hub itself sent the transaction (its reactive handler), `call` otherwise. */
+export const viaOf = (sender: Address, hub: Address): Via => (sender.toLowerCase() === hub.toLowerCase() ? "handler" : "call");
+
+function limiter(n: number) {
+  let active = 0;
+  const queue: (() => void)[] = [];
+  return async <T>(task: () => Promise<T>): Promise<T> => {
+    if (active >= n) await new Promise<void>((r) => queue.push(r));
+    active++;
+    try {
+      return await task();
+    } finally {
+      active--;
+      queue.shift()?.();
+    }
+  };
+}
+
+/**
+ * The hub's (and the risk gate's) event log since deployment, read in fixed block segments. A segment that ends
+ * safely below the head is final: it is read once and kept (in memory and in `persist`). The open segment at the
+ * head is extended incrementally. Concurrent reads share every scan, a read can answer within a time budget
+ * (listing what it has not covered yet while the scans finish), and a failed segment is retried on the next read.
+ */
+export function createHubLog(deps: HubLogDeps) {
+  const SEG = deps.segmentBlocks ?? 10_000n;
+  const MARGIN = deps.sealMargin ?? 64n;
+  const run = limiter(deps.concurrency ?? 12);
+  const address = (c: Contract) => (c === "hub" ? deps.hub : deps.gate);
+
+  const sealed = new Map<string, LoggedEvent[]>();
+  const inflight = new Map<string, Promise<LoggedEvent[]>>();
+  const tails = new Map<Contract, { from: bigint; to: bigint; events: LoggedEvent[] }>();
+  const tailInflight = new Map<Contract, Promise<void>>();
+
+  async function annotate(c: Contract, events: CopybookEvent[]): Promise<LoggedEvent[]> {
+    if (c !== "hub") return events;
+    const hashes = [...new Set(events.filter((e) => e.name === "Copied" || e.name === "Refused").map((e) => e.log.transactionHash!))];
+    const senders = new Map<string, Address>();
+    await Promise.all(hashes.map(async (h) => senders.set(h, await deps.senderOf(h))));
+    return events.map((e) => {
+      const s = (e.name === "Copied" || e.name === "Refused") && senders.get(e.log.transactionHash!);
+      return s ? { ...e, via: viaOf(s, deps.hub) } : e;
+    });
+  }
+
+  const scanAnnotated = async (c: Contract, from: bigint, to: bigint) => annotate(c, await deps.scan(c, from, to));
+
+  function loadSealed(c: Contract, from: bigint, to: bigint): Promise<LoggedEvent[]> {
+    const key = `${c}:${address(c).toLowerCase()}:${from}-${to}:${VERSION}`;
+    const have = sealed.get(key);
+    if (have) return Promise.resolve(have);
+    let p = inflight.get(key);
+    if (!p) {
+      const load = () => scanAnnotated(c, from, to);
+      p = run(() => (deps.persist ? deps.persist(key, load) : load())).then(
+        (events) => {
+          sealed.set(key, events);
+          inflight.delete(key);
+          return events;
+        },
+        (err) => {
+          inflight.delete(key);
+          throw err;
+        },
+      );
+      inflight.set(key, p);
+    }
+    return p;
+  }
+
+  /** Brings the open segment of `c` up to `head`, extending what an earlier read covered. */
+  async function extendTail(c: Contract, from: bigint, head: bigint): Promise<LoggedEvent[]> {
+    for (;;) {
+      const busy = tailInflight.get(c);
+      if (busy) {
+        await busy.catch(() => undefined);
+        continue;
+      }
+      const t = tails.get(c);
+      if (t && t.from === from && t.to >= head) return t.events.filter((e) => e.log.blockNumber! <= head);
+      const start = t && t.from === from ? t.to + 1n : from;
+      const job = run(() => scanAnnotated(c, start, head)).then((events) => {
+        const prev = t && t.from === from ? t.events : [];
+        tails.set(c, { from, to: head, events: [...prev, ...events] });
+      });
+      tailInflight.set(c, job);
+      try {
+        await job;
+      } finally {
+        tailInflight.delete(c);
+      }
+    }
+  }
+
+  async function read(opts: { fromBlock?: bigint; budgetMs?: number } = {}): Promise<HubLogRead> {
+    const head = await deps.head();
+    const lowest = deps.starts.hub < deps.starts.gate ? deps.starts.hub : deps.starts.gate;
+    const fromBlock = opts.fromBlock !== undefined && opts.fromBlock > lowest ? opts.fromBlock : lowest;
+    const jobs: { range: MissingRange; p: Promise<LoggedEvent[]> }[] = [];
+
+    for (const c of ["hub", "gate"] as const) {
+      const start = deps.starts[c];
+      if (start > head) continue;
+      const sealedUpTo = head - MARGIN;
+      let from = start;
+      for (; from + SEG - 1n <= sealedUpTo; from += SEG) {
+        const to = from + SEG - 1n;
+        if (to < fromBlock) continue;
+        jobs.push({ range: { contract: c, from, to }, p: loadSealed(c, from, to) });
+      }
+      const tailFrom = from;
+      jobs.push({ range: { contract: c, from: tailFrom, to: head }, p: extendTail(c, tailFrom, head) });
+    }
+
+    const settled = new Map<number, LoggedEvent[] | Error>();
+    const all = Promise.all(
+      jobs.map((j, i) =>
+        j.p.then(
+          (v) => void settled.set(i, v),
+          (e: unknown) => void settled.set(i, e instanceof Error ? e : new Error(String(e))),
+        ),
+      ),
+    );
+    if (opts.budgetMs === undefined) await all;
+    else {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      await Promise.race([all, new Promise<void>((r) => (timer = setTimeout(r, opts.budgetMs)))]);
+      clearTimeout(timer);
+    }
+
+    const seen = new Set<string>();
+    const events: LoggedEvent[] = [];
+    const missing: MissingRange[] = [];
+    jobs.forEach((j, i) => {
+      const got = settled.get(i);
+      if (!got || got instanceof Error) {
+        missing.push(j.range);
+        return;
+      }
+      for (const e of got) {
+        if (e.log.blockNumber! < fromBlock) continue;
+        const k = eventKey(e);
+        if (seen.has(k)) continue;
+        seen.add(k);
+        events.push(e);
+      }
+    });
+    events.sort(byChain);
+    return { events, fromBlock, toBlock: head, complete: missing.length === 0, missing };
+  }
+
+  return {
+    read,
+    /** Resolves when every scan started so far has finished (keep a serverless function alive until then). */
+    settled: async () => {
+      await Promise.allSettled([...inflight.values(), ...tailInflight.values()]);
+    },
+  };
+}
+
+export type HubLog = ReturnType<typeof createHubLog>;

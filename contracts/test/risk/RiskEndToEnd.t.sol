@@ -64,10 +64,19 @@ contract RiskEndToEndTest is RiskBase {
         assertEq(address(reviewer).balance, 10 ether - SUMMARY_DEPOSIT - VERDICT_DEPOSIT);
         assertEq(address(gate).balance, FEE);
 
-        // a later review that comes back OK lifts the block
-        vm.warp(T0 + 20 + 10 minutes);
+        // an OK one hour later is held: the block stands for 24 hours
+        vm.warp(T0 + 20 + 1 hours);
+        (uint64 heldNonce,) = _reviewOnShannon(trader, "OK", "ok", "CAUTION");
+        vm.expectEmit(true, true, false, true, address(gate));
+        emit RiskGate.BlockHeld(_sid(trader), trader, Tier.Ok, heldNonce);
+        shannon.deliverNext();
+        _assertVerdict(trader, Tier.Block, T0 + 20, llmId, summaryHash);
+        assertFalse(gate.allowIncrease(_sid(trader), follower));
+
+        // an OK review 24 hours after the block lifts it
+        vm.warp(T0 + 20 + 24 hours);
         (, uint256 nextLlm) = _review(trader, "OK", "ok", "CAUTION");
-        _assertVerdict(trader, Tier.Ok, T0 + 20 + 10 minutes, nextLlm, summaryHash);
+        _assertVerdict(trader, Tier.Ok, T0 + 20 + 24 hours, nextLlm, summaryHash);
         assertTrue(gate.allowIncrease(_sid(trader), follower));
     }
 
@@ -147,7 +156,8 @@ contract RiskEndToEndTest is RiskBase {
         assertEq(uint8(v.tier), uint8(Tier.Caution));
     }
 
-    // Gas per hop, mocks included (an upper bound for the contracts' own share).
+    // EVM gas per hop, mocks included (an upper bound for the contracts' own share). Not Somnia budgets: Somnia prices
+    // storage differently (a cold or missing key needs ~1M gas available).
     function test_gasProfile() public {
         uint256 g = gasleft();
         _request(trader);

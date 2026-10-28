@@ -12,10 +12,13 @@ import {Tier, Verdict, RiskMessages} from "./RiskTypes.sol";
 /// Anyone may pay for a review of a trader; the request travels over Hyperlane to the reviewer on Shannon, whose
 /// validator committees classify the trader, and the verdict comes back the same way. A follower is guarded unless
 /// they opt out, and a guarded follower gets no new size from a trader whose latest verdict is a `Block` younger
-/// than `VERDICT_TTL`. Exits never reach the gate.
+/// than `VERDICT_TTL`. A milder verdict can replace a `Block` only after `BLOCK_HOLD`. Exits never reach the gate.
 contract RiskGate is IRiskGate, IMessageRecipient, Ownable2Step {
     /// @notice How long a `Block` keeps blocking.
     uint256 public constant VERDICT_TTL = 7 days;
+    /// @notice Minimum age of a stored `Block` before a milder verdict may replace it. A new `Block` may refresh it
+    /// at any time.
+    uint256 public constant BLOCK_HOLD = 24 hours;
     /// @notice Wait after a stored verdict before the same trader can be reviewed again.
     uint256 public constant REVIEW_COOLDOWN = 10 minutes;
     /// @notice Age after which an unanswered review may be replaced by a new one.
@@ -47,6 +50,8 @@ contract RiskGate is IRiskGate, IMessageRecipient, Ownable2Step {
     event ReviewFailed(address indexed trader, uint64 nonce);
     /// @notice A verdict arrived for a review that is no longer pending (replaced or already answered).
     event StaleVerdict(address indexed trader, uint64 nonce);
+    /// @notice A milder verdict arrived within `BLOCK_HOLD` of a stored `Block`; the `Block` stands.
+    event BlockHeld(bytes32 indexed sourceId, address indexed trader, Tier newTier, uint64 nonce);
     event GuardSet(address indexed follower, bool on);
     event ReviewerSet(address reviewer);
     event ReviewFeeSet(uint256 fee);
@@ -60,14 +65,16 @@ contract RiskGate is IRiskGate, IMessageRecipient, Ownable2Step {
     error Cooldown(uint256 readyAt);
     error NoReviewer();
     error ZeroAddress();
+    error InvalidDomain(uint32 domain);
     error RenounceDisabled();
     error TransferFailed();
     error InsufficientBalance(uint256 requested, uint256 available);
 
     /// @param mailbox_ the Hyperlane Mailbox on this chain
-    /// @param reviewerDomain_ the Hyperlane domain the reviewer lives on
+    /// @param reviewerDomain_ the Hyperlane domain the reviewer lives on; neither 0 nor this chain's
     constructor(address owner_, IMailbox mailbox_, uint32 reviewerDomain_) Ownable(owner_) {
         if (address(mailbox_) == address(0)) revert ZeroAddress();
+        if (!RiskMessages.isRemoteDomain(address(mailbox_), reviewerDomain_)) revert InvalidDomain(reviewerDomain_);
         MAILBOX = mailbox_;
         REVIEWER_DOMAIN = reviewerDomain_;
         reviewFee = DEFAULT_REVIEW_FEE;
@@ -76,7 +83,9 @@ contract RiskGate is IRiskGate, IMessageRecipient, Ownable2Step {
     // ---------------------------------------------------------------- hub
 
     /// @inheritdoc IRiskGate
-    /// @dev Total: never reverts. One storage read for an unblocked source, two for a blocked one.
+    /// @dev Total: never reverts. One storage read for an unblocked source, two for a blocked one. On Somnia a cold
+    /// or missing storage key needs about 1M gas available (little of it is consumed), so the hub's `riskGateGas`
+    /// must stay at or above ~1.5M; its default of 2M is enough.
     function allowIncrease(bytes32 sourceId, address follower) external view returns (bool) {
         Verdict storage v = _verdicts[sourceId];
         if (v.tier != Tier.Block) return true;
@@ -126,7 +135,8 @@ contract RiskGate is IRiskGate, IMessageRecipient, Ownable2Step {
 
     /// @notice Receives a verdict from the reviewer. Only the local Mailbox may call, and only for a message from
     /// the reviewer on `REVIEWER_DOMAIN`. A verdict for anything but the trader's pending review is ignored; a
-    /// failed review (tier 0, or out of range) clears the pending review and keeps the stored verdict.
+    /// failed review (tier 0, or out of range) clears the pending review and keeps the stored verdict, and so does
+    /// a milder verdict arriving within `BLOCK_HOLD` of a stored `Block`.
     function handle(uint32 origin, bytes32 sender, bytes calldata body) external payable {
         if (msg.sender != address(MAILBOX)) revert NotMailbox();
         if (origin != REVIEWER_DOMAIN) revert UnknownOrigin(origin);
@@ -146,6 +156,14 @@ contract RiskGate is IRiskGate, IMessageRecipient, Ownable2Step {
             return;
         }
         bytes32 sourceId = RiskMessages.traderSourceId(trader);
+        Verdict storage current = _verdicts[sourceId];
+        if (
+            tier != uint8(Tier.Block) && current.tier == Tier.Block
+                && block.timestamp < uint256(current.reviewedAt) + BLOCK_HOLD
+        ) {
+            emit BlockHeld(sourceId, trader, Tier(tier), nonce);
+            return;
+        }
         _verdicts[sourceId] = Verdict(Tier(tier), uint64(block.timestamp), requestId, summaryHash);
         emit VerdictReceived(sourceId, trader, Tier(tier), requestId, summaryHash);
     }

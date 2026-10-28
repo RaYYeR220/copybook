@@ -85,8 +85,11 @@ contract RiskReviewer is IMessageRecipient, Ownable2Step {
         uint8 blocked,
         uint8 responded
     );
-    /// @dev `requestId` is the platform request that failed, or 0 when none was made.
-    event ReviewFailed(address indexed trader, uint64 nonce, uint256 indexed requestId, Failure reason);
+    /// @dev `requestId` is the review's latest platform request (summary or inference), or 0 when none was made;
+    /// `summaryHash` is the agreed summary's hash, or 0 when none was agreed.
+    event ReviewFailed(
+        address indexed trader, uint64 nonce, uint256 indexed requestId, bytes32 summaryHash, Failure reason
+    );
     event Unfunded(address indexed trader, uint64 nonce, uint256 needed, uint256 available);
     event VerdictSent(address indexed trader, uint64 nonce, Tier tier, bytes32 messageId);
     /// @notice The reply could not be dispatched; the gate's pending review expires after its timeout.
@@ -103,6 +106,7 @@ contract RiskReviewer is IMessageRecipient, Ownable2Step {
     error NotPlatform();
     error UnknownRequest(uint256 requestId);
     error ZeroAddress();
+    error InvalidDomain(uint32 domain);
     error EmptyValue();
     error RenounceDisabled();
     error TransferFailed();
@@ -110,7 +114,7 @@ contract RiskReviewer is IMessageRecipient, Ownable2Step {
 
     /// @param platform_ Somnia's agent platform on this chain
     /// @param mailbox_ the Hyperlane Mailbox on this chain
-    /// @param gateDomain_ the Hyperlane domain the gate lives on
+    /// @param gateDomain_ the Hyperlane domain the gate lives on; neither 0 nor this chain's
     /// @param gate_ the gate, the only sender whose requests are accepted and the recipient of every reply
     /// @param baseUrl_ risk summary endpoint prefix, e.g. `https://host/api/risk/`
     constructor(
@@ -124,6 +128,7 @@ contract RiskReviewer is IMessageRecipient, Ownable2Step {
         if (address(platform_) == address(0) || address(mailbox_) == address(0) || gate_ == address(0)) {
             revert ZeroAddress();
         }
+        if (!RiskMessages.isRemoteDomain(address(mailbox_), gateDomain_)) revert InvalidDomain(gateDomain_);
         if (bytes(baseUrl_).length == 0) revert EmptyValue();
         PLATFORM = platform_;
         MAILBOX = mailbox_;
@@ -151,9 +156,11 @@ contract RiskReviewer is IMessageRecipient, Ownable2Step {
         emit ReviewReceived(trader, nonce);
 
         (bool quoted, uint256 summaryDeposit, uint256 verdictDeposit) = _quote();
-        if (!quoted) return _fail(trader, nonce, 0, Failure.AgentUnavailable);
+        if (!quoted) return _fail(trader, nonce, 0, bytes32(0), Failure.AgentUnavailable);
         // Both stages up front: a summary bought without the means to classify it is wasted.
-        if (!_funded(trader, nonce, summaryDeposit + verdictDeposit)) return _fail(trader, nonce, 0, Failure.Unfunded);
+        if (!_funded(trader, nonce, summaryDeposit + verdictDeposit)) {
+            return _fail(trader, nonce, 0, bytes32(0), Failure.Unfunded);
+        }
 
         bytes memory payload = abi.encodeWithSelector(
             IJsonApiAgent.fetchString.selector, string.concat(baseUrl, trader.toHexString()), SUMMARY_FIELD
@@ -173,7 +180,7 @@ contract RiskReviewer is IMessageRecipient, Ownable2Step {
             summaryJobs[requestId] = SummaryJob(trader, nonce);
             emit SummaryRequested(trader, nonce, requestId, summaryDeposit);
         } catch {
-            _fail(trader, nonce, 0, Failure.AgentUnavailable);
+            _fail(trader, nonce, 0, bytes32(0), Failure.AgentUnavailable);
         }
     }
 
@@ -193,20 +200,29 @@ contract RiskReviewer is IMessageRecipient, Ownable2Step {
         delete summaryJobs[requestId];
 
         if (status != IAgentRequester.ResponseStatus.Success) {
-            return _fail(job.trader, job.nonce, requestId, Failure.CommitteeFailed);
+            return _fail(job.trader, job.nonce, requestId, bytes32(0), Failure.CommitteeFailed);
         }
         (bool found, string memory summary) = _agreedSummary(responses);
-        if (!found) return _fail(job.trader, job.nonce, requestId, Failure.NoSummary);
+        if (!found) return _fail(job.trader, job.nonce, requestId, bytes32(0), Failure.NoSummary);
 
         bytes32 summaryHash = keccak256(bytes(summary));
         emit SummaryReceived(job.trader, job.nonce, requestId, summaryHash, summary);
-        _requestVerdict(job.trader, job.nonce, summary, summaryHash);
+        _requestVerdict(job.trader, job.nonce, requestId, summary, summaryHash);
     }
 
-    function _requestVerdict(address trader, uint64 nonce, string memory summary, bytes32 summaryHash) internal {
+    /// @dev A failure here reports the summary request and the summary hash already known.
+    function _requestVerdict(
+        address trader,
+        uint64 nonce,
+        uint256 summaryRequestId,
+        string memory summary,
+        bytes32 summaryHash
+    ) internal {
         (bool quoted,, uint256 deposit) = _quote();
-        if (!quoted) return _fail(trader, nonce, 0, Failure.AgentUnavailable);
-        if (!_funded(trader, nonce, deposit)) return _fail(trader, nonce, 0, Failure.Unfunded);
+        if (!quoted) return _fail(trader, nonce, summaryRequestId, summaryHash, Failure.AgentUnavailable);
+        if (!_funded(trader, nonce, deposit)) {
+            return _fail(trader, nonce, summaryRequestId, summaryHash, Failure.Unfunded);
+        }
 
         string[] memory allowed = new string[](3);
         allowed[0] = "OK";
@@ -229,7 +245,7 @@ contract RiskReviewer is IMessageRecipient, Ownable2Step {
             verdictJobs[requestId] = VerdictJob(trader, nonce, summaryHash);
             emit VerdictRequested(trader, nonce, requestId, deposit);
         } catch {
-            _fail(trader, nonce, 0, Failure.AgentUnavailable);
+            _fail(trader, nonce, summaryRequestId, summaryHash, Failure.AgentUnavailable);
         }
     }
 
@@ -249,8 +265,7 @@ contract RiskReviewer is IMessageRecipient, Ownable2Step {
         delete verdictJobs[requestId];
 
         if (status != IAgentRequester.ResponseStatus.Success) {
-            emit ReviewFailed(job.trader, job.nonce, requestId, Failure.CommitteeFailed);
-            return _reply(job.trader, job.nonce, Tier.None, requestId, job.summaryHash);
+            return _fail(job.trader, job.nonce, requestId, job.summaryHash, Failure.CommitteeFailed);
         }
 
         uint256[4] memory votes;
@@ -275,7 +290,7 @@ contract RiskReviewer is IMessageRecipient, Ownable2Step {
             _u8(votes[uint8(Tier.Block)]),
             _u8(responded)
         );
-        if (tier == Tier.None) emit ReviewFailed(job.trader, job.nonce, requestId, Failure.NoMajority);
+        if (tier == Tier.None) return _fail(job.trader, job.nonce, requestId, job.summaryHash, Failure.NoMajority);
         _reply(job.trader, job.nonce, tier, requestId, job.summaryHash);
     }
 
@@ -367,9 +382,9 @@ contract RiskReviewer is IMessageRecipient, Ownable2Step {
         return false;
     }
 
-    function _fail(address trader, uint64 nonce, uint256 requestId, Failure reason) internal {
-        emit ReviewFailed(trader, nonce, requestId, reason);
-        _reply(trader, nonce, Tier.None, requestId, bytes32(0));
+    function _fail(address trader, uint64 nonce, uint256 requestId, bytes32 summaryHash, Failure reason) internal {
+        emit ReviewFailed(trader, nonce, requestId, summaryHash, reason);
+        _reply(trader, nonce, Tier.None, requestId, summaryHash);
     }
 
     /// @dev Never reverts, so neither the Mailbox delivery nor a platform callback can fail on the way out.

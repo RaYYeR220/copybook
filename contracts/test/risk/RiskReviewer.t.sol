@@ -39,11 +39,14 @@ contract RiskReviewerTest is RiskBase {
         return abi.decode(m.body, (address, uint64, uint8, uint256, bytes32));
     }
 
-    function _assertFailedReply(address t, uint64 nonce) internal view {
-        (address rt, uint64 rn, uint8 tier,,) = _lastReply();
+    /// The last reply is a failed review carrying the request id and summary hash known when it failed.
+    function _assertFailedReply(address t, uint64 nonce, uint256 requestId, bytes32 summaryHash) internal view {
+        (address rt, uint64 rn, uint8 tier, uint256 rid, bytes32 h) = _lastReply();
         assertEq(rt, t);
         assertEq(rn, nonce);
         assertEq(tier, uint8(Tier.None));
+        assertEq(rid, requestId, "requestId");
+        assertEq(h, summaryHash, "summaryHash");
     }
 
     /// Runs the inference stage with the given answers and returns the tier the reviewer sent back.
@@ -205,35 +208,35 @@ contract RiskReviewerTest is RiskBase {
         (uint64 nonce, uint256 id) = _intake(trader);
         uint256 before = platform.count();
         vm.expectEmit(true, true, false, true, address(reviewer));
-        emit RiskReviewer.ReviewFailed(trader, nonce, id, RiskReviewer.Failure.NoSummary);
+        emit RiskReviewer.ReviewFailed(trader, nonce, id, bytes32(0), RiskReviewer.Failure.NoSummary);
         _success(id, _three("a=1", "a=2", "a=3"));
         assertEq(platform.count(), before, "no inference bought");
-        _assertFailedReply(trader, nonce);
+        _assertFailedReply(trader, nonce, id, bytes32(0));
 
         // a single summary is not agreement
         address t2 = makeAddr("t2");
         (nonce, id) = _intake(t2);
         _success(id, _list(_resp(SUMMARY), _failedResp(), _resp("")));
-        _assertFailedReply(t2, nonce);
+        _assertFailedReply(t2, nonce, id, bytes32(0));
 
         // nothing usable
         address t3 = makeAddr("t3");
         (nonce, id) = _intake(t3);
         _success(id, _list(_resp(""), _raw(hex"01"), _failedResp()));
-        _assertFailedReply(t3, nonce);
+        _assertFailedReply(t3, nonce, id, bytes32(0));
     }
 
     function test_stage1_committeeFailureRepliesNone() public {
         (uint64 nonce, uint256 id) = _intake(trader);
         vm.expectEmit(true, true, false, true, address(reviewer));
-        emit RiskReviewer.ReviewFailed(trader, nonce, id, RiskReviewer.Failure.CommitteeFailed);
+        emit RiskReviewer.ReviewFailed(trader, nonce, id, bytes32(0), RiskReviewer.Failure.CommitteeFailed);
         platform.respond(id, _three(SUMMARY, SUMMARY, SUMMARY), IAgentRequester.ResponseStatus.Failed);
-        _assertFailedReply(trader, nonce);
+        _assertFailedReply(trader, nonce, id, bytes32(0));
 
         address t2 = makeAddr("t2");
         (nonce, id) = _intake(t2);
         platform.respond(id, new IAgentRequester.Response[](0), IAgentRequester.ResponseStatus.TimedOut);
-        _assertFailedReply(t2, nonce);
+        _assertFailedReply(t2, nonce, id, bytes32(0));
     }
 
     // ---------- stage 2 reduction ----------
@@ -279,14 +282,25 @@ contract RiskReviewerTest is RiskBase {
         assertEq(uint8(_tierFor(_list(_raw(huge), _resp("BLOCK"), _resp("BLOCK")))), uint8(Tier.Block));
     }
 
-    function test_stage2_committeeFailureRepliesNone() public {
+    // Stage-2 failures report the inference request and the hash of the summary it was given.
+    function test_stage2_failuresCarryTheSummaryContext() public {
+        bytes32 h = keccak256(bytes(SUMMARY));
         (uint64 nonce, uint256 summaryId) = _intake(trader);
         _success(summaryId, _three(SUMMARY, SUMMARY, SUMMARY));
         uint256 id = platform.lastId();
         vm.expectEmit(true, true, false, true, address(reviewer));
-        emit RiskReviewer.ReviewFailed(trader, nonce, id, RiskReviewer.Failure.CommitteeFailed);
+        emit RiskReviewer.ReviewFailed(trader, nonce, id, h, RiskReviewer.Failure.CommitteeFailed);
         platform.respond(id, _three("BLOCK", "BLOCK", "BLOCK"), IAgentRequester.ResponseStatus.TimedOut);
-        _assertFailedReply(trader, nonce);
+        _assertFailedReply(trader, nonce, id, h);
+
+        address t2 = makeAddr("t2");
+        (nonce, summaryId) = _intake(t2);
+        _success(summaryId, _three(SUMMARY, SUMMARY, SUMMARY));
+        id = platform.lastId();
+        vm.expectEmit(true, true, false, true, address(reviewer));
+        emit RiskReviewer.ReviewFailed(t2, nonce, id, h, RiskReviewer.Failure.NoMajority);
+        _success(id, _three("BLOCK", "OK", "CAUTION"));
+        _assertFailedReply(t2, nonce, id, h);
     }
 
     // ---------- funding and platform failures ----------
@@ -300,11 +314,11 @@ contract RiskReviewerTest is RiskBase {
         vm.expectEmit(true, false, false, true, address(reviewer));
         emit RiskReviewer.Unfunded(trader, nonce, SUMMARY_DEPOSIT + VERDICT_DEPOSIT, balance);
         vm.expectEmit(true, true, false, true, address(reviewer));
-        emit RiskReviewer.ReviewFailed(trader, nonce, 0, RiskReviewer.Failure.Unfunded);
+        emit RiskReviewer.ReviewFailed(trader, nonce, 0, bytes32(0), RiskReviewer.Failure.Unfunded);
         hideki.deliverNext();
         assertEq(platform.count(), 0);
         assertEq(address(reviewer).balance, balance);
-        _assertFailedReply(trader, nonce);
+        _assertFailedReply(trader, nonce, 0, bytes32(0));
 
         // the reply reaches the gate as a failed review
         vm.expectEmit(true, false, false, true, address(gate));
@@ -318,36 +332,42 @@ contract RiskReviewerTest is RiskBase {
         vm.prank(owner);
         reviewer.withdraw(owner, left - VERDICT_DEPOSIT + 1);
 
+        bytes32 h = keccak256(bytes(SUMMARY));
         vm.expectEmit(true, false, false, true, address(reviewer));
         emit RiskReviewer.Unfunded(trader, nonce, VERDICT_DEPOSIT, VERDICT_DEPOSIT - 1);
+        vm.expectEmit(true, true, false, true, address(reviewer));
+        emit RiskReviewer.ReviewFailed(trader, nonce, summaryId, h, RiskReviewer.Failure.Unfunded);
         _success(summaryId, _three(SUMMARY, SUMMARY, SUMMARY));
         assertEq(platform.count(), 1, "no inference bought");
-        _assertFailedReply(trader, nonce);
+        _assertFailedReply(trader, nonce, summaryId, h);
     }
 
     function test_platformRejection_repliesNone() public {
         platform.setRejectRequests(true);
         uint64 nonce = _request(trader);
         vm.expectEmit(true, true, false, true, address(reviewer));
-        emit RiskReviewer.ReviewFailed(trader, nonce, 0, RiskReviewer.Failure.AgentUnavailable);
+        emit RiskReviewer.ReviewFailed(trader, nonce, 0, bytes32(0), RiskReviewer.Failure.AgentUnavailable);
         hideki.deliverNext();
-        _assertFailedReply(trader, nonce);
+        _assertFailedReply(trader, nonce, 0, bytes32(0));
 
         platform.setRejectRequests(false);
         platform.setBrokenQuotes(true);
         address t2 = makeAddr("t2");
         nonce = _request(t2);
         hideki.deliverNext();
-        _assertFailedReply(t2, nonce);
+        _assertFailedReply(t2, nonce, 0, bytes32(0));
 
-        // rejected at stage 2
+        // rejected at stage 2: the summary request and hash are reported
         platform.setBrokenQuotes(false);
         address t3 = makeAddr("t3");
         uint256 summaryId;
         (nonce, summaryId) = _intake(t3);
         platform.setRejectRequests(true);
+        bytes32 h = keccak256(bytes(SUMMARY));
+        vm.expectEmit(true, true, false, true, address(reviewer));
+        emit RiskReviewer.ReviewFailed(t3, nonce, summaryId, h, RiskReviewer.Failure.AgentUnavailable);
         _success(summaryId, _three(SUMMARY, SUMMARY, SUMMARY));
-        _assertFailedReply(t3, nonce);
+        _assertFailedReply(t3, nonce, summaryId, h);
     }
 
     // A reply the mailbox refuses is reported, not reverted (the platform's callback must not fail).
@@ -506,5 +526,22 @@ contract RiskReviewerTest is RiskBase {
         new RiskReviewer(
             owner, IAgentRequester(address(platform)), IMailbox(address(shannon)), HIDEKI, address(gate), ""
         );
+    }
+
+    // The gate's domain is neither 0 nor this chain's own (when the mailbox reports it).
+    function test_constructor_rejectsBadDomain() public {
+        vm.expectRevert(abi.encodeWithSelector(RiskReviewer.InvalidDomain.selector, uint32(0)));
+        new RiskReviewer(
+            owner, IAgentRequester(address(platform)), IMailbox(address(shannon)), 0, address(gate), BASE_URL
+        );
+        vm.expectRevert(abi.encodeWithSelector(RiskReviewer.InvalidDomain.selector, SHANNON));
+        new RiskReviewer(
+            owner, IAgentRequester(address(platform)), IMailbox(address(shannon)), SHANNON, address(gate), BASE_URL
+        );
+        // a mailbox that does not report its domain is only checked against 0
+        RiskReviewer r = new RiskReviewer(
+            owner, IAgentRequester(address(platform)), IMailbox(address(platform)), SHANNON, address(gate), BASE_URL
+        );
+        assertEq(r.GATE_DOMAIN(), SHANNON);
     }
 }

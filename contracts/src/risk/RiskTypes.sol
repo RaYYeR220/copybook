@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
 
+import {IMailbox} from "./IHyperlane.sol";
+
 /// @notice A trader's reviewed risk class. `None` means never reviewed; it is also what a failed review reports,
 /// and a failed review never changes a stored verdict.
 enum Tier {
@@ -19,8 +21,8 @@ struct Verdict {
     bytes32 summaryHash;
 }
 
-/// @notice Hyperlane message bodies between the gate (Hideki) and the reviewer (Shannon), and the hub's id for a
-/// trader source.
+/// @notice Hyperlane message bodies between the gate (Hideki) and the reviewer (Shannon), the hub's id for a trader
+/// source, and a check on the remote domain each side is configured with.
 library RiskMessages {
     /// @dev Gate to reviewer.
     function encodeRequest(address trader, uint64 nonce) internal pure returns (bytes memory) {
@@ -32,7 +34,8 @@ library RiskMessages {
     }
 
     /// @dev Reviewer to gate. `tier` 0 reports a failed review; `requestId` is the inference request the tier
-    /// came from (on failure, the request that failed, or 0).
+    /// came from (on failure, the review's latest platform request, summary or inference, or 0 if none was made),
+    /// and `summaryHash` the hash of the summary read (0 if none was agreed).
     function encodeVerdict(address trader, uint64 nonce, uint8 tier, uint256 requestId, bytes32 summaryHash)
         internal
         pure
@@ -56,5 +59,12 @@ library RiskMessages {
 
     function toBytes32(address a) internal pure returns (bytes32) {
         return bytes32(uint256(uint160(a)));
+    }
+
+    /// @dev False for domain 0 and for the mailbox's own domain, when the mailbox reports one.
+    function isRemoteDomain(address mailbox, uint32 domain) internal view returns (bool) {
+        if (domain == 0) return false;
+        (bool ok, bytes memory ret) = mailbox.staticcall(abi.encodeCall(IMailbox.localDomain, ()));
+        return !(ok && ret.length >= 32 && abi.decode(ret, (uint256)) == domain);
     }
 }

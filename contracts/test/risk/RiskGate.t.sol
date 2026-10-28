@@ -25,6 +25,7 @@ contract RiskGateTest is RiskBase {
         assertEq(gate.VERDICT_TTL(), 7 days);
         assertEq(gate.REVIEW_COOLDOWN(), 10 minutes);
         assertEq(gate.PENDING_TIMEOUT(), 30 minutes);
+        assertEq(gate.BLOCK_HOLD(), 24 hours);
         assertEq(address(gate.MAILBOX()), address(hideki));
         assertEq(gate.REVIEWER_DOMAIN(), SHANNON);
         assertEq(gate.reviewer(), address(reviewer));
@@ -251,6 +252,59 @@ contract RiskGateTest is RiskBase {
         _assertVerdict(trader, Tier.Ok, at, 2, H);
     }
 
+    // A milder verdict within BLOCK_HOLD of a Block is held (pending still clears); from 24 h on it replaces.
+    function test_blockHold_milderVerdictHeldFor24Hours() public {
+        uint64 nonce = _request(trader);
+        _deliverVerdict(trader, nonce, uint8(Tier.Block), 1, H);
+        uint256 blockedAt = vm.getBlockTimestamp();
+
+        vm.warp(blockedAt + 1 hours);
+        nonce = _request(trader);
+        vm.expectEmit(true, true, false, true, address(gate));
+        emit RiskGate.BlockHeld(_sid(trader), trader, Tier.Ok, nonce);
+        _deliverVerdict(trader, nonce, uint8(Tier.Ok), 2, keccak256("ok"));
+        _assertVerdict(trader, Tier.Block, blockedAt, 1, H);
+        assertEq(gate.pendingOf(trader).nonce, 0, "pending cleared");
+        assertFalse(gate.allowIncrease(_sid(trader), follower));
+
+        vm.warp(blockedAt + 24 hours - 1);
+        nonce = _request(trader);
+        vm.expectEmit(true, true, false, true, address(gate));
+        emit RiskGate.BlockHeld(_sid(trader), trader, Tier.Caution, nonce);
+        _deliverVerdict(trader, nonce, uint8(Tier.Caution), 3, keccak256("caution"));
+        _assertVerdict(trader, Tier.Block, blockedAt, 1, H);
+
+        vm.warp(blockedAt + 24 hours);
+        nonce = _request(trader);
+        vm.expectEmit(true, true, false, true, address(gate));
+        emit RiskGate.VerdictReceived(_sid(trader), trader, Tier.Ok, 4, keccak256("ok"));
+        _deliverVerdict(trader, nonce, uint8(Tier.Ok), 4, keccak256("ok"));
+        _assertVerdict(trader, Tier.Ok, blockedAt + 24 hours, 4, keccak256("ok"));
+        assertTrue(gate.allowIncrease(_sid(trader), follower));
+    }
+
+    // A new Block refreshes a Block at any time, and the hold restarts from it.
+    function test_blockHold_newBlockRefreshesAnytime() public {
+        uint64 nonce = _request(trader);
+        _deliverVerdict(trader, nonce, uint8(Tier.Block), 1, H);
+        uint256 refreshedAt = vm.getBlockTimestamp() + 10 minutes;
+
+        vm.warp(refreshedAt);
+        nonce = _request(trader);
+        _deliverVerdict(trader, nonce, uint8(Tier.Block), 2, keccak256("again"));
+        _assertVerdict(trader, Tier.Block, refreshedAt, 2, keccak256("again"));
+
+        vm.warp(refreshedAt + 23 hours);
+        nonce = _request(trader);
+        _deliverVerdict(trader, nonce, uint8(Tier.Ok), 3, H);
+        _assertVerdict(trader, Tier.Block, refreshedAt, 2, keccak256("again"));
+
+        vm.warp(refreshedAt + 24 hours);
+        nonce = _request(trader);
+        _deliverVerdict(trader, nonce, uint8(Tier.Ok), 4, H);
+        _assertVerdict(trader, Tier.Ok, refreshedAt + 24 hours, 4, H);
+    }
+
     // ---------- allowIncrease ----------
 
     function test_allowIncrease_blocksGuardedFollowersOfABlockedTraderOnly() public {
@@ -289,7 +343,8 @@ contract RiskGateTest is RiskBase {
         assertFalse(gate.allowIncrease(_sid(trader), follower), "re-reviewed");
     }
 
-    // Total for any source, follower, stored verdict and clock, within the hub's smallest budget.
+    // Total for any source, follower, stored verdict and clock. The 2M cap is the hub's default riskGateGas; this is
+    // EVM metering, not a Somnia budget (see allowIncrease: Somnia needs ~1M available for a cold or missing key).
     function test_allowIncrease_neverReverts_fuzz(
         address t,
         address who,
@@ -316,18 +371,20 @@ contract RiskGateTest is RiskBase {
         bool expected = !(stored && tier == uint8(Tier.Block) && fresh && !unguard);
 
         (bool ok, bytes memory ret) =
-            address(gate).staticcall{gas: 200_000}(abi.encodeCall(IRiskGate.allowIncrease, (_sid(t), who)));
+            address(gate).staticcall{gas: 2_000_000}(abi.encodeCall(IRiskGate.allowIncrease, (_sid(t), who)));
         assertTrue(ok, "never reverts");
         assertEq(ret.length, 32);
         assertEq(abi.decode(ret, (bool)), expected);
 
-        (ok, ret) = address(gate).staticcall{gas: 200_000}(abi.encodeCall(IRiskGate.allowIncrease, (randomSource, who)));
+        (ok, ret) =
+            address(gate).staticcall{gas: 2_000_000}(abi.encodeCall(IRiskGate.allowIncrease, (randomSource, who)));
         assertTrue(ok, "never reverts on any source");
         assertEq(ret.length, 32);
         if (randomSource != _sid(t)) assertTrue(abi.decode(ret, (bool)));
     }
 
-    // Measured cold (account and storage), as the hub's first call in a transaction sees it.
+    // EVM gas as forge meters it, cold (account and storage). These bounds are not Somnia budgets: on Somnia a cold or
+    // missing key needs ~1M gas available though little is used, so the hub's riskGateGas must stay >= ~1.5M.
     function test_allowIncrease_gas() public {
         uint64 nonce = _request(trader);
         _deliverVerdict(trader, nonce, uint8(Tier.Block), 1, H);
@@ -422,6 +479,17 @@ contract RiskGateTest is RiskBase {
         vm.prank(stranger);
         gate.acceptOwnership();
         assertEq(gate.owner(), stranger);
+    }
+
+    // The reviewer's domain is neither 0 nor this chain's own (when the mailbox reports it).
+    function test_constructor_rejectsBadDomain() public {
+        vm.expectRevert(abi.encodeWithSelector(RiskGate.InvalidDomain.selector, uint32(0)));
+        new RiskGate(owner, IMailbox(address(hideki)), 0);
+        vm.expectRevert(abi.encodeWithSelector(RiskGate.InvalidDomain.selector, HIDEKI));
+        new RiskGate(owner, IMailbox(address(hideki)), HIDEKI);
+        // a mailbox that does not report its domain is only checked against 0
+        RiskGate g = new RiskGate(owner, IMailbox(address(new RejectingReceiver())), HIDEKI);
+        assertEq(g.REVIEWER_DOMAIN(), HIDEKI);
     }
 
     function test_constructor_rejectsZeroMailbox() public {

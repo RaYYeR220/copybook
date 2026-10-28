@@ -2,12 +2,17 @@ import { readFileSync } from "node:fs";
 import { createPublicClient, createWalletClient, http, type Hex, type PublicClient } from "viem";
 import { privateKeyToAccount, type PrivateKeyAccount } from "viem/accounts";
 import { SomniaMarkets, SOMNIA_HIDEKI_TESTNET_ADDRESSES } from "@somnia-chain/markets-sdk";
-import { hidekiTestnet } from "@somnia-chain/markets-sdk/chains";
+import { hidekiTestnet, somniaShannon } from "@somnia-chain/markets-sdk/chains";
 
 export const RPC_URL = process.env.HIDEKI_RPC ?? "https://api.hideki2.infra.testnet.somnia.network";
 export const INDEXER_URL = process.env.HIDEKI_INDEXER ?? "https://hideki-dev.smk.somnia.host/v1/graphql";
 export const EXPLORER_TX = "https://explorer.testnet.somnia.network/tokyo/tx/";
 export const chain = hidekiTestnet;
+
+/** Shannon (50312), where the risk reviewer and Somnia's agent platform live. */
+export const SHANNON_RPC = process.env.SHANNON_RPC ?? "https://dream-rpc.somnia.network";
+export const SHANNON_EXPLORER_TX = "https://shannon-explorer.somnia.network/tx/";
+export const shannon = somniaShannon;
 
 export const MARGIN_BANK = "0x478769E1177C0773c43A593DCCc4Ad15F15F1394" as const;
 export const OPERATOR_REGISTRY = "0x6B2FbfeD328FF5F20C0BE7D3C3437613aFFE8D3a" as const;
@@ -52,6 +57,14 @@ export const pub: PublicClient = createPublicClient({ chain, transport: transpor
 
 export function wallet(role: Role) {
   return createWalletClient({ chain, transport: transport(), account: account(role) });
+}
+
+const shannonTransport = () => http(SHANNON_RPC, { retryCount: 6, retryDelay: 2_000, timeout: 60_000 });
+
+export const shannonPub: PublicClient = createPublicClient({ chain: shannon, transport: shannonTransport() }) as PublicClient;
+
+export function shannonWallet(role: Role) {
+  return createWalletClient({ chain: shannon, transport: shannonTransport(), account: account(role) });
 }
 
 export function markets(role?: Role): SomniaMarkets {

@@ -16,7 +16,7 @@ import { pub, wallet, chain, EXPLORER_TX, MARGIN_BANK, REACTIVITY, type Role } f
 
 export const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
-function artifact(file: string, name: string): Abi {
+export function artifact(file: string, name: string): Abi {
   const path = resolve(ROOT, `contracts/out/${file}/${name}.json`);
   if (!existsSync(path)) throw new Error(`missing ${path}: run forge build in contracts/`);
   return JSON.parse(readFileSync(path, "utf8")).abi as Abi;

@@ -8,6 +8,7 @@
     "rpc-shim": "tsx src/rpc-shim.ts",
     "record-deploy": "tsx src/record-deploy.ts",
     "live": "tsx src/live.ts",
+    "risk": "tsx src/risk.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

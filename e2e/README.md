@@ -132,3 +132,50 @@ the previous hub's proof is kept beside it as `out/proof-<hub>.json`.
 ## After a fresh deploy
 
 Before the first follow, the owner applies the gas parameters measured on Hideki (handler floor, charge overhead, risk-gate budget) with `setGasParams`, and the subscription parameters (fees, gas limits, guaranteed delivery) with `setSubParams`. The current deployment uses: `setGasParams` floor 12,000,000 · per-follower cap 20,000,000 · theme per-follower cap 90,000,000 · tail base 1,200,000 · per-deferral 30,000 · charge overhead 150,000 · risk-gate budget 2,000,000; `setSubParams` priority fee 0 · max fee 20 gwei · trader and theme gas limits 200,000,000 · guaranteed delivery on.
+
+## Risk module (Shannon and Hideki)
+
+The risk gate spans two chains: `RiskReviewer` on Shannon (50312) runs the validator committees, `RiskGate` on
+Hideki (50383) holds the verdicts the hub consults. They talk over the Hyperlane lane between the two testnets.
+
+**Deploy**, Shannon first. Both nodes need the shim, one per chain:
+
+```sh
+cd e2e && npm run rpc-shim 8547                                    # Hideki
+cd e2e && HIDEKI_RPC=https://dream-rpc.somnia.network npm run rpc-shim 8548   # Shannon
+
+cd contracts
+export PRIVATE_KEY="$(grep '^HUB_OWNER_PK=' "$COPYBOOK_ENV" | cut -d= -f2)"
+BASE_URL=https://<app>/api/risk/ forge script script/DeployRisk.s.sol --rpc-url http://127.0.0.1:8548 \
+  --broadcast --skip-simulation --slow -g 150 --private-key "$PRIVATE_KEY"          # RiskReviewer
+REVIEWER=<reviewer> forge script script/DeployRisk.s.sol --rpc-url http://127.0.0.1:8547 \
+  --broadcast --skip-simulation --slow -g 150 --private-key "$PRIVATE_KEY"          # RiskGate + setReviewer
+unset PRIVATE_KEY
+```
+
+**Verify**: Shannon's explorer is Blockscout, so the same verifier works there:
+
+```sh
+forge verify-contract <reviewer> src/risk/RiskReviewer.sol:RiskReviewer --verifier blockscout \
+  --verifier-url https://shannon-explorer.somnia.network/api/ --chain-id 50312 --constructor-args \
+  $(cast abi-encode "f(address,address,address,uint32,address,string)" <owner> <platform> <shannon mailbox> 50383 <gate> <base url>)
+forge verify-contract <gate> src/risk/RiskGate.sol:RiskGate --verifier blockscout \
+  --verifier-url https://explorer.testnet.somnia.network/tokyo/api/ --skip-is-verified-check --chain-id 50383 \
+  --constructor-args $(cast abi-encode "f(address,address,uint32)" <owner> <hideki mailbox> 50312)
+```
+
+**Wire and run** with `COPYBOOK_ENV=/path/to/keys.env npm run risk <step>`:
+
+| step | what it does |
+|---|---|
+| `bridge <stt>` | bridges STT from Hideki to the owner on Shannon (the SDK's Hyperlane STT route) and waits for the delivery |
+| `record` | writes both deploy broadcasts into `deployments/risk.json` |
+| `wire` | `reviewer.setGate(gate)` on Shannon, then the hub's `setRiskGate(gate)` on Hideki, each only when not yet set |
+| `fund <stt>` | sends STT to the reviewer; each review holds two committee deposits (0.36 STT at today's platform floor) |
+| `check` | both sides' settings; `allowIncrease` answers true without a verdict |
+| `trade` | the leader opens and closes 0.0005 BTC; the increase passes the gate (one staticcall, traced) and the exit never asks it |
+| `base-url <url>` | points the reviewer at the public risk endpoint |
+| `review [trader ...]` | pays for reviews and follows each one: the Hyperlane delivery to Shannon, both committee stages with every validator's answer and receipt, the reply, and the gate's verdict on Hideki |
+| `guard` | with a live `Block` on the leader: an unguarded increase copies, a guarded one is refused `RiskGate`, the exit copies; without one, only the guard switch |
+
+Every transaction lands in `deployments/risk.json` with its explorer link.

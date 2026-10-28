@@ -12,12 +12,7 @@ lcov.info
 .next/
 dist/
 .vercel/
-.playwright-mcp/
-.remember/
-.superpowers/
-.claude/
 ui-prototypes/
 mockups/
 design-ref/
 variants/
-*-internal/

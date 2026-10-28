@@ -7,6 +7,8 @@
 //                       balance goes back to the owner, the new one is funded (default: what the old one held)
 //   wire                reviewer.setGate(gate) on Shannon, then the hub's setRiskGate(gate) on Hideki (each only if unset)
 //   fund <stt>          sends STT from the hub owner to the reviewer for agent deposits
+//   refill [stt]        the refill loop: the gate's review fees back to the owner on Hideki, a bridge to Shannon only
+//                       when the owner would keep < 2 STT there, and the reviewer topped up to <stt> (default 10)
 //   check               both sides' settings; allowIncrease answers true without a verdict; the gate call's gas
 //   trade               the leader opens and closes 0.0005 BTC; the follower's copies pass the gate
 //   base-url <url>      reviewer.setBaseUrl(url)
@@ -100,6 +102,8 @@ type TxEntry = {
   status: string;
   from: string;
   to: string | null;
+  /** The deployed contract, for a creation. */
+  contractAddress?: string;
   url: string;
 };
 type Rec = {
@@ -111,6 +115,8 @@ type Rec = {
   reviews: Record<string, unknown>[];
   /** Reviewers the gate used before the current one, with their last recorded settings. */
   previousReviewers?: Record<string, unknown>[];
+  /** The first three live reviews (run v1, the launch prompt), kept as recorded then. */
+  runV1?: Record<string, unknown>;
 };
 
 const rec: Rec = existsSync(RISK_FILE)
@@ -123,6 +129,14 @@ function save() {
 
 let step = "";
 let failed = false;
+let unverified = 0;
+/** A check that could not be made (e.g. no trace on the node): reported as such, never as a pass. */
+function cannotVerify(what: string, why: string) {
+  const line = `UNVERIFIED: ${what} (${why})`;
+  (rec.checks[step] ??= []).push(line);
+  console.log(`  ${line}`);
+  unverified += 1;
+}
 function check(ok: boolean, what: string) {
   const line = `${ok ? "ok" : "FAILED"}: ${what}`;
   (rec.checks[step] ??= []).push(line);
@@ -145,6 +159,7 @@ function track(side: Side, label: string, r: TransactionReceipt): TxEntry {
     status: r.status,
     from: getAddress(r.from),
     to: r.to ? getAddress(r.to) : null,
+    ...(r.contractAddress ? { contractAddress: getAddress(r.contractAddress) } : {}),
     url: sides[side].explorer + r.transactionHash,
   };
   rec.txs = rec.txs.filter((t) => t.hash !== e.hash);
@@ -432,6 +447,9 @@ async function settings() {
     hub: HUB,
     hubRiskGate: await readHub("riskGate"),
     riskGateGas: Number((await readHub<readonly bigint[]>("gasParams"))[6]),
+    // review fees held by the gate (owner-withdrawable), read at balanceAsOf
+    balance: formatEther(await pub.getBalance({ address: gate })),
+    balanceAsOf: new Date().toISOString(),
     explorer: `https://explorer.testnet.somnia.network/tokyo/address/${gate}`,
   });
   save();
@@ -471,6 +489,63 @@ async function fund(amountStt: string) {
   await settings();
 }
 
+const OWNER_SHANNON_FLOOR = parseEther("2");
+
+/** The refill loop. Review fees accrue in the gate on Hideki while agent deposits are paid from the reviewer on
+ * Shannon (0.36 STT held per review, about 0.215 STT spent once the platform returns the rest). The owner withdraws
+ * the fees, bridges to Shannon only when sending the top-up would leave it under 2 STT there, and tops the reviewer up
+ * to `targetStt`. */
+async function refill(targetStt: string) {
+  const gate = gateAddr();
+  const reviewer = reviewerAddr();
+  const target = parseEther(targetStt);
+  const at = () => new Date().toISOString();
+  const before = {
+    at: at(),
+    gate: formatEther(await pub.getBalance({ address: gate })),
+    reviewer: formatEther(await shannonPub.getBalance({ address: reviewer })),
+    ownerHideki: formatEther(await pub.getBalance({ address: OWNER })),
+    ownerShannon: formatEther(await shannonPub.getBalance({ address: OWNER })),
+  };
+  note("before", before);
+
+  const fees = await pub.getBalance({ address: gate });
+  if (fees > 0n) {
+    await sendOn("hideki", "HUB_OWNER", `gate.withdraw(owner, ${formatEther(fees)})`, { address: gate, abi: gateAbi, functionName: "withdraw", args: [OWNER, fees] });
+  }
+  check((await pub.getBalance({ address: gate })) === 0n, `the gate's review fees (${formatEther(fees)} STT) are back with the owner`);
+
+  const have = await shannonPub.getBalance({ address: reviewer });
+  let bridged = "0";
+  if (have < target) {
+    const need = target - have;
+    const ownerShannon = await shannonPub.getBalance({ address: OWNER });
+    if (ownerShannon < need + OWNER_SHANNON_FLOOR) {
+      const short = need + OWNER_SHANNON_FLOOR - ownerShannon;
+      const whole = (short + parseEther("1") - 1n) / parseEther("1");
+      bridged = String(whole < 10n ? 10n : whole);
+      await bridge(bridged);
+    }
+    await sendValueOn("shannon", "HUB_OWNER", `top up reviewer by ${formatEther(need)} STT`, reviewer, need);
+  } else {
+    note("reviewer", `already holds ${formatEther(have)} STT`);
+  }
+  const after = {
+    at: at(),
+    gate: formatEther(await pub.getBalance({ address: gate })),
+    reviewer: formatEther(await shannonPub.getBalance({ address: reviewer })),
+    ownerHideki: formatEther(await pub.getBalance({ address: OWNER })),
+    ownerShannon: formatEther(await shannonPub.getBalance({ address: OWNER })),
+  };
+  note("after", after);
+  check(parseEther(after.reviewer) >= target, `reviewer holds >= ${targetStt} STT (${after.reviewer})`);
+  check(parseEther(after.ownerShannon) >= OWNER_SHANNON_FLOOR, `owner keeps >= 2 STT on Shannon (${after.ownerShannon})`);
+  check(parseEther(after.ownerHideki) >= OWNER_HIDEKI_FLOOR, `owner keeps >= 40 STT on Hideki (${after.ownerHideki})`);
+  const log = ((rec.measurements.refills ??= []) as Record<string, unknown>[]);
+  log.push({ target: targetStt, feesWithdrawn: formatEther(fees), bridged, before, after });
+  await settings();
+}
+
 const sourceIdOf = (trader: Address) => keccak256(encodeAbiParameters([{ type: "uint8" }, { type: "uint256" }], [0, BigInt(trader)]));
 
 async function checks() {
@@ -487,7 +562,7 @@ async function checks() {
   check(ownerHideki >= OWNER_HIDEKI_FLOOR, `owner keeps >= 40 STT on Hideki (${formatEther(ownerHideki)})`);
   note("owner on Shannon", formatEther(await shannonPub.getBalance({ address: OWNER })));
 
-  // no verdict anywhere yet: every increase is allowed
+  // a random trader has no verdict, so every increase is allowed; the leader's answer follows its stored verdict
   const randomTrader = getAddress(keccak256(`0x${Date.now().toString(16).padStart(16, "0")}`).slice(0, 42));
   const randomFollower = getAddress(keccak256(randomTrader).slice(0, 42));
   for (const [what, trader, follower] of [
@@ -498,7 +573,13 @@ async function checks() {
     const hubSid = await readHub<Hex>("sourceIdOf", [0, BigInt(trader)]);
     check(sid === hubSid && sid === (await readGate<Hex>("sourceIdOf", [trader])), `${what}: gate and hub agree on the source id`);
     const allowed = await readGate<boolean>("allowIncrease", [sid, follower]);
-    check(allowed, `${what}: allowIncrease = true with no verdict`);
+    const v = await readGate<{ tier: number; reviewedAt: bigint }>("verdictOf", [trader]);
+    const now = BigInt(Math.floor(Date.now() / 1000));
+    const liveBlock = Number(v.tier) === 3 && now <= v.reviewedAt + BigInt(rec.hideki.verdictTtlSeconds as number);
+    const guarded = await readGate<boolean>("guardOf", [follower]);
+    const expected = !(liveBlock && guarded);
+    const why = liveBlock ? `live Block from ${new Date(Number(v.reviewedAt) * 1000).toISOString()}, follower ${guarded ? "guarded" : "opted out"}` : `verdict ${TIERS[Number(v.tier)]}`;
+    check(allowed === expected, `${what}: allowIncrease = ${allowed} (${why})`);
     // the hub's call: a staticcall from the hub with its riskGateGas budget
     const data = encodeFunctionData({ abi: gateAbi, functionName: "allowIncrease", args: [sid, follower] });
     const est = await pub.estimateGas({ account: HUB, to: gate, data });
@@ -532,10 +613,12 @@ function frames(f: CallFrame | undefined, pred: (c: CallFrame) => boolean, out: 
   return out;
 }
 
-/** The hub's staticcalls to the gate inside a handler run: gas offered, gas used, answer. */
+/** The hub's staticcalls to the gate inside a handler run: gas offered, gas used, answer. Undefined when the node
+ * gives no trace: then nothing is known about the calls, which is not the same as "no calls". */
 async function gateCalls(hash: Hex) {
   const gate = gateAddr().toLowerCase();
   const t = await trace("hideki", hash);
+  if (!t) return undefined;
   return frames(t, (c) => c.to?.toLowerCase() === gate).map((c) => ({
     type: c.type,
     from: c.from,
@@ -594,12 +677,14 @@ async function trade() {
   if (o) {
     check(!riskRefusal(o.events), "no Refused(RiskGate)");
     check(copiedTo(50_000n)(o.events), "Copied 0 -> 50000");
-    check(o.calls.length === 1 && o.calls[0].type === "STATICCALL", "the hub asked the gate once, by staticcall");
+    if (o.calls) check(o.calls.length === 1 && o.calls[0].type === "STATICCALL", "the hub asked the gate once, by staticcall");
+    else cannotVerify("the hub asked the gate once, by staticcall", "no trace");
   }
   check((await size(FOLLOWER, pool)) === 50_000n, "follower long 0.0005 BTC");
   const close = await leaderTrade("leader sells 0.0005 BTC (exit)", false, 50_000n);
   const c = await followerRun("close (exit, never gated)", close, copiedTo(0n));
-  if (c) check(c.calls.length === 0, "the exit did not ask the gate");
+  if (c?.calls) check(c.calls.length === 0, "the exit did not ask the gate");
+  else if (c) cannotVerify("the exit did not ask the gate", "no trace");
   check((await size(FOLLOWER, pool)) === 0n, "follower flat");
   rec.measurements.gatedCopy = {
     open: o && { handler: o.tx.hash, handlerGas: Number(o.receipt.gasUsed), gateCalls: o.calls, logs: o.logs },
@@ -852,7 +937,9 @@ async function guard() {
   check((await size(FOLLOWER, pool)) === 50_000n, "follower still holds 50000");
   const t3 = await leaderTrade("leader sells 0.0008 BTC (exit)", false, 80_000n);
   const r3 = await followerRun("exit while blocked", t3, copiedTo(0n));
-  check(!!r3 && r3.calls.length === 0, "the exit copied without asking the gate");
+  if (r3?.calls) check(r3.calls.length === 0, "the exit copied without asking the gate");
+  else if (r3) cannotVerify("the exit copied without asking the gate", "no trace");
+  else check(false, "the exit copied without asking the gate");
   check((await size(FOLLOWER, pool)) === 0n, "follower flat");
   rec.measurements.guard = { ...(rec.measurements.guard as object), unguarded: r1?.logs, guarded: r2?.logs, exit: r3?.logs };
   save();
@@ -879,6 +966,9 @@ try {
     case "wire":
       await wire();
       break;
+    case "refill":
+      await refill(args[0] ?? "10");
+      break;
     case "fund":
       await fund(args[0] ?? "12");
       break;
@@ -904,12 +994,13 @@ try {
       await guard();
       break;
     default:
-      throw new Error("steps: bridge <stt> | record | swap-reviewer [stt] | wire | fund <stt> | check | trade | base-url <url> | prompt | review [trader ...] | follow <nonce> [shannon block] | guard");
+      throw new Error("steps: bridge <stt> | record | swap-reviewer [stt] | wire | fund <stt> | refill [stt] | check | trade | base-url <url> | prompt | review [trader ...] | follow <nonce> [shannon block] | guard");
   }
 } catch (e) {
   failed = true;
   check(false, `error: ${errMsg(e)}`);
 }
 save();
-console.log(`=== ${step}: ${failed ? "FAIL" : "PASS"}`);
-process.exit(failed ? 1 : 0);
+// a step with checks that could not be made is not reported as a pass
+console.log(`=== ${step}: ${failed ? "FAIL" : unverified ? `UNVERIFIED (${unverified} check(s) could not be made)` : "PASS"}`);
+process.exit(failed ? 1 : unverified ? 2 : 0);

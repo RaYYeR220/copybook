@@ -78,34 +78,64 @@
       "summary": "the fuller line for people"
     }
   },
-  "reviewTargets": {
-    "steady": "0xfc2fb08cccf87bfc472cded8e7ebef588fcf7fd2",
-    "liquidated": "0xa14d4561f2697859ab6c2d5eb62e1172a6cc3d14",
-    "leader": "0xA1d0CB85c869e534Fe1e0c22af3b238301157b5d"
-  },
-  "verdicts": [
-    {
-      "trader": "0xfc2Fb08CCCF87BFC472cded8E7eBEF588fCF7fd2",
-      "nonce": 1,
-      "tier": "Block",
-      "votes": "3 of 3",
-      "summary": "trades30d=113 activeDays30d=7 markets=3 realizedPnl30d=+3773.3 liquidations30d=0 maxDrawdown30d=679.3 avgLeverage=n/a lastActive=2026-10-22"
+  "runV1": {
+    "about": "The first three live reviews (gate nonces 1-3, 2026-10-28), under the launch prompt with the full summary, kept as recorded then. Later runs are in eval/ (v2: eval/results.json, v3: eval/v3/results.json); every review is also under reviews[].",
+    "reviewTargets": {
+      "steady": "0xfc2fb08cccf87bfc472cded8e7ebef588fcf7fd2",
+      "liquidated": "0xa14d4561f2697859ab6c2d5eb62e1172a6cc3d14",
+      "leader": "0xA1d0CB85c869e534Fe1e0c22af3b238301157b5d"
     },
-    {
-      "trader": "0xA14d4561F2697859AB6c2d5eb62E1172a6cc3D14",
-      "nonce": 2,
-      "tier": "Block",
-      "votes": "3 of 3",
-      "summary": "trades30d=115 activeDays30d=6 markets=3 realizedPnl30d=-979.7 liquidations30d=3 maxDrawdown30d=2609.9 maxDrawdownPct30d=92.2 avgLeverage=17.0 lastActive=2026-10-26"
+    "verdicts": [
+      {
+        "trader": "0xfc2Fb08CCCF87BFC472cded8E7eBEF588fCF7fd2",
+        "nonce": 1,
+        "tier": "Block",
+        "votes": "3 of 3",
+        "summary": "trades30d=113 activeDays30d=7 markets=3 realizedPnl30d=+3773.3 liquidations30d=0 maxDrawdown30d=679.3 avgLeverage=n/a lastActive=2026-10-22"
+      },
+      {
+        "trader": "0xA14d4561F2697859AB6c2d5eb62E1172a6cc3D14",
+        "nonce": 2,
+        "tier": "Block",
+        "votes": "3 of 3",
+        "summary": "trades30d=115 activeDays30d=6 markets=3 realizedPnl30d=-979.7 liquidations30d=3 maxDrawdown30d=2609.9 maxDrawdownPct30d=92.2 avgLeverage=17.0 lastActive=2026-10-26"
+      },
+      {
+        "trader": "0xA1d0CB85c869e534Fe1e0c22af3b238301157b5d",
+        "nonce": 3,
+        "tier": "Block",
+        "votes": "3 of 3",
+        "summary": "trades30d=42 activeDays30d=2 markets=2 realizedPnl30d=-0.2 liquidations30d=0 maxDrawdown30d=0.2 avgLeverage=n/a lastActive=2026-10-28"
+      }
+    ],
+    "reviewLatencySeconds": {
+      "note": "from block timestamps, request on Hideki = 0",
+      "steady": {
+        "toShannon": 4,
+        "summary": 6,
+        "verdict": 7,
+        "onHideki": 13
+      },
+      "liquidated": {
+        "toShannon": 3,
+        "summary": 6,
+        "verdict": 7,
+        "onHideki": 13
+      },
+      "leader": {
+        "toShannon": 4,
+        "summary": 7,
+        "verdict": 7,
+        "onHideki": 14
+      }
     },
-    {
-      "trader": "0xA1d0CB85c869e534Fe1e0c22af3b238301157b5d",
-      "nonce": 3,
-      "tier": "Block",
-      "votes": "3 of 3",
-      "summary": "trades30d=42 activeDays30d=2 markets=2 realizedPnl30d=-0.2 liquidations30d=0 maxDrawdown30d=0.2 avgLeverage=n/a lastActive=2026-10-28"
+    "reviewerSpend": {
+      "reviews": 3,
+      "spent": "0.6466063248",
+      "perReview": "0.2155",
+      "note": "deposits are 0.36 per review; the platform returns what the committees did not use"
     }
-  ],
+  },
   "txs": [
     {
       "chain": "hideki",
@@ -141,6 +171,7 @@
       "status": "success",
       "from": "0x5397812d66F3233E0972b7AEB5e195a945504632",
       "to": "0x0000000000000000000000000000000000000000",
+      "contractAddress": "0x45b46d39697Cfd191BfEb215512d012d28E6ECc3",
       "url": "https://shannon-explorer.somnia.network/tx/0x7aaa705f0aad43c41404f55685e6b2c2e3df494112876456f4bdc524d8f39f17"
     },
     {
@@ -153,6 +184,7 @@
       "status": "success",
       "from": "0x5397812d66F3233E0972b7AEB5e195a945504632",
       "to": "0x0000000000000000000000000000000000000000",
+      "contractAddress": "0xEe54c49E9e70a0e5C2218Eec1b1BDBd4e1Cb20f1",
       "url": "https://explorer.testnet.somnia.network/tokyo/tx/0x7176d2e229bb9a88e2f853360dc81a6bf6597d3d1602f4f53554b53b469e72a5"
     },
     {
@@ -1761,6 +1793,7 @@
       "status": "success",
       "from": "0x5397812d66F3233E0972b7AEB5e195a945504632",
       "to": "0x0000000000000000000000000000000000000000",
+      "contractAddress": "0xc999B6924179a0dc9649DA7eBa8F3aC8b7CF7c25",
       "url": "https://shannon-explorer.somnia.network/tx/0x99765a02b814805036c8293ff919d1cb1f0130829d6983272463ed4f919a3ced"
     },
     {
@@ -3276,33 +3309,6 @@
         "Copied(follower=0x7d736A88978e94E60494Ff91C49Ba838EDfb1932, sourceId=0x6744c2cdbcc5b0f6ad21719c8964204a5ffadf668d2b84479c9b14c029b0a40f, pool=0x4181dd08E73BbCdd1Ba3E615A18f6abD941b94C0, fromSize=50000, toSize=0, price=79926900000000000000000, capped=false)",
         "TankCharged(follower=0x7d736A88978e94E60494Ff91C49Ba838EDfb1932, amount=10877058000000000)"
       ]
-    },
-    "reviewLatencySeconds": {
-      "note": "from block timestamps, request on Hideki = 0",
-      "steady": {
-        "toShannon": 4,
-        "summary": 6,
-        "verdict": 7,
-        "onHideki": 13
-      },
-      "liquidated": {
-        "toShannon": 3,
-        "summary": 6,
-        "verdict": 7,
-        "onHideki": 13
-      },
-      "leader": {
-        "toShannon": 4,
-        "summary": 7,
-        "verdict": 7,
-        "onHideki": 14
-      }
-    },
-    "reviewerSpend": {
-      "reviews": 3,
-      "spent": "0.6466063248",
-      "perReview": "0.2155",
-      "note": "deposits are 0.36 per review; the platform returns what the committees did not use"
     }
   },
   "reviews": [

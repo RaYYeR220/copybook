@@ -21,9 +21,9 @@
       "verdict": "0.24",
       "total": "0.36"
     },
-    "baseUrl": "https://copybook.invalid/api/risk/",
+    "baseUrl": "https://copybook-eosin.vercel.app/api/risk/",
     "systemPrompt": "You review perpetual-futures traders for people who copy their positions automatically. Read the 30-day stats (key=value). n/a means unknown, not safe. partial=1 means only the most recent activity was read. history=none means no trades. Answer with exactly one word: BLOCK if a follower copying this trader is likely to be wiped out (repeated liquidations or a drawdown near or above the margin), CAUTION if risk is elevated or the data is too thin to judge, OK otherwise.",
-    "balance": "12",
+    "balance": "11.3533936752",
     "explorer": "https://shannon-explorer.somnia.network/address/0x45b46d39697Cfd191BfEb215512d012d28E6ECc3",
     "verification": {
       "verifier": "blockscout",
@@ -51,20 +51,50 @@
       "verifier": "blockscout (Tokyo explorer)",
       "result": "Pass - Verified",
       "readBack": "not possible: the explorer API answers 'Not available' / 'Not found'"
-    }
+    },
+    "balance": "1.5"
   },
   "endpoint": {
-    "status": "not public yet",
+    "status": "public",
+    "baseUrl": "https://copybook-eosin.vercel.app/api/risk/",
+    "productionAliases": [
+      "https://copybook-eosin.vercel.app",
+      "https://copybook-rayyer220s-projects.vercel.app"
+    ],
+    "deployment": "https://copybook-11377caea-rayyer220s-projects.vercel.app",
+    "commit": "5ceee83",
     "checked": "2026-10-28",
-    "production": "https://copybook-olv2us20q-rayyer220s-projects.vercel.app",
-    "anonymousHttp": 302,
-    "note": "baseUrl stays a placeholder and no review has been requested until /api/risk/<trader> answers anonymously"
+    "valid": "GET /api/risk/0xa1d0cb85c869e534fe1e0c22af3b238301157b5d -> 200 with summary",
+    "invalid": "GET /api/risk/0x1234 -> 400 {\"error\":\"invalid trader address\"}"
   },
   "reviewTargets": {
     "steady": "0xfc2fb08cccf87bfc472cded8e7ebef588fcf7fd2",
     "liquidated": "0xa14d4561f2697859ab6c2d5eb62e1172a6cc3d14",
     "leader": "0xA1d0CB85c869e534Fe1e0c22af3b238301157b5d"
   },
+  "verdicts": [
+    {
+      "trader": "0xfc2Fb08CCCF87BFC472cded8E7eBEF588fCF7fd2",
+      "nonce": 1,
+      "tier": "Block",
+      "votes": "3 of 3",
+      "summary": "trades30d=113 activeDays30d=7 markets=3 realizedPnl30d=+3773.3 liquidations30d=0 maxDrawdown30d=679.3 avgLeverage=n/a lastActive=2026-10-22"
+    },
+    {
+      "trader": "0xA14d4561F2697859AB6c2d5eb62E1172a6cc3D14",
+      "nonce": 2,
+      "tier": "Block",
+      "votes": "3 of 3",
+      "summary": "trades30d=115 activeDays30d=6 markets=3 realizedPnl30d=-979.7 liquidations30d=3 maxDrawdown30d=2609.9 maxDrawdownPct30d=92.2 avgLeverage=17.0 lastActive=2026-10-26"
+    },
+    {
+      "trader": "0xA1d0CB85c869e534Fe1e0c22af3b238301157b5d",
+      "nonce": 3,
+      "tier": "Block",
+      "votes": "3 of 3",
+      "summary": "trades30d=42 activeDays30d=2 markets=2 realizedPnl30d=-0.2 liquidations30d=0 maxDrawdown30d=0.2 avgLeverage=n/a lastActive=2026-10-28"
+    }
+  ],
   "txs": [
     {
       "chain": "hideki",
@@ -209,6 +239,294 @@
       "from": "0xdF73BBbB6517B712BBeD9bfAe6253A5E1FCDE154",
       "to": "0xEFf35D485c4559D9f44e5138B38Cd93052f2E7BF",
       "url": "https://explorer.testnet.somnia.network/tokyo/tx/0x3a6c3caac06422dafbff719d731b1118c7959666bfa1bf13d2c22f34a62468d8"
+    },
+    {
+      "chain": "shannon",
+      "step": "base-url",
+      "label": "reviewer.setBaseUrl(https://copybook-eosin.vercel.app/api/risk/)",
+      "hash": "0xc4fd1da7b071ccfcaad8c51a0bb33f8b268b8641adb6a11f5cb92734b08b9492",
+      "block": 526202242,
+      "gasUsed": 73278,
+      "status": "success",
+      "from": "0x5397812d66F3233E0972b7AEB5e195a945504632",
+      "to": "0x45b46d39697Cfd191BfEb215512d012d28E6ECc3",
+      "url": "https://shannon-explorer.somnia.network/tx/0xc4fd1da7b071ccfcaad8c51a0bb33f8b268b8641adb6a11f5cb92734b08b9492"
+    },
+    {
+      "chain": "hideki",
+      "step": "review 0xfc2fb08cccf87bfc472cded8e7ebef588fcf7fd2",
+      "label": "requestReview(0xfc2Fb08CCCF87BFC472cded8E7eBEF588fCF7fd2)",
+      "hash": "0x8a92f667d92d26d0ae8caa258f44e596ced734d5add1fa1c03a89aebcdd82a08",
+      "block": 35413410,
+      "gasUsed": 596782,
+      "status": "success",
+      "from": "0x5397812d66F3233E0972b7AEB5e195a945504632",
+      "to": "0xEe54c49E9e70a0e5C2218Eec1b1BDBd4e1Cb20f1",
+      "url": "https://explorer.testnet.somnia.network/tokyo/tx/0x8a92f667d92d26d0ae8caa258f44e596ced734d5add1fa1c03a89aebcdd82a08"
+    },
+    {
+      "chain": "shannon",
+      "step": "review 0xfc2fb08cccf87bfc472cded8e7ebef588fcf7fd2",
+      "label": "review 1 delivered to the reviewer",
+      "hash": "0x2c1bf907e991b72603d5638a9153233d0800bd57f928f20068f902bd5a830408",
+      "block": 526202750,
+      "gasUsed": 931214,
+      "status": "success",
+      "from": "0xcCC32990233cB34008777b2eDB62236F8e432046",
+      "to": "0xF805734aAC42cf238eAef9E905e3A04F2Ab554f9",
+      "url": "https://shannon-explorer.somnia.network/tx/0x2c1bf907e991b72603d5638a9153233d0800bd57f928f20068f902bd5a830408"
+    },
+    {
+      "chain": "shannon",
+      "step": "review 0xfc2fb08cccf87bfc472cded8e7ebef588fcf7fd2",
+      "label": "review 1 committee callback",
+      "hash": "0xc22ae38a223e16bc9dde8de61efdfb90e9453885198dadae070acb831d8fecc1",
+      "block": 526202779,
+      "gasUsed": 1211577,
+      "status": "success",
+      "from": "0x55Acbe370872c7D90F504eF169217a00c29E2A33",
+      "to": "0x037Bb9C718F3f7fe5eCBDB0b600D607b52706776",
+      "url": "https://shannon-explorer.somnia.network/tx/0xc22ae38a223e16bc9dde8de61efdfb90e9453885198dadae070acb831d8fecc1"
+    },
+    {
+      "chain": "shannon",
+      "step": "review 0xfc2fb08cccf87bfc472cded8e7ebef588fcf7fd2",
+      "label": "review 1 committee callback",
+      "hash": "0x09e063c8ecd6cd21be9439ba9dc30d90266fbf8493f8881ed1887f0462573384",
+      "block": 526202785,
+      "gasUsed": 598820,
+      "status": "success",
+      "from": "0x55Acbe370872c7D90F504eF169217a00c29E2A33",
+      "to": "0x037Bb9C718F3f7fe5eCBDB0b600D607b52706776",
+      "url": "https://shannon-explorer.somnia.network/tx/0x09e063c8ecd6cd21be9439ba9dc30d90266fbf8493f8881ed1887f0462573384"
+    },
+    {
+      "chain": "hideki",
+      "step": "review 0xfc2fb08cccf87bfc472cded8e7ebef588fcf7fd2",
+      "label": "review 1 verdict delivered to the gate",
+      "hash": "0x96028c21e4b35b2717927779c637e135b2f2e411f5898aec4577b85b53a25110",
+      "block": 35413546,
+      "gasUsed": 1170712,
+      "status": "success",
+      "from": "0xcCC32990233cB34008777b2eDB62236F8e432046",
+      "to": "0xD7C2E95c62De3c0ad95b2C1cf08E4B85DF6b332D",
+      "url": "https://explorer.testnet.somnia.network/tokyo/tx/0x96028c21e4b35b2717927779c637e135b2f2e411f5898aec4577b85b53a25110"
+    },
+    {
+      "chain": "hideki",
+      "step": "review 0xa14d4561f2697859ab6c2d5eb62e1172a6cc3d14 0xA1d0CB85c869e534Fe1e0c22af3b238301157b5d",
+      "label": "requestReview(0xA14d4561F2697859AB6c2d5eb62E1172a6cc3D14)",
+      "hash": "0x66ad6e3d2d3b6fcee128aaf7a6505b6df62f04a720ab2e2c6757746e1a783f7c",
+      "block": 35413826,
+      "gasUsed": 394542,
+      "status": "success",
+      "from": "0x5397812d66F3233E0972b7AEB5e195a945504632",
+      "to": "0xEe54c49E9e70a0e5C2218Eec1b1BDBd4e1Cb20f1",
+      "url": "https://explorer.testnet.somnia.network/tokyo/tx/0x66ad6e3d2d3b6fcee128aaf7a6505b6df62f04a720ab2e2c6757746e1a783f7c"
+    },
+    {
+      "chain": "shannon",
+      "step": "review 0xa14d4561f2697859ab6c2d5eb62e1172a6cc3d14 0xA1d0CB85c869e534Fe1e0c22af3b238301157b5d",
+      "label": "review 2 delivered to the reviewer",
+      "hash": "0x766301821e529770d4ed81fd043c176fbd82371362a3c439fda302c025473be1",
+      "block": 526203154,
+      "gasUsed": 931214,
+      "status": "success",
+      "from": "0xcCC32990233cB34008777b2eDB62236F8e432046",
+      "to": "0xF805734aAC42cf238eAef9E905e3A04F2Ab554f9",
+      "url": "https://shannon-explorer.somnia.network/tx/0x766301821e529770d4ed81fd043c176fbd82371362a3c439fda302c025473be1"
+    },
+    {
+      "chain": "shannon",
+      "step": "review 0xa14d4561f2697859ab6c2d5eb62e1172a6cc3d14 0xA1d0CB85c869e534Fe1e0c22af3b238301157b5d",
+      "label": "review 2 committee callback",
+      "hash": "0x2b779f98906b4e2352f97bec153351acd9f5af5fabe944ac70b4f3fe76b762c1",
+      "block": 526203183,
+      "gasUsed": 1225312,
+      "status": "success",
+      "from": "0x05f1fE2DDF9B65576D3165E37C6A60e6c5Ba93De",
+      "to": "0x037Bb9C718F3f7fe5eCBDB0b600D607b52706776",
+      "url": "https://shannon-explorer.somnia.network/tx/0x2b779f98906b4e2352f97bec153351acd9f5af5fabe944ac70b4f3fe76b762c1"
+    },
+    {
+      "chain": "shannon",
+      "step": "review 0xa14d4561f2697859ab6c2d5eb62e1172a6cc3d14 0xA1d0CB85c869e534Fe1e0c22af3b238301157b5d",
+      "label": "review 2 committee callback",
+      "hash": "0x07612729a6eb0703144531050080805ca86a666253f54cdb5ba0610db2ddcb8a",
+      "block": 526203190,
+      "gasUsed": 596580,
+      "status": "success",
+      "from": "0x3E05e29029C60E000C8F01EB5AC9cEE6b242D7e0",
+      "to": "0x037Bb9C718F3f7fe5eCBDB0b600D607b52706776",
+      "url": "https://shannon-explorer.somnia.network/tx/0x07612729a6eb0703144531050080805ca86a666253f54cdb5ba0610db2ddcb8a"
+    },
+    {
+      "chain": "hideki",
+      "step": "review 0xa14d4561f2697859ab6c2d5eb62e1172a6cc3d14 0xA1d0CB85c869e534Fe1e0c22af3b238301157b5d",
+      "label": "review 2 verdict delivered to the gate",
+      "hash": "0xd0e24bca0f38de12f82f68cc74f14eeb39ae3380fcc655ef1d25a0932e263b1e",
+      "block": 35413953,
+      "gasUsed": 1170712,
+      "status": "success",
+      "from": "0xcCC32990233cB34008777b2eDB62236F8e432046",
+      "to": "0xD7C2E95c62De3c0ad95b2C1cf08E4B85DF6b332D",
+      "url": "https://explorer.testnet.somnia.network/tokyo/tx/0xd0e24bca0f38de12f82f68cc74f14eeb39ae3380fcc655ef1d25a0932e263b1e"
+    },
+    {
+      "chain": "hideki",
+      "step": "review 0xa14d4561f2697859ab6c2d5eb62e1172a6cc3d14 0xA1d0CB85c869e534Fe1e0c22af3b238301157b5d",
+      "label": "requestReview(0xA1d0CB85c869e534Fe1e0c22af3b238301157b5d)",
+      "hash": "0xca1921874841d1aa89317ec45bd0219d2c92e646bd1b960921635d010d65ba6f",
+      "block": 35414004,
+      "gasUsed": 399022,
+      "status": "success",
+      "from": "0x5397812d66F3233E0972b7AEB5e195a945504632",
+      "to": "0xEe54c49E9e70a0e5C2218Eec1b1BDBd4e1Cb20f1",
+      "url": "https://explorer.testnet.somnia.network/tokyo/tx/0xca1921874841d1aa89317ec45bd0219d2c92e646bd1b960921635d010d65ba6f"
+    },
+    {
+      "chain": "shannon",
+      "step": "review 0xa14d4561f2697859ab6c2d5eb62e1172a6cc3d14 0xA1d0CB85c869e534Fe1e0c22af3b238301157b5d",
+      "label": "review 3 delivered to the reviewer",
+      "hash": "0x33d1f1a8870168e436423791f6c20673833a6a711bff386772de5aa94dde6306",
+      "block": 526203348,
+      "gasUsed": 931214,
+      "status": "success",
+      "from": "0xcCC32990233cB34008777b2eDB62236F8e432046",
+      "to": "0xF805734aAC42cf238eAef9E905e3A04F2Ab554f9",
+      "url": "https://shannon-explorer.somnia.network/tx/0x33d1f1a8870168e436423791f6c20673833a6a711bff386772de5aa94dde6306"
+    },
+    {
+      "chain": "shannon",
+      "step": "review 0xa14d4561f2697859ab6c2d5eb62e1172a6cc3d14 0xA1d0CB85c869e534Fe1e0c22af3b238301157b5d",
+      "label": "review 3 committee callback",
+      "hash": "0x854b3660b727d4387961a522ba4e8dabe0862e5220e9fc702ecacdf8e4a85022",
+      "block": 526203370,
+      "gasUsed": 1211289,
+      "status": "success",
+      "from": "0x3E05e29029C60E000C8F01EB5AC9cEE6b242D7e0",
+      "to": "0x037Bb9C718F3f7fe5eCBDB0b600D607b52706776",
+      "url": "https://shannon-explorer.somnia.network/tx/0x854b3660b727d4387961a522ba4e8dabe0862e5220e9fc702ecacdf8e4a85022"
+    },
+    {
+      "chain": "shannon",
+      "step": "review 0xa14d4561f2697859ab6c2d5eb62e1172a6cc3d14 0xA1d0CB85c869e534Fe1e0c22af3b238301157b5d",
+      "label": "review 3 committee callback",
+      "hash": "0x9e929a20a144e8181072bdc1d9c17f78609823c5ab4d637ee7b975c898e7b576",
+      "block": 526203376,
+      "gasUsed": 602997,
+      "status": "success",
+      "from": "0x55Acbe370872c7D90F504eF169217a00c29E2A33",
+      "to": "0x037Bb9C718F3f7fe5eCBDB0b600D607b52706776",
+      "url": "https://shannon-explorer.somnia.network/tx/0x9e929a20a144e8181072bdc1d9c17f78609823c5ab4d637ee7b975c898e7b576"
+    },
+    {
+      "chain": "hideki",
+      "step": "review 0xa14d4561f2697859ab6c2d5eb62e1172a6cc3d14 0xA1d0CB85c869e534Fe1e0c22af3b238301157b5d",
+      "label": "review 3 verdict delivered to the gate",
+      "hash": "0x47b1fc509d0a4898ee6dcd4b4f61310f0f99b482074238c670ffe50441e93857",
+      "block": 35414146,
+      "gasUsed": 1170712,
+      "status": "success",
+      "from": "0xcCC32990233cB34008777b2eDB62236F8e432046",
+      "to": "0xD7C2E95c62De3c0ad95b2C1cf08E4B85DF6b332D",
+      "url": "https://explorer.testnet.somnia.network/tokyo/tx/0x47b1fc509d0a4898ee6dcd4b4f61310f0f99b482074238c670ffe50441e93857"
+    },
+    {
+      "chain": "hideki",
+      "step": "guard",
+      "label": "follower opts out of the guard",
+      "hash": "0x514511897ce35f14c2addde4e7e5c838f83ac4c5e4194a935b4b05457268fbfa",
+      "block": 35414455,
+      "gasUsed": 247799,
+      "status": "success",
+      "from": "0x7d736A88978e94E60494Ff91C49Ba838EDfb1932",
+      "to": "0xEe54c49E9e70a0e5C2218Eec1b1BDBd4e1Cb20f1",
+      "url": "https://explorer.testnet.somnia.network/tokyo/tx/0x514511897ce35f14c2addde4e7e5c838f83ac4c5e4194a935b4b05457268fbfa"
+    },
+    {
+      "chain": "hideki",
+      "step": "guard",
+      "label": "leader buys 0.0005 BTC (follower unguarded)",
+      "hash": "0x90d223e26f2f54faed03da9bd63a917f77176c8ad662246f30b11cd040e32c9a",
+      "block": 35414495,
+      "gasUsed": 1684713,
+      "status": "success",
+      "from": "0xA1d0CB85c869e534Fe1e0c22af3b238301157b5d",
+      "to": "0x4181dd08E73BbCdd1Ba3E615A18f6abD941b94C0",
+      "url": "https://explorer.testnet.somnia.network/tokyo/tx/0x90d223e26f2f54faed03da9bd63a917f77176c8ad662246f30b11cd040e32c9a"
+    },
+    {
+      "chain": "hideki",
+      "step": "guard",
+      "label": "unguarded increase (hub handler)",
+      "hash": "0x8a2d36e01bb352e5feebd523381f2c9d0f2ef410bd111868a71071b18dee07ef",
+      "block": 35414495,
+      "gasUsed": 1926099,
+      "status": "success",
+      "from": "0xdF73BBbB6517B712BBeD9bfAe6253A5E1FCDE154",
+      "to": "0xEFf35D485c4559D9f44e5138B38Cd93052f2E7BF",
+      "url": "https://explorer.testnet.somnia.network/tokyo/tx/0x8a2d36e01bb352e5feebd523381f2c9d0f2ef410bd111868a71071b18dee07ef"
+    },
+    {
+      "chain": "hideki",
+      "step": "guard",
+      "label": "follower turns the guard on",
+      "hash": "0x39d65da7c37379db8e2992fae1f20cf3266ac417743e766610d5304b154b1075",
+      "block": 35414540,
+      "gasUsed": 47799,
+      "status": "success",
+      "from": "0x7d736A88978e94E60494Ff91C49Ba838EDfb1932",
+      "to": "0xEe54c49E9e70a0e5C2218Eec1b1BDBd4e1Cb20f1",
+      "url": "https://explorer.testnet.somnia.network/tokyo/tx/0x39d65da7c37379db8e2992fae1f20cf3266ac417743e766610d5304b154b1075"
+    },
+    {
+      "chain": "hideki",
+      "step": "guard",
+      "label": "leader adds 0.0003 BTC (follower guarded)",
+      "hash": "0xe2cf079e39cd19fab19ab610dd1b9dfa81a8c5e2eabe0deeadadf91dede4dc2d",
+      "block": 35414570,
+      "gasUsed": 1615666,
+      "status": "success",
+      "from": "0xA1d0CB85c869e534Fe1e0c22af3b238301157b5d",
+      "to": "0x4181dd08E73BbCdd1Ba3E615A18f6abD941b94C0",
+      "url": "https://explorer.testnet.somnia.network/tokyo/tx/0xe2cf079e39cd19fab19ab610dd1b9dfa81a8c5e2eabe0deeadadf91dede4dc2d"
+    },
+    {
+      "chain": "hideki",
+      "step": "guard",
+      "label": "guarded increase (hub handler)",
+      "hash": "0x6d1513eae0aa1c0aa4a9bad7059388f42b2eeebea8cbb502aa5631356ef51c79",
+      "block": 35414570,
+      "gasUsed": 270165,
+      "status": "success",
+      "from": "0xdF73BBbB6517B712BBeD9bfAe6253A5E1FCDE154",
+      "to": "0xEFf35D485c4559D9f44e5138B38Cd93052f2E7BF",
+      "url": "https://explorer.testnet.somnia.network/tokyo/tx/0x6d1513eae0aa1c0aa4a9bad7059388f42b2eeebea8cbb502aa5631356ef51c79"
+    },
+    {
+      "chain": "hideki",
+      "step": "guard",
+      "label": "leader sells 0.0008 BTC (exit)",
+      "hash": "0x18c5625772d2bbdcd2402012f3bf167de8117d47435c9b53fcda3918fc40daa6",
+      "block": 35414612,
+      "gasUsed": 1575655,
+      "status": "success",
+      "from": "0xA1d0CB85c869e534Fe1e0c22af3b238301157b5d",
+      "to": "0x4181dd08E73BbCdd1Ba3E615A18f6abD941b94C0",
+      "url": "https://explorer.testnet.somnia.network/tokyo/tx/0x18c5625772d2bbdcd2402012f3bf167de8117d47435c9b53fcda3918fc40daa6"
+    },
+    {
+      "chain": "hideki",
+      "step": "guard",
+      "label": "exit while blocked (hub handler)",
+      "hash": "0x0f1c670aa00e4b3269e829241a63ce9c4f6189a3e540f8a42ff366b5b01487f9",
+      "block": 35414612,
+      "gasUsed": 1812616,
+      "status": "success",
+      "from": "0xdF73BBbB6517B712BBeD9bfAe6253A5E1FCDE154",
+      "to": "0xEFf35D485c4559D9f44e5138B38Cd93052f2E7BF",
+      "url": "https://explorer.testnet.somnia.network/tokyo/tx/0x0f1c670aa00e4b3269e829241a63ce9c4f6189a3e540f8a42ff366b5b01487f9"
     }
   ],
   "checks": {
@@ -259,6 +577,39 @@
       "ok: close (exit, never gated): handler in the trigger's block (delta 0)",
       "ok: the exit did not ask the gate",
       "ok: follower flat"
+    ],
+    "base-url": [
+      "ok: baseUrl = https://copybook-eosin.vercel.app/api/risk/"
+    ],
+    "review 0xfc2fb08cccf87bfc472cded8e7ebef588fcf7fd2": [
+      "ok: review 1 delivered to the reviewer: delivered on shannon (found after ~4s of polling)",
+      "ok: review 1: the reviewer replied (tier Block)",
+      "ok: review 1 verdict delivered to the gate: delivered on hideki (found after ~6s of polling)",
+      "ok: review 1: the gate settled it (VerdictReceived)"
+    ],
+    "review 0xa14d4561f2697859ab6c2d5eb62e1172a6cc3d14 0xA1d0CB85c869e534Fe1e0c22af3b238301157b5d": [
+      "ok: review 2 delivered to the reviewer: delivered on shannon (found after ~4s of polling)",
+      "ok: review 2: the reviewer replied (tier Block)",
+      "ok: review 2 verdict delivered to the gate: delivered on hideki (found after ~7s of polling)",
+      "ok: review 2: the gate settled it (VerdictReceived)",
+      "ok: review 3 delivered to the reviewer: delivered on shannon (found after ~4s of polling)",
+      "ok: review 3: the reviewer replied (tier Block)",
+      "ok: review 3 verdict delivered to the gate: delivered on hideki (found after ~7s of polling)",
+      "ok: review 3: the gate settled it (VerdictReceived)"
+    ],
+    "guard": [
+      "ok: leader and follower flat on BTC",
+      "ok: unguarded increase: the hub reacted for the follower",
+      "ok: unguarded increase: handler in the trigger's block (delta 0)",
+      "ok: unguarded follower copies the increase",
+      "ok: guarded increase: the hub reacted for the follower",
+      "ok: guarded increase: handler in the trigger's block (delta 0)",
+      "ok: Refused(RiskGate) for the guarded follower",
+      "ok: follower still holds 50000",
+      "ok: exit while blocked: the hub reacted for the follower",
+      "ok: exit while blocked: handler in the trigger's block (delta 0)",
+      "ok: the exit copied without asking the gate",
+      "ok: follower flat"
     ]
   },
   "measurements": {
@@ -301,7 +652,561 @@
         ]
       },
       "withoutGate": "the same trades on this hub before the gate was set: open 1.89-2.10M, close 1.79-1.87M handler gas"
+    },
+    "guard": {
+      "leaderTier": "Block",
+      "liveBlock": true,
+      "unguarded": [
+        "Copied(follower=0x7d736A88978e94E60494Ff91C49Ba838EDfb1932, sourceId=0x6744c2cdbcc5b0f6ad21719c8964204a5ffadf668d2b84479c9b14c029b0a40f, pool=0x4181dd08E73BbCdd1Ba3E615A18f6abD941b94C0, fromSize=0, toSize=50000, price=81179800000000000000000, capped=false)",
+        "TankCharged(follower=0x7d736A88978e94E60494Ff91C49Ba838EDfb1932, amount=11566026000000000)"
+      ],
+      "guarded": [
+        "Refused(follower=0x7d736A88978e94E60494Ff91C49Ba838EDfb1932, sourceId=0x6744c2cdbcc5b0f6ad21719c8964204a5ffadf668d2b84479c9b14c029b0a40f, pool=0x4181dd08E73BbCdd1Ba3E615A18f6abD941b94C0, reason=6, venueError=0x)",
+        "TankCharged(follower=0x7d736A88978e94E60494Ff91C49Ba838EDfb1932, amount=1630422000000000)"
+      ],
+      "exit": [
+        "Copied(follower=0x7d736A88978e94E60494Ff91C49Ba838EDfb1932, sourceId=0x6744c2cdbcc5b0f6ad21719c8964204a5ffadf668d2b84479c9b14c029b0a40f, pool=0x4181dd08E73BbCdd1Ba3E615A18f6abD941b94C0, fromSize=50000, toSize=0, price=79926900000000000000000, capped=false)",
+        "TankCharged(follower=0x7d736A88978e94E60494Ff91C49Ba838EDfb1932, amount=10877058000000000)"
+      ]
+    },
+    "reviewLatencySeconds": {
+      "note": "from block timestamps, request on Hideki = 0",
+      "steady": {
+        "toShannon": 4,
+        "summary": 6,
+        "verdict": 7,
+        "onHideki": 13
+      },
+      "liquidated": {
+        "toShannon": 3,
+        "summary": 6,
+        "verdict": 7,
+        "onHideki": 13
+      },
+      "leader": {
+        "toShannon": 4,
+        "summary": 7,
+        "verdict": 7,
+        "onHideki": 14
+      }
+    },
+    "reviewerSpend": {
+      "reviews": 3,
+      "spent": "0.6466063248",
+      "perReview": "0.2155",
+      "note": "deposits are 0.36 per review; the platform returns what the committees did not use"
     }
   },
-  "reviews": []
+  "reviews": [
+    {
+      "trader": "0xfc2Fb08CCCF87BFC472cded8E7eBEF588fCF7fd2",
+      "at": "2026-10-28T13:35:14.954Z",
+      "fee": "0.5",
+      "nonce": 1,
+      "requestTx": "0x8a92f667d92d26d0ae8caa258f44e596ced734d5add1fa1c03a89aebcdd82a08",
+      "messageToShannon": "0x1b82a3835749c98bf45192055c2bcf046a8ea4bfe58e6db1fb2467336f54b053",
+      "deliveryToShannon": "0x2c1bf907e991b72603d5638a9153233d0800bd57f928f20068f902bd5a830408",
+      "shannonEvents": [
+        {
+          "event": "ReviewReceived",
+          "tx": "0x2c1bf907e991b72603d5638a9153233d0800bd57f928f20068f902bd5a830408",
+          "block": 526202750,
+          "args": {
+            "trader": "0xfc2Fb08CCCF87BFC472cded8E7eBEF588fCF7fd2",
+            "nonce": "1"
+          }
+        },
+        {
+          "event": "SummaryRequested",
+          "tx": "0x2c1bf907e991b72603d5638a9153233d0800bd57f928f20068f902bd5a830408",
+          "block": 526202750,
+          "args": {
+            "trader": "0xfc2Fb08CCCF87BFC472cded8E7eBEF588fCF7fd2",
+            "requestId": "18072838",
+            "nonce": "1",
+            "deposit": "120000000000000000"
+          }
+        },
+        {
+          "event": "SummaryReceived",
+          "tx": "0xc22ae38a223e16bc9dde8de61efdfb90e9453885198dadae070acb831d8fecc1",
+          "block": 526202779,
+          "args": {
+            "trader": "0xfc2Fb08CCCF87BFC472cded8E7eBEF588fCF7fd2",
+            "requestId": "18072838",
+            "nonce": "1",
+            "summaryHash": "0xe791bfc7d479670c680919dfe06e94183a02ac964a5eb76a055844b0e7b0fd63",
+            "summary": "trades30d=113 activeDays30d=7 markets=3 realizedPnl30d=+3773.3 liquidations30d=0 maxDrawdown30d=679.3 avgLeverage=n/a lastActive=2026-10-22"
+          }
+        },
+        {
+          "event": "VerdictRequested",
+          "tx": "0xc22ae38a223e16bc9dde8de61efdfb90e9453885198dadae070acb831d8fecc1",
+          "block": 526202779,
+          "args": {
+            "trader": "0xfc2Fb08CCCF87BFC472cded8E7eBEF588fCF7fd2",
+            "requestId": "18072842",
+            "nonce": "1",
+            "deposit": "240000000000000000"
+          }
+        },
+        {
+          "event": "VerdictTallied",
+          "tx": "0x09e063c8ecd6cd21be9439ba9dc30d90266fbf8493f8881ed1887f0462573384",
+          "block": 526202785,
+          "args": {
+            "trader": "0xfc2Fb08CCCF87BFC472cded8E7eBEF588fCF7fd2",
+            "requestId": "18072842",
+            "nonce": "1",
+            "tier": 3,
+            "ok": 0,
+            "caution": 0,
+            "blocked": 3,
+            "responded": 3
+          }
+        },
+        {
+          "event": "VerdictSent",
+          "tx": "0x09e063c8ecd6cd21be9439ba9dc30d90266fbf8493f8881ed1887f0462573384",
+          "block": 526202785,
+          "args": {
+            "trader": "0xfc2Fb08CCCF87BFC472cded8E7eBEF588fCF7fd2",
+            "nonce": "1",
+            "tier": 3,
+            "messageId": "0xab33a43d224bfd7bf3f1a975ba750d4c1159c648bdbc2391767bc35c2c265a2d"
+          }
+        }
+      ],
+      "callbacks": [
+        {
+          "tx": "0xc22ae38a223e16bc9dde8de61efdfb90e9453885198dadae070acb831d8fecc1",
+          "submittedBy": "0x55acbe370872c7d90f504ef169217a00c29e2a33",
+          "committee": [
+            {
+              "callback": "handleSummary",
+              "requestId": "18072838",
+              "status": 2,
+              "responses": [
+                {
+                  "validator": "0x3E05e29029C60E000C8F01EB5AC9cEE6b242D7e0",
+                  "status": 2,
+                  "receipt": "0",
+                  "executionCost": "300000000000000",
+                  "result": "trades30d=113 activeDays30d=7 markets=3 realizedPnl30d=+3773.3 liquidations30d=0 maxDrawdown30d=679.3 avgLeverage=n/a lastActive=2026-10-22"
+                },
+                {
+                  "validator": "0x05f1fE2DDF9B65576D3165E37C6A60e6c5Ba93De",
+                  "status": 2,
+                  "receipt": "0",
+                  "executionCost": "300000000000000",
+                  "result": "trades30d=113 activeDays30d=7 markets=3 realizedPnl30d=+3773.3 liquidations30d=0 maxDrawdown30d=679.3 avgLeverage=n/a lastActive=2026-10-22"
+                },
+                {
+                  "validator": "0x55Acbe370872c7D90F504eF169217a00c29E2A33",
+                  "status": 2,
+                  "receipt": "0",
+                  "executionCost": "300000000000000",
+                  "result": "trades30d=113 activeDays30d=7 markets=3 realizedPnl30d=+3773.3 liquidations30d=0 maxDrawdown30d=679.3 avgLeverage=n/a lastActive=2026-10-22"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "tx": "0x09e063c8ecd6cd21be9439ba9dc30d90266fbf8493f8881ed1887f0462573384",
+          "submittedBy": "0x55acbe370872c7d90f504ef169217a00c29e2a33",
+          "committee": [
+            {
+              "callback": "handleVerdict",
+              "requestId": "18072842",
+              "status": 2,
+              "responses": [
+                {
+                  "validator": "0x3E05e29029C60E000C8F01EB5AC9cEE6b242D7e0",
+                  "status": 2,
+                  "receipt": "0",
+                  "executionCost": "70000000000000000",
+                  "result": "BLOCK"
+                },
+                {
+                  "validator": "0x1Cb38b3ee632B5dCc0347dB81766606d6Aad4926",
+                  "status": 2,
+                  "receipt": "0",
+                  "executionCost": "70000000000000000",
+                  "result": "BLOCK"
+                },
+                {
+                  "validator": "0x55Acbe370872c7D90F504eF169217a00c29E2A33",
+                  "status": 2,
+                  "receipt": "0",
+                  "executionCost": "70000000000000000",
+                  "result": "BLOCK"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "deliveryToHideki": "0x96028c21e4b35b2717927779c637e135b2f2e411f5898aec4577b85b53a25110",
+      "gateEvents": [
+        {
+          "event": "VerdictReceived",
+          "args": {
+            "sourceId": "0x2eb3e418548838760618fa45b6d6871e0541c0641103ea4bb6f0ac4368718dff",
+            "trader": "0xfc2Fb08CCCF87BFC472cded8E7eBEF588fCF7fd2",
+            "tier": 3,
+            "shannonRequestId": "18072842",
+            "summaryHash": "0xe791bfc7d479670c680919dfe06e94183a02ac964a5eb76a055844b0e7b0fd63"
+          }
+        }
+      ],
+      "verdict": {
+        "tier": "Block",
+        "reviewedAt": 1793194531,
+        "shannonRequestId": "18072842",
+        "summaryHash": "0xe791bfc7d479670c680919dfe06e94183a02ac964a5eb76a055844b0e7b0fd63"
+      },
+      "summary": "trades30d=113 activeDays30d=7 markets=3 realizedPnl30d=+3773.3 liquidations30d=0 maxDrawdown30d=679.3 avgLeverage=n/a lastActive=2026-10-22"
+    },
+    {
+      "trader": "0xA14d4561F2697859AB6c2d5eb62E1172a6cc3D14",
+      "at": "2026-10-28T13:35:55.656Z",
+      "fee": "0.5",
+      "nonce": 2,
+      "requestTx": "0x66ad6e3d2d3b6fcee128aaf7a6505b6df62f04a720ab2e2c6757746e1a783f7c",
+      "messageToShannon": "0x45f52c53cdcf5ad133d1f7ce33e4b885531480095300b6f8994cbd05fbfa481b",
+      "deliveryToShannon": "0x766301821e529770d4ed81fd043c176fbd82371362a3c439fda302c025473be1",
+      "shannonEvents": [
+        {
+          "event": "ReviewReceived",
+          "tx": "0x766301821e529770d4ed81fd043c176fbd82371362a3c439fda302c025473be1",
+          "block": 526203154,
+          "args": {
+            "trader": "0xA14d4561F2697859AB6c2d5eb62E1172a6cc3D14",
+            "nonce": "2"
+          }
+        },
+        {
+          "event": "SummaryRequested",
+          "tx": "0x766301821e529770d4ed81fd043c176fbd82371362a3c439fda302c025473be1",
+          "block": 526203154,
+          "args": {
+            "trader": "0xA14d4561F2697859AB6c2d5eb62E1172a6cc3D14",
+            "requestId": "18072881",
+            "nonce": "2",
+            "deposit": "120000000000000000"
+          }
+        },
+        {
+          "event": "SummaryReceived",
+          "tx": "0x2b779f98906b4e2352f97bec153351acd9f5af5fabe944ac70b4f3fe76b762c1",
+          "block": 526203183,
+          "args": {
+            "trader": "0xA14d4561F2697859AB6c2d5eb62E1172a6cc3D14",
+            "requestId": "18072881",
+            "nonce": "2",
+            "summaryHash": "0xb73cbe60dd9aeb2003a25abe405df0f47366b8de9dc96cc66a066fcb0aa36d50",
+            "summary": "trades30d=115 activeDays30d=6 markets=3 realizedPnl30d=-979.7 liquidations30d=3 maxDrawdown30d=2609.9 maxDrawdownPct30d=92.2 avgLeverage=17.0 lastActive=2026-10-26"
+          }
+        },
+        {
+          "event": "VerdictRequested",
+          "tx": "0x2b779f98906b4e2352f97bec153351acd9f5af5fabe944ac70b4f3fe76b762c1",
+          "block": 526203183,
+          "args": {
+            "trader": "0xA14d4561F2697859AB6c2d5eb62E1172a6cc3D14",
+            "requestId": "18072885",
+            "nonce": "2",
+            "deposit": "240000000000000000"
+          }
+        },
+        {
+          "event": "VerdictTallied",
+          "tx": "0x07612729a6eb0703144531050080805ca86a666253f54cdb5ba0610db2ddcb8a",
+          "block": 526203190,
+          "args": {
+            "trader": "0xA14d4561F2697859AB6c2d5eb62E1172a6cc3D14",
+            "requestId": "18072885",
+            "nonce": "2",
+            "tier": 3,
+            "ok": 0,
+            "caution": 0,
+            "blocked": 3,
+            "responded": 3
+          }
+        },
+        {
+          "event": "VerdictSent",
+          "tx": "0x07612729a6eb0703144531050080805ca86a666253f54cdb5ba0610db2ddcb8a",
+          "block": 526203190,
+          "args": {
+            "trader": "0xA14d4561F2697859AB6c2d5eb62E1172a6cc3D14",
+            "nonce": "2",
+            "tier": 3,
+            "messageId": "0x42236ee9e7d0bf2b8945f62ce32dbea18ee0a25b32af9c2badcf39f997139604"
+          }
+        }
+      ],
+      "callbacks": [
+        {
+          "tx": "0x2b779f98906b4e2352f97bec153351acd9f5af5fabe944ac70b4f3fe76b762c1",
+          "submittedBy": "0x05f1fe2ddf9b65576d3165e37c6a60e6c5ba93de",
+          "committee": [
+            {
+              "callback": "handleSummary",
+              "requestId": "18072881",
+              "status": 2,
+              "responses": [
+                {
+                  "validator": "0x1Cb38b3ee632B5dCc0347dB81766606d6Aad4926",
+                  "status": 2,
+                  "receipt": "0",
+                  "executionCost": "300000000000000",
+                  "result": "trades30d=115 activeDays30d=6 markets=3 realizedPnl30d=-979.7 liquidations30d=3 maxDrawdown30d=2609.9 maxDrawdownPct30d=92.2 avgLeverage=17.0 lastActive=2026-10-26"
+                },
+                {
+                  "validator": "0x3E05e29029C60E000C8F01EB5AC9cEE6b242D7e0",
+                  "status": 2,
+                  "receipt": "0",
+                  "executionCost": "300000000000000",
+                  "result": "trades30d=115 activeDays30d=6 markets=3 realizedPnl30d=-979.7 liquidations30d=3 maxDrawdown30d=2609.9 maxDrawdownPct30d=92.2 avgLeverage=17.0 lastActive=2026-10-26"
+                },
+                {
+                  "validator": "0x05f1fE2DDF9B65576D3165E37C6A60e6c5Ba93De",
+                  "status": 2,
+                  "receipt": "0",
+                  "executionCost": "300000000000000",
+                  "result": "trades30d=115 activeDays30d=6 markets=3 realizedPnl30d=-979.7 liquidations30d=3 maxDrawdown30d=2609.9 maxDrawdownPct30d=92.2 avgLeverage=17.0 lastActive=2026-10-26"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "tx": "0x07612729a6eb0703144531050080805ca86a666253f54cdb5ba0610db2ddcb8a",
+          "submittedBy": "0x3e05e29029c60e000c8f01eb5ac9cee6b242d7e0",
+          "committee": [
+            {
+              "callback": "handleVerdict",
+              "requestId": "18072885",
+              "status": 2,
+              "responses": [
+                {
+                  "validator": "0x05f1fE2DDF9B65576D3165E37C6A60e6c5Ba93De",
+                  "status": 2,
+                  "receipt": "0",
+                  "executionCost": "70000000000000000",
+                  "result": "BLOCK"
+                },
+                {
+                  "validator": "0x55Acbe370872c7D90F504eF169217a00c29E2A33",
+                  "status": 2,
+                  "receipt": "0",
+                  "executionCost": "70000000000000000",
+                  "result": "BLOCK"
+                },
+                {
+                  "validator": "0x3E05e29029C60E000C8F01EB5AC9cEE6b242D7e0",
+                  "status": 2,
+                  "receipt": "0",
+                  "executionCost": "70000000000000000",
+                  "result": "BLOCK"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "deliveryToHideki": "0xd0e24bca0f38de12f82f68cc74f14eeb39ae3380fcc655ef1d25a0932e263b1e",
+      "gateEvents": [
+        {
+          "event": "VerdictReceived",
+          "args": {
+            "sourceId": "0x521fb23e0c115461b3fa60ff6091640e91b29ce6bad68a63de8eb3acf816b2e5",
+            "trader": "0xA14d4561F2697859AB6c2d5eb62E1172a6cc3D14",
+            "tier": 3,
+            "shannonRequestId": "18072885",
+            "summaryHash": "0xb73cbe60dd9aeb2003a25abe405df0f47366b8de9dc96cc66a066fcb0aa36d50"
+          }
+        }
+      ],
+      "verdict": {
+        "tier": "Block",
+        "reviewedAt": 1793194572,
+        "shannonRequestId": "18072885",
+        "summaryHash": "0xb73cbe60dd9aeb2003a25abe405df0f47366b8de9dc96cc66a066fcb0aa36d50"
+      },
+      "summary": "trades30d=115 activeDays30d=6 markets=3 realizedPnl30d=-979.7 liquidations30d=3 maxDrawdown30d=2609.9 maxDrawdownPct30d=92.2 avgLeverage=17.0 lastActive=2026-10-26"
+    },
+    {
+      "trader": "0xA1d0CB85c869e534Fe1e0c22af3b238301157b5d",
+      "at": "2026-10-28T13:36:14.944Z",
+      "fee": "0.5",
+      "nonce": 3,
+      "requestTx": "0xca1921874841d1aa89317ec45bd0219d2c92e646bd1b960921635d010d65ba6f",
+      "messageToShannon": "0x5aa3ce6cea7ef442b7d4d72c9e42ab057cf8416e4f9f5719de1a3421d7abb9a4",
+      "deliveryToShannon": "0x33d1f1a8870168e436423791f6c20673833a6a711bff386772de5aa94dde6306",
+      "shannonEvents": [
+        {
+          "event": "ReviewReceived",
+          "tx": "0x33d1f1a8870168e436423791f6c20673833a6a711bff386772de5aa94dde6306",
+          "block": 526203348,
+          "args": {
+            "trader": "0xA1d0CB85c869e534Fe1e0c22af3b238301157b5d",
+            "nonce": "3"
+          }
+        },
+        {
+          "event": "SummaryRequested",
+          "tx": "0x33d1f1a8870168e436423791f6c20673833a6a711bff386772de5aa94dde6306",
+          "block": 526203348,
+          "args": {
+            "trader": "0xA1d0CB85c869e534Fe1e0c22af3b238301157b5d",
+            "requestId": "18072902",
+            "nonce": "3",
+            "deposit": "120000000000000000"
+          }
+        },
+        {
+          "event": "SummaryReceived",
+          "tx": "0x854b3660b727d4387961a522ba4e8dabe0862e5220e9fc702ecacdf8e4a85022",
+          "block": 526203370,
+          "args": {
+            "trader": "0xA1d0CB85c869e534Fe1e0c22af3b238301157b5d",
+            "requestId": "18072902",
+            "nonce": "3",
+            "summaryHash": "0x6988ede7b0e93085cb85ba4ebe1bfac6460124df2353058eb71935a50a75935f",
+            "summary": "trades30d=42 activeDays30d=2 markets=2 realizedPnl30d=-0.2 liquidations30d=0 maxDrawdown30d=0.2 avgLeverage=n/a lastActive=2026-10-28"
+          }
+        },
+        {
+          "event": "VerdictRequested",
+          "tx": "0x854b3660b727d4387961a522ba4e8dabe0862e5220e9fc702ecacdf8e4a85022",
+          "block": 526203370,
+          "args": {
+            "trader": "0xA1d0CB85c869e534Fe1e0c22af3b238301157b5d",
+            "requestId": "18072906",
+            "nonce": "3",
+            "deposit": "240000000000000000"
+          }
+        },
+        {
+          "event": "VerdictTallied",
+          "tx": "0x9e929a20a144e8181072bdc1d9c17f78609823c5ab4d637ee7b975c898e7b576",
+          "block": 526203376,
+          "args": {
+            "trader": "0xA1d0CB85c869e534Fe1e0c22af3b238301157b5d",
+            "requestId": "18072906",
+            "nonce": "3",
+            "tier": 3,
+            "ok": 0,
+            "caution": 0,
+            "blocked": 3,
+            "responded": 3
+          }
+        },
+        {
+          "event": "VerdictSent",
+          "tx": "0x9e929a20a144e8181072bdc1d9c17f78609823c5ab4d637ee7b975c898e7b576",
+          "block": 526203376,
+          "args": {
+            "trader": "0xA1d0CB85c869e534Fe1e0c22af3b238301157b5d",
+            "nonce": "3",
+            "tier": 3,
+            "messageId": "0x6cad5914a96f9b427b7efcafcc19bd91bfd8f1b1dbf20b914ac5c52f098a6d27"
+          }
+        }
+      ],
+      "callbacks": [
+        {
+          "tx": "0x854b3660b727d4387961a522ba4e8dabe0862e5220e9fc702ecacdf8e4a85022",
+          "submittedBy": "0x3e05e29029c60e000c8f01eb5ac9cee6b242d7e0",
+          "committee": [
+            {
+              "callback": "handleSummary",
+              "requestId": "18072902",
+              "status": 2,
+              "responses": [
+                {
+                  "validator": "0x1Cb38b3ee632B5dCc0347dB81766606d6Aad4926",
+                  "status": 2,
+                  "receipt": "0",
+                  "executionCost": "300000000000000",
+                  "result": "trades30d=42 activeDays30d=2 markets=2 realizedPnl30d=-0.2 liquidations30d=0 maxDrawdown30d=0.2 avgLeverage=n/a lastActive=2026-10-28"
+                },
+                {
+                  "validator": "0x05f1fE2DDF9B65576D3165E37C6A60e6c5Ba93De",
+                  "status": 2,
+                  "receipt": "0",
+                  "executionCost": "300000000000000",
+                  "result": "trades30d=42 activeDays30d=2 markets=2 realizedPnl30d=-0.2 liquidations30d=0 maxDrawdown30d=0.2 avgLeverage=n/a lastActive=2026-10-28"
+                },
+                {
+                  "validator": "0x3E05e29029C60E000C8F01EB5AC9cEE6b242D7e0",
+                  "status": 2,
+                  "receipt": "0",
+                  "executionCost": "300000000000000",
+                  "result": "trades30d=42 activeDays30d=2 markets=2 realizedPnl30d=-0.2 liquidations30d=0 maxDrawdown30d=0.2 avgLeverage=n/a lastActive=2026-10-28"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "tx": "0x9e929a20a144e8181072bdc1d9c17f78609823c5ab4d637ee7b975c898e7b576",
+          "submittedBy": "0x55acbe370872c7d90f504ef169217a00c29e2a33",
+          "committee": [
+            {
+              "callback": "handleVerdict",
+              "requestId": "18072906",
+              "status": 2,
+              "responses": [
+                {
+                  "validator": "0x05f1fE2DDF9B65576D3165E37C6A60e6c5Ba93De",
+                  "status": 2,
+                  "receipt": "0",
+                  "executionCost": "70000000000000000",
+                  "result": "BLOCK"
+                },
+                {
+                  "validator": "0x1Cb38b3ee632B5dCc0347dB81766606d6Aad4926",
+                  "status": 2,
+                  "receipt": "0",
+                  "executionCost": "70000000000000000",
+                  "result": "BLOCK"
+                },
+                {
+                  "validator": "0x55Acbe370872c7D90F504eF169217a00c29E2A33",
+                  "status": 2,
+                  "receipt": "0",
+                  "executionCost": "70000000000000000",
+                  "result": "BLOCK"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "deliveryToHideki": "0x47b1fc509d0a4898ee6dcd4b4f61310f0f99b482074238c670ffe50441e93857",
+      "gateEvents": [
+        {
+          "event": "VerdictReceived",
+          "args": {
+            "sourceId": "0x6744c2cdbcc5b0f6ad21719c8964204a5ffadf668d2b84479c9b14c029b0a40f",
+            "trader": "0xA1d0CB85c869e534Fe1e0c22af3b238301157b5d",
+            "tier": 3,
+            "shannonRequestId": "18072906",
+            "summaryHash": "0x6988ede7b0e93085cb85ba4ebe1bfac6460124df2353058eb71935a50a75935f"
+          }
+        }
+      ],
+      "verdict": {
+        "tier": "Block",
+        "reviewedAt": 1793194591,
+        "shannonRequestId": "18072906",
+        "summaryHash": "0x6988ede7b0e93085cb85ba4ebe1bfac6460124df2353058eb71935a50a75935f"
+      },
+      "summary": "trades30d=42 activeDays30d=2 markets=2 realizedPnl30d=-0.2 liquidations30d=0 maxDrawdown30d=0.2 avgLeverage=n/a lastActive=2026-10-28"
+    }
+  ]
 }

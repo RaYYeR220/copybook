@@ -1,0 +1,31 @@
+{
+  "chainId": 50383,
+  "hub": "0xE86597D649B8e3924E0860c4358E9b4d21b8dB9d",
+  "engine": "0xBde2C724cc5c5335a5Ec155b5bC74E6cF78ad6a0",
+  "themes": "0x8846e5134906662c48aa35AaBbC39Cb55447B4F3",
+  "marginBank": "0x478769E1177C0773c43A593DCCc4Ad15F15F1394",
+  "groupSize": 8,
+  "deployBlock": 34968604,
+  "txs": {
+    "engine": {
+      "hash": "0x6f7bcebce6880252bed3d6582d98f24fdd4bf60e1c101a3a0ce68e1ac1fc2499",
+      "block": 34968604,
+      "gasUsed": 46029209
+    },
+    "themes": {
+      "hash": "0x9e69b14e614d5a1bc8162e88837161c3d4ec6d71e281bb3f266f0fbbb4e59d95",
+      "block": 34968617,
+      "gasUsed": 12260562
+    },
+    "hub": {
+      "hash": "0x2e5f8c6312cae3ff665251e372e38d0a23c9dae17a17272a483f83d9f300c8c9",
+      "block": 34968633,
+      "gasUsed": 74099442
+    },
+    "fundHub": {
+      "hash": "0xb9a11a70bfe1f08ccba539d4e40b66cb73cdaa58c8f419b4eae29fc09f6bed96",
+      "block": 34968646,
+      "gasUsed": 21062
+    }
+  }
+}

@@ -1,30 +1,31 @@
 {
   "chainId": 50383,
-  "hub": "0xE86597D649B8e3924E0860c4358E9b4d21b8dB9d",
-  "engine": "0xBde2C724cc5c5335a5Ec155b5bC74E6cF78ad6a0",
-  "themes": "0x8846e5134906662c48aa35AaBbC39Cb55447B4F3",
+  "hub": "0xdF73BBbB6517B712BBeD9bfAe6253A5E1FCDE154",
+  "engine": "0xE37F735b8E43e63E56f7E550e732Ab808257D56A",
+  "themes": "0xbcA03A20eaf337b7bb35DBD76512Af5BC61f6c79",
   "marginBank": "0x478769E1177C0773c43A593DCCc4Ad15F15F1394",
   "groupSize": 8,
-  "deployBlock": 34968604,
+  "owner": "0x5397812d66F3233E0972b7AEB5e195a945504632",
+  "deployBlock": 35024222,
   "txs": {
     "engine": {
-      "hash": "0x6f7bcebce6880252bed3d6582d98f24fdd4bf60e1c101a3a0ce68e1ac1fc2499",
-      "block": 34968604,
-      "gasUsed": 46029209
+      "hash": "0x0799a2897eda354432344749f7788b775e037808bb6d6f98c9ce0c3b946cc4cd",
+      "block": 35024222,
+      "gasUsed": 46962361
     },
     "themes": {
-      "hash": "0x9e69b14e614d5a1bc8162e88837161c3d4ec6d71e281bb3f266f0fbbb4e59d95",
-      "block": 34968617,
+      "hash": "0x67500cb4f993ff4edf1073442f097144d94fb54a42ca795d59ee9f51b2705df1",
+      "block": 35024236,
       "gasUsed": 12260562
     },
     "hub": {
-      "hash": "0x2e5f8c6312cae3ff665251e372e38d0a23c9dae17a17272a483f83d9f300c8c9",
-      "block": 34968633,
-      "gasUsed": 74099442
+      "hash": "0x9301f8c0b32b4fab8b9c0919fa455c58c92090ca4f110eae29a31e03aef184cd",
+      "block": 35024249,
+      "gasUsed": 75383438
     },
     "fundHub": {
-      "hash": "0xb9a11a70bfe1f08ccba539d4e40b66cb73cdaa58c8f419b4eae29fc09f6bed96",
-      "block": 34968646,
+      "hash": "0x625b4f1d688056e80f04eece7e43c607ed2eb532153a87d5fd9380391eab3296",
+      "block": 35024262,
       "gasUsed": 21062
     }
   }

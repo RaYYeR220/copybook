@@ -13,14 +13,18 @@ function json(body: unknown, status: number, cache?: string): Response {
   });
 }
 
+const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
+
 export async function GET(_req: Request, ctx: { params: Promise<{ trader: string }> }): Promise<Response> {
   const { trader } = await ctx.params;
+  if (!ADDRESS_RE.test(trader)) return json({ error: "invalid trader address" }, 400);
   try {
     const stats = await getTraderStats(trader as `0x${string}`, { maxRows: ROW_CAP });
+    // asOf is the response time; the response may be served from cache for up to s-maxage.
     return json({ trader: stats.trader, summary: riskSummary(stats), stats, asOf: new Date().toISOString() }, 200, CACHE);
   } catch (err) {
-    if (err instanceof TypeError) return json({ error: "invalid trader address" }, 400);
-    if (err instanceof IndexerError) return json({ error: "indexer unavailable" }, 502);
-    return json({ error: "risk summary unavailable" }, 502);
+    if (err instanceof IndexerError) return json({ error: "risk summary unavailable" }, 502);
+    console.error("risk route failed", err);
+    return json({ error: "internal error" }, 500);
   }
 }

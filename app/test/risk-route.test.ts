@@ -1,7 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 let impl: () => Promise<unknown> = async () => stats;
-const getTraderStats = (..._a: unknown[]) => impl();
+const calls: unknown[][] = [];
+const getTraderStats = (...a: unknown[]) => {
+  calls.push(a);
+  return impl();
+};
 
 vi.mock("@copybook/stats", async () => {
   const actual = await vi.importActual<typeof import("@copybook/stats")>("@copybook/stats");
@@ -31,6 +35,7 @@ const stats = {
 };
 
 beforeEach(() => {
+  calls.length = 0;
   impl = async () => stats;
 });
 
@@ -41,7 +46,9 @@ describe("GET /api/risk/[trader]", () => {
     };
     const res = await call("nope");
     expect(res.status).toBe(400);
-    expect(typeof (await res.json()).error).toBe("string");
+    expect(await res.json()).toEqual({ error: "invalid trader address" });
+    expect(res.headers.get("cache-control")).toBeNull();
+    expect(calls.length).toBe(0);
   });
 
   it("200 with a summary string", async () => {
@@ -55,6 +62,7 @@ describe("GET /api/risk/[trader]", () => {
     expect(body.summary.length).toBeGreaterThan(0);
     expect(body.summary.length).toBeLessThanOrEqual(280);
     expect(body.stats.trades30d).toBe(12);
+    expect(calls[0][1]).toEqual({ maxRows: 2000 });
     expect(typeof body.asOf).toBe("string");
   });
 
@@ -67,6 +75,20 @@ describe("GET /api/risk/[trader]", () => {
     expect(res.status).toBe(502);
     const body = await res.json();
     expect(body.summary).toBeUndefined();
-    expect(typeof body.error).toBe("string");
+    expect(body.error).toBe("risk summary unavailable");
+    expect(res.headers.get("cache-control")).toBeNull();
+  });
+
+  it("500 on an unexpected error, no message leak", async () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    impl = async () => {
+      throw new Error("secret detail");
+    };
+    const res = await call(TRADER);
+    expect(res.status).toBe(500);
+    expect(await res.json()).toEqual({ error: "internal error" });
+    expect(res.headers.get("cache-control")).toBeNull();
+    expect(spy).toHaveBeenCalled();
+    spy.mockRestore();
   });
 });

@@ -64,7 +64,8 @@ test("parseSummary reads key=value tokens", () => {
 });
 
 test("the rubric line served to the validators gives the same tier as the full summary", async () => {
-  const { riskRubric, riskSummary } = await import("@copybook/stats");
+  // by path, so the eval needs only e2e's install (e2e links @copybook/stats for its own sources)
+  const { riskRubric, riskSummary } = await import("../packages/stats/src/index.ts");
   const base = {
     trader: "0x0000000000000000000000000000000000000001" as const,
     windowDays: 30,

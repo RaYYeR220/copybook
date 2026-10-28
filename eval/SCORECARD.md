@@ -586,7 +586,9 @@ As read from the gate after run v3, on 2026-10-28:
 
 ```sh
 cd e2e
+npm ci                                                 # e2e's dependencies, with packages/stats linked
 npm run eval:test                                      # the rubric's unit tests, incl. rubric line = summary tier
+npm run typecheck
 
 # run v2
 COPYBOOK_ENV=keys.env npm run eval select              # sample + eval/answer-key.json (commit it)

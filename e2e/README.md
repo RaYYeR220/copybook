@@ -43,8 +43,11 @@ without it.
 
 ```sh
 cd contracts && npm ci && forge build    # e2e reads the ABIs from contracts/out
-cd ../e2e && npm ci
+cd ../e2e && npm ci                      # links packages/stats as @copybook/stats; no install at the repo root needed
 ```
+
+`npm run typecheck` and the eval (`npm run eval:test`, `npm run eval score`) need only these two installs; the
+`risk` and `live` steps also read the ABIs from `contracts/out`.
 
 ## 2. Deploy
 

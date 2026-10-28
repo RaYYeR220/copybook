@@ -676,11 +676,30 @@ async function guard() {
   rec.measurements.guard = { leaderTier: TIERS[Number(v.tier)], liveBlock: blocked };
   const pool = await btc();
   if (!blocked) {
+    // the leader has no Block, so no copy can be refused; the guard switch is shown against any reviewed trader
+    // that does hold a live Block (the follower does not copy that trader: these are the gate's answers only)
+    const blockedTrader = (rec.reviews as { trader?: string; verdict?: { tier?: string } }[])
+      .filter((r) => r.verdict?.tier === "Block" && r.trader)
+      .map((r) => getAddress(r.trader!))
+      .find((t) => t !== LEADER);
+    const ask = async (what: string) => {
+      const answers: Record<string, boolean> = { leader: await readGate<boolean>("allowIncrease", [sourceIdOf(LEADER), FOLLOWER]) };
+      if (blockedTrader) answers[blockedTrader] = await readGate<boolean>("allowIncrease", [sourceIdOf(blockedTrader), FOLLOWER]);
+      note(`allowIncrease for the follower, ${what}`, answers);
+      return answers;
+    };
+    const on1 = await ask("guard on");
     await sendOn("hideki", "FOLLOWER", "follower opts out of the guard", { address: gateAddr(), abi: gateAbi, functionName: "setGuard", args: [false] });
     check((await readGate<boolean>("guardOf", [FOLLOWER])) === false, "guardOf(follower) = false");
+    const off = await ask("guard off");
     await sendOn("hideki", "FOLLOWER", "follower opts back in", { address: gateAddr(), abi: gateAbi, functionName: "setGuard", args: [true] });
     check((await readGate<boolean>("guardOf", [FOLLOWER])) === true, "guardOf(follower) = true");
-    check(await readGate<boolean>("allowIncrease", [sourceIdOf(LEADER), FOLLOWER]), "no live Block on the leader: increases stay allowed");
+    const on2 = await ask("guard back on");
+    check(on1.leader && off.leader && on2.leader, "no live Block on the leader: the follower's increases stay allowed");
+    if (blockedTrader) {
+      check(!on1[blockedTrader] && off[blockedTrader] && !on2[blockedTrader], `${blockedTrader} holds a live Block: refused while guarded, allowed after opting out, refused again after opting in`);
+    }
+    rec.measurements.guard = { ...(rec.measurements.guard as object), blockedTrader, guardOn: on1, guardOff: off, guardBackOn: on2 };
     save();
     return;
   }
@@ -707,7 +726,8 @@ async function guard() {
 // ---------------------------------------------------------------- main
 
 const [cmd, ...args] = process.argv.slice(2);
-step = cmd ?? "";
+// a review run is recorded per trader list, so separate runs keep their own checks
+step = cmd === "review" && args.length ? `review ${args.join(" ")}` : (cmd ?? "");
 rec.checks[step] = [];
 console.log(`=== ${step}`);
 try {

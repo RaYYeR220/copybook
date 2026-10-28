@@ -94,6 +94,8 @@ export function configFrom(hideki: unknown, risk: unknown) {
 
   return {
     deployments,
+    /** The wallet that deployed and owns the contracts. */
+    owner: asAddress(h.owner) ?? asAddress(rh.owner),
     risk: params,
     gateDeployBlock,
     demoLeader,

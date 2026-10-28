@@ -19,6 +19,8 @@ export function Wordmark({ href = "/", flockGuard = false }: { href?: string; fl
 export interface NavLink {
   href: string;
   label: string;
+  /** Next.js route prefetch (default: Next's own). Off for pages that only make sense with a wallet. */
+  prefetch?: boolean;
 }
 
 /**

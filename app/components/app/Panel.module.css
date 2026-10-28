@@ -1,0 +1,140 @@
+/* The app's page rhythm: a 400px column beside a fluid one, square panels on hairlines, no shadows. */
+
+.wrap {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: 400px minmax(0, 1fr);
+  gap: 20px;
+  padding: 20px 36px 44px;
+  align-items: start;
+}
+
+.col {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+}
+
+.panel {
+  position: relative;
+  min-width: 0;
+  border: 1px solid var(--hair-2);
+  background: var(--card);
+}
+
+.ph {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 20px 12px;
+  border-bottom: 1px solid var(--hair);
+}
+
+.h2 {
+  font: 560 24px/1 var(--display);
+  font-variation-settings: "opsz" 72, "SOFT" 0;
+  letter-spacing: -0.025em;
+  color: var(--bone);
+}
+
+.h2 em {
+  font-style: italic;
+  font-weight: 500;
+}
+
+.kick {
+  font: 400 10px/1.4 var(--mono);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--night-4);
+}
+
+.meta {
+  display: flex;
+  align-items: baseline;
+  gap: 18px;
+  font: 400 11.5px var(--mono);
+  color: var(--night-4);
+}
+
+.meta b {
+  font-weight: 400;
+  color: var(--bone);
+}
+
+.body {
+  padding: 16px 20px 18px;
+}
+
+.note {
+  padding: 10px 20px 16px;
+  font: 400 11px/1.6 var(--mono);
+  letter-spacing: 0.03em;
+  color: var(--night-4);
+}
+
+.note b {
+  font-weight: 400;
+  color: var(--bone-2);
+}
+
+.colophon {
+  padding: 2px 4px 0;
+  font: 400 10.5px/1.8 var(--mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--night-4);
+}
+
+.colophon b {
+  font-weight: 400;
+  color: var(--bone);
+}
+
+@media (max-width: 1180px) {
+  .wrap {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 720px) {
+  .wrap {
+    padding: 14px 16px 32px;
+    gap: 14px;
+  }
+
+  /* one column; panels take the order their page gives them */
+  .col {
+    display: contents;
+  }
+
+  .panel {
+    order: var(--order, 0);
+  }
+
+  .colophon {
+    order: 99;
+  }
+
+  .ph {
+    padding: 14px 16px 10px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+
+  .body {
+    padding: 14px 16px 16px;
+  }
+
+  .note {
+    padding: 8px 16px 14px;
+  }
+
+  .meta .wide {
+    display: none;
+  }
+}

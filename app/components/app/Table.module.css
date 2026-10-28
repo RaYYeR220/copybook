@@ -1,0 +1,168 @@
+/* The book table: mono caps headers, the display face for the row's name, tabular mono values. */
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table th {
+  padding: 12px 20px 10px;
+  border-bottom: 1px solid var(--hair);
+  font: 400 10px/1.3 var(--mono);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--night-4);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.table th.num,
+.table td.num {
+  text-align: right;
+}
+
+.table td {
+  padding: 13px 20px;
+  border-bottom: 1px solid var(--hair);
+  font: 400 12.5px var(--mono);
+  color: var(--bone-2);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.table td b {
+  font-weight: 400;
+  color: var(--bone);
+}
+
+/* the row's name: Fraunces 19 */
+.table td.name {
+  font: 560 19px/1 var(--display);
+  font-variation-settings: "opsz" 48, "SOFT" 0;
+  letter-spacing: -0.01em;
+  color: var(--bone);
+}
+
+/* figures set as display numerals (PnL), never coloured */
+.table td.fig {
+  font: 560 17px/1 var(--display);
+  font-variation-settings: "opsz" 48, "SOFT" 0;
+  letter-spacing: -0.01em;
+  color: var(--bone);
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+/* an address standing as the row's name: mono, a size under the display names */
+.table td.name a.addr {
+  font: 400 14px/1 var(--mono);
+  letter-spacing: 0.01em;
+}
+
+/* a second body under the first, set apart by a stronger rule */
+.sub {
+  border-top: 1px solid var(--hair-2);
+}
+
+.table td.rank {
+  width: 1%;
+  color: var(--night-4);
+}
+
+.table tr.link {
+  cursor: pointer;
+  transition: background 0.25s var(--ease);
+}
+
+.table tr.link:hover {
+  background: rgba(230, 223, 204, 0.025);
+}
+
+.table td a {
+  border-bottom: 1px solid var(--hair-3);
+  transition: border-color 0.25s var(--ease);
+}
+
+.table td a:hover {
+  border-color: var(--bone);
+}
+
+.table td.name a {
+  border-bottom-color: transparent;
+}
+
+.table td.name a:hover {
+  border-bottom-color: var(--hair-3);
+}
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  margin-left: 10px;
+  padding: 0 8px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--gold-line);
+  font: 400 10px/1 var(--mono);
+  letter-spacing: 0.08em;
+  color: var(--gold);
+  vertical-align: 3px;
+}
+
+.dim {
+  color: var(--night-4);
+}
+
+/* one record per row on phones: the name first, then labelled values */
+@media (max-width: 720px) {
+  .table thead {
+    display: none;
+  }
+
+  .table tr {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px 12px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--hair);
+  }
+
+  .table tbody tr:last-child {
+    border-bottom: 0;
+  }
+
+  .table td {
+    padding: 0;
+    border: 0;
+    white-space: normal;
+    font-size: 11.5px;
+  }
+
+  .table td.num {
+    text-align: left;
+  }
+
+  .table td.name,
+  .table td.full {
+    grid-column: 1 / -1;
+  }
+
+  .table td.rank {
+    display: none;
+  }
+
+  .table td[data-label]::before {
+    content: attr(data-label) "  ";
+    color: var(--night-4);
+    font: 400 10px var(--mono);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .table td.fig {
+    font-size: 17px;
+  }
+}

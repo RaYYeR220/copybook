@@ -85,6 +85,13 @@ describe("GET /api/history", () => {
     expect(afters.length).toBe(1); // scans still running keep going after the response
   });
 
+  it("leaves the raw topics and data out unless asked", async () => {
+    const lean = (await call()).decoded.events[0].log;
+    expect("topics" in lean).toBe(false);
+    expect(lean.transactionHash).toBe(`0x${(1).toString(16).padStart(64, "0")}`);
+    expect((await call("?raw=1")).decoded.events[0].log.topics).toEqual([]);
+  });
+
   it("filters by follower", async () => {
     const { decoded } = await call(`?follower=${FOLLOWER.toLowerCase()}`);
     expect(decoded.events.map((e) => e.name)).toEqual(["Followed", "Copied", "TankCharged"]);

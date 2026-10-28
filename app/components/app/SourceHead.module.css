@@ -1,0 +1,134 @@
+.top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px 0;
+}
+
+.kick {
+  font: 400 10px/1.4 var(--mono);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--night-4);
+}
+
+.kick b {
+  font-weight: 400;
+  color: var(--gold);
+}
+
+.step {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font: 400 11px var(--mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--bone);
+  white-space: nowrap;
+}
+
+.step i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--gold);
+  outline: 3px solid var(--gold-wash);
+}
+
+.step.quiet i {
+  background: none;
+  border: 1px solid var(--bone);
+  outline: 0;
+}
+
+.h1 {
+  padding: 10px 20px 0;
+  font: 560 60px/0.92 var(--display);
+  font-variation-settings: "opsz" 144, "SOFT" 0;
+  letter-spacing: -0.045em;
+  color: var(--bone);
+  overflow-wrap: anywhere;
+}
+
+.h1.addr {
+  font-size: 50px;
+  letter-spacing: -0.04em;
+}
+
+.h1 em {
+  font-style: italic;
+  font-weight: 500;
+}
+
+.line {
+  padding: 10px 20px 0;
+  font: 400 12px/1.6 var(--mono);
+  color: var(--bone-2);
+  overflow-wrap: anywhere;
+}
+
+.line span {
+  color: var(--night-4);
+}
+
+.line a {
+  border-bottom: 1px solid var(--hair-3);
+  transition: border-color 0.25s var(--ease);
+}
+
+.line a:hover {
+  border-color: var(--bone);
+}
+
+.lead {
+  padding: 14px 20px 0;
+  font: 400 14px/1.55 var(--body);
+  color: var(--bone-2);
+  max-width: 36em;
+}
+
+.lead b {
+  font-weight: 500;
+  color: var(--bone);
+}
+
+.ledger {
+  margin: 14px 20px 0;
+}
+
+.acts {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 18px 20px 20px;
+}
+
+@media (max-width: 720px) {
+  .top,
+  .line,
+  .lead {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .h1 {
+    font-size: 50px;
+    padding: 10px 16px 0;
+  }
+
+  .h1.addr {
+    font-size: 38px;
+  }
+
+  .ledger {
+    margin: 12px 16px 0;
+  }
+
+  .acts {
+    padding: 16px;
+  }
+}

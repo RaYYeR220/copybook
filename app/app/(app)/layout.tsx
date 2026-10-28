@@ -8,7 +8,7 @@ import styles from "./app.module.css";
 
 const LINKS = [
   { href: "/app", label: "Discover" },
-  { href: "/me", label: "Dashboard" },
+  { href: "/me", label: "Dashboard", prefetch: false },
 ];
 
 /** Every app route lives at night, inside the double-rule frame, with the wallet in context. */

@@ -75,6 +75,24 @@ export const GlyphVerdict = (p: GlyphProps) => (
   </svg>
 );
 
+/** Feed glyph: a wallet joins a source (its copy, a ring, set on the leader's meridian). */
+export const GlyphFollow = (p: GlyphProps) => (
+  <svg viewBox="0 0 24 18" {...deco} {...p}>
+    <line x1="3" y1="15" x2="21" y2="3" stroke="#caa063" strokeDasharray="2 2" />
+    <circle cx="17" cy="5.7" r="2.6" fill="#caa063" />
+    <circle cx="10" cy="10.3" r="2.4" fill="none" stroke="#e6dfcc" />
+  </svg>
+);
+
+/** Feed glyph: a wallet leaves a source (its copy off the meridian). */
+export const GlyphUnfollow = (p: GlyphProps) => (
+  <svg viewBox="0 0 24 18" {...deco} {...p}>
+    <line x1="3" y1="15" x2="21" y2="3" stroke="#caa063" strokeDasharray="2 2" />
+    <circle cx="17" cy="5.7" r="2.6" fill="#caa063" />
+    <circle cx="7" cy="5" r="2.4" fill="none" stroke="#e6dfcc" strokeDasharray="1.4 1.4" />
+  </svg>
+);
+
 /** Verdict OK. */
 export const VerdictOk = (p: GlyphProps) => (
   <svg viewBox="0 0 14 14" {...deco} {...p}>

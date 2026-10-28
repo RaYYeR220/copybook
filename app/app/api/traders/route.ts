@@ -31,7 +31,7 @@ const ranking = unstable_cache(
       demoLeader: config.demoLeader,
       now: () => new Date(),
     }),
-  ["top-traders", "v1"],
+  ["top-traders", "v2"],
   { revalidate: 300 },
 );
 

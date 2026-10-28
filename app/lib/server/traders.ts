@@ -10,10 +10,27 @@ const SLACK = 3;
  * (about 40 s measured against the live indexer). Rows past 2000 per trader mark it truncated, and truncated
  * histories are dropped from the ranking, as `topTraders` documents.
  */
-export const RANK_OPTIONS: RankOptions = { candidateLimit: 20, delayMs: 40, maxRows: 2_000 };
+export const RANK_OPTIONS = {
+  candidateLimit: 20,
+  delayMs: 40,
+  maxRows: 2_000,
+  minTrades: 20,
+  minActiveDays: 5,
+  maxLiquidations: 1,
+} as const satisfies RankOptions;
+
+/** The filters a ranked trader passed, as the page states them. */
+export const RANK_RULES = {
+  minTrades: RANK_OPTIONS.minTrades,
+  minActiveDays: RANK_OPTIONS.minActiveDays,
+  maxLiquidations: RANK_OPTIONS.maxLiquidations,
+  candidates: RANK_OPTIONS.candidateLimit,
+  maxRows: RANK_OPTIONS.maxRows,
+};
 
 export interface TradersPayload {
   windowDays: number;
+  rules: typeof RANK_RULES;
   asOf: string;
   traders: RankedTrader[];
   skipped: SkippedTrader[];
@@ -48,10 +65,11 @@ export async function rankTraders(d: RankDeps): Promise<TradersPayload> {
     .map((t, i) => ({ ...t, rank: i + 1 }));
 
   // after the ranking, not beside it: the indexer is read one request at a time
-  const demoStats = await d.getTraderStats(d.demoLeader, { windowDays: WINDOW_DAYS, maxRows: RANK_OPTIONS.maxRows! }).catch(() => null);
+  const demoStats = await d.getTraderStats(d.demoLeader, { windowDays: WINDOW_DAYS, maxRows: RANK_OPTIONS.maxRows }).catch(() => null);
 
   return {
     windowDays: WINDOW_DAYS,
+    rules: RANK_RULES,
     asOf: d.now().toISOString(),
     traders,
     skipped: ranked.skipped,

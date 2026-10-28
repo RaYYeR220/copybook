@@ -1,22 +1,8 @@
 import type { Address, Hex } from "viem";
 import { eventKey, type CopybookEvent } from "@copybook/sdk";
+import { viaOf, type Contract, type LoggedEvent, type MissingRange } from "../events";
 
-/**
- * How a copy or refusal reached the chain. `handler`: the hub's reactive handler sent it, inside the block of the
- * move it answers (the same-block path). `call`: someone called the hub directly (catchUp, resync, poke).
- */
-export type Via = "handler" | "call";
-
-/** A Copybook event as the history route serves it: copies and refusals carry how they were sent. */
-export type LoggedEvent = CopybookEvent & { via?: Via };
-
-export type Contract = "hub" | "gate";
-
-export interface MissingRange {
-  contract: Contract;
-  from: bigint;
-  to: bigint;
-}
+export { viaOf, type Contract, type LoggedEvent, type MissingRange, type Via } from "../events";
 
 export interface HubLogRead {
   /** Chain order, no duplicates. */
@@ -57,9 +43,6 @@ const byChain = (a: CopybookEvent, b: CopybookEvent) =>
   Number((a.log.blockNumber ?? 0n) - (b.log.blockNumber ?? 0n)) ||
   (a.log.transactionIndex ?? 0) - (b.log.transactionIndex ?? 0) ||
   (a.log.logIndex ?? 0) - (b.log.logIndex ?? 0);
-
-/** `handler` when the hub itself sent the transaction (its reactive handler), `call` otherwise. */
-export const viaOf = (sender: Address, hub: Address): Via => (sender.toLowerCase() === hub.toLowerCase() ? "handler" : "call");
 
 function limiter(n: number) {
   let active = 0;

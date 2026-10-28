@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { fmtInt } from "@/lib/format";
 import { ExplorerLink } from "./Badge";
-import { GlyphExit, GlyphPaused, GlyphRefused, GlyphSame, GlyphVerdict } from "./glyphs";
+import { GlyphExit, GlyphFollow, GlyphPaused, GlyphRefused, GlyphSame, GlyphUnfollow, GlyphVerdict } from "./glyphs";
 import styles from "./FeedRow.module.css";
 
 const GLYPHS = {
@@ -10,6 +10,8 @@ const GLYPHS = {
   refused: GlyphRefused,
   paused: GlyphPaused,
   verdict: GlyphVerdict,
+  follow: GlyphFollow,
+  unfollow: GlyphUnfollow,
 } as const;
 
 export type FeedKind = keyof typeof GLYPHS;

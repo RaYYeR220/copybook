@@ -18,7 +18,7 @@ export function AppBar({ links }: { links: NavLink[] }) {
       </Link>
       <nav className={styles.nav} aria-label="App">
         {links.map((l) => (
-          <Link key={l.href} href={l.href} aria-current={path === l.href ? "page" : undefined}>
+          <Link key={l.href} href={l.href} prefetch={l.prefetch} aria-current={path === l.href ? "page" : undefined}>
             {l.label}
           </Link>
         ))}

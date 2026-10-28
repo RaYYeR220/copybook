@@ -79,6 +79,8 @@ describe("GET /api/traders", () => {
     expect(exclude).toContain("0x5397812d66f3233e0972b7aeb5e195a945504632"); // owner
     expect(exclude).toContain("0x7d736a88978e94e60494ff91c49ba838edfb1932"); // the demo follower
     expect(body.windowDays).toBe(30);
+    expect(body.rules).toEqual({ minTrades: 20, minActiveDays: 5, maxLiquidations: 1, candidates: 20, maxRows: 2000 });
+    expect(topCalls[0].opts).toMatchObject({ minTrades: 20, minActiveDays: 5, maxLiquidations: 1, candidateLimit: 20, maxRows: 2000 });
     expect(typeof body.asOf).toBe("string");
   });
 

@@ -16,7 +16,8 @@ export const THEME_DRIFT_BPS = 500;
 export const PLACE_ORDER_FOR_SELECTOR: Hex = "0x80054449";
 /**
  * dreamDEX's OperatorPermissionsRegistry on Hideki2. It belongs to the venue, not to Copybook, so it is not in
- * `deployments/hideki.json`; set `operatorRegistry` there to override it if the venue ever moves it.
+ * the Copybook contracts. `deployments/hideki.json` carries it as `operatorRegistry`; this is only the fallback
+ * for a file written before that field existed.
  * Perps honour a global grant to the hub for `placeOrderFor`.
  */
 export const DEFAULT_OPERATOR_REGISTRY = "0x6B2FbfeD328FF5F20C0BE7D3C3437613aFFE8D3a" as const;

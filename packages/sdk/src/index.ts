@@ -10,7 +10,7 @@ export type { FollowStepId, PreflightCode, PreflightInput, PreflightReason, Pref
 export { getHubHistory, eventKey } from "./history.ts";
 export type { Contract, History, HistoryOptions } from "./history.ts";
 export { watchHub, somniaWatchTransport } from "./watch.ts";
-export type { WatchHandle, WatchNotification, WatchOptions, WatchStatus, WatchTransport } from "./watch.ts";
+export type { WatchHandle, WatchOptions, WatchStatus, WatchTransport } from "./watch.ts";
 export {
   isTradeable,
   minOrderQty,

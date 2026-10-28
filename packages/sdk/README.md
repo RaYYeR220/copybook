@@ -19,7 +19,7 @@ const tx = await copybook.follow({ target: { kind: "Theme", themeId: 1n }, polic
 const { events } = await tx.wait();                      // typed Copybook events from the receipt
 
 const status = await copybook.status(account);           // every stuck state carries the exact call that clears it
-await copybook.watch({ follower: account, onEvent });    // somnia_watch with reconnect and backfill, no duplicates
+await copybook.watch({ follower: account, onEvent });    // somnia_watch ticks + getLogs, reconnect-safe, no duplicates
 const past = await copybook.history({ fromBlock, follower: account });
 ```
 
@@ -31,7 +31,9 @@ Notes:
 - Writes check the wallet's chain first and estimate gas on the node before asking for a signature, so a call that would revert fails with the contract's reason (`CopybookError.revert`). Somnia's estimate runs low for handler-heavy calls, so the SDK sends 1.5x.
 - `Copied.limitPrice` is the limit price of the order that moved the position, not the fill price.
 - `preflightFollow` uses the venue's own market parameters (mark, lot, minimum quantity) at call time. Marks move, so show `themeMinimum().recommendedAllocation` (10% headroom) rather than the exact minimum.
-- The venue's operator registry is not part of the Copybook deployments; the SDK defaults to the Hideki2 one and accepts an `operatorRegistry` field in `hideki.json` to override it.
+- The venue's operator registry is read from `operatorRegistry` in `deployments/hideki.json` (falling back to the Hideki2 address).
+- Next.js: the package ships TypeScript source, so add `transpilePackages: ["@copybook/sdk"]` to `next.config`.
+- `watch` treats a somnia_watch notification as a tick only: it re-reads logs from the last covered block and emits each `txHash:logIndex` once.
 - ABIs in `src/abi` are generated from `contracts/out`: run `forge build` in `contracts/`, then `npm run abis`. They are committed, so consumers need no forge.
 
 ```

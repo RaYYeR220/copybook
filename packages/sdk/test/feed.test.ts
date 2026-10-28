@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { encodeAbiParameters, encodeEventTopics, getAbiItem, toHex, type Abi, type AbiEvent, type Address, type Hex } from "viem";
 import { hubAbi } from "../src/abi/hub.ts";
 import { getHubHistory } from "../src/history.ts";
-import { watchHub, type WatchNotification, type WatchTransport } from "../src/watch.ts";
+import { watchHub, type WatchTransport } from "../src/watch.ts";
 import type { CopybookEvent } from "../src/events.ts";
 import { ETH, ME, TRADER, world } from "./world.ts";
 import { deployments } from "./fake.ts";
@@ -66,16 +66,16 @@ describe("getHubHistory", () => {
   });
 });
 
-/** A hand-driven stand-in for the somnia_watch socket. */
+/** A hand-driven stand-in for the somnia_watch socket: it only ever sends ticks. */
 class FakeSocket implements WatchTransport {
-  subs: { push: (n: WatchNotification) => void; drop: (e?: unknown) => void; closed: boolean }[] = [];
+  subs: { tick: () => void; drop: (e?: unknown) => void; closed: boolean }[] = [];
   failNext = 0;
   async subscribe(p: Parameters<WatchTransport["subscribe"]>[0]) {
     if (this.failNext > 0) {
       this.failNext--;
       throw new Error("socket refused");
     }
-    const sub = { push: p.onNotification, drop: p.onClose, closed: false };
+    const sub = { tick: p.onTick, drop: p.onClose, closed: false };
     this.subs.push(sub);
     return { close: async () => void (sub.closed = true) };
   }
@@ -84,89 +84,150 @@ class FakeSocket implements WatchTransport {
   }
 }
 
-const notify = (log: ReturnType<typeof hubLog>, block: bigint): WatchNotification => ({
-  address: log.address,
-  topics: log.topics,
-  data: log.data,
-  simulationResults: [toHex(block, { size: 32 })],
-});
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const sizes = (got: { e: CopybookEvent }[]) => got.map((g) => (g.e.name === "Copied" ? g.e.toSize : -1n));
+
+async function start(c: ReturnType<typeof world>, sock: FakeSocket, extra: Partial<Parameters<typeof watchHub>[0]> = {}) {
+  const got: { e: CopybookEvent; source: string }[] = [];
+  const errors: unknown[] = [];
+  const h = await watchHub({
+    publicClient: c.publicClient,
+    deployments,
+    transport: sock,
+    reconnect: { minDelayMs: 5, maxDelayMs: 10 },
+    onEvent: (e, i) => got.push({ e, source: i.source }),
+    onError: (e) => errors.push(e),
+    ...extra,
+  });
+  return { h, got, errors };
+}
 
 describe("watchHub", () => {
-  it("delivers live events, reading their block from the notification", async () => {
+  it("treats a notification as a tick and emits what the chain logged, with its block", async () => {
     const c = world();
+    c.head = 1_000n;
     const sock = new FakeSocket();
-    const got: CopybookEvent[] = [];
-    const h = await watchHub({ publicClient: c.publicClient, deployments, transport: sock, onEvent: (e) => got.push(e) });
-    sock.live.push(notify(copied(ME, 1001n), 1001n));
+    const { h, got } = await start(c, sock);
+    await wait(20);
+    c.head = 1_001n;
+    c.logs = [copied(ME, 1_001n, 0, 1n, "01")];
+    sock.live.tick();
+    await wait(30);
     expect(got).toHaveLength(1);
-    expect(got[0]).toMatchObject({ name: "Copied", follower: ME });
-    expect(got[0]!.log.blockNumber).toBe(1001n);
-    expect(h.lastBlock).toBe(1001n);
+    expect(got[0]!.e).toMatchObject({ name: "Copied", follower: ME });
+    expect(got[0]!.e.log).toMatchObject({ blockNumber: 1_001n, logIndex: 0 });
+    expect(got[0]!.source).toBe("live");
+    expect(h.lastBlock).toBe(1_001n);
     await h.stop();
     expect(sock.live.closed).toBe(true);
   });
 
-  it("filters to one follower and ignores foreign logs", async () => {
-    const c = world();
-    const sock = new FakeSocket();
-    const got: CopybookEvent[] = [];
-    await watchHub({ publicClient: c.publicClient, deployments, transport: sock, follower: ME, onEvent: (e) => got.push(e) });
-    sock.live.push(notify(copied(TRADER, 1001n), 1001n));
-    sock.live.push({ ...notify(copied(ME, 1002n), 1002n), address: TRADER });
-    sock.live.push(notify(copied(ME, 1003n), 1003n));
-    expect(got).toHaveLength(1);
-  });
-
-  it("reconnects after a drop and backfills the gap without repeating what it already delivered", async () => {
+  it("filters to one follower", async () => {
     const c = world();
     c.head = 1_000n;
     const sock = new FakeSocket();
-    const got: { e: CopybookEvent; source: string }[] = [];
-    const statuses: string[] = [];
-    const h = await watchHub({
-      publicClient: c.publicClient,
-      deployments,
-      transport: sock,
-      reconnect: { minDelayMs: 5, maxDelayMs: 10 },
-      onEvent: (e, i) => got.push({ e, source: i.source }),
-      onStatus: (s) => statuses.push(s),
-    });
-    const first = copied(ME, 1_001n, 0, 1n, "01");
-    sock.live.push(notify(first, 1_001n));
-    // the socket drops; two more events land on chain while it is down
-    c.head = 1_010n;
-    c.logs = [first, copied(ME, 1_004n, 0, 2n, "02"), copied(ME, 1_006n, 0, 3n, "03")];
-    sock.live.drop(new Error("closed"));
-    await wait(80);
-    expect(sock.subs).toHaveLength(2);
-    expect(got.map((g) => [g.source, g.e.name === "Copied" ? g.e.toSize : 0n])).toEqual([
-      ["live", 1n],
-      ["backfill", 2n],
-      ["backfill", 3n],
-    ]);
-    // live resumes on the new socket
-    sock.live.push(notify(copied(ME, 1_011n, 0, 4n, "04"), 1_011n));
-    expect(got).toHaveLength(4);
-    expect(statuses).toContain("reconnecting");
-    expect(statuses.filter((s) => s === "live")).toHaveLength(2);
+    const { h, got } = await start(c, sock, { follower: ME });
+    await wait(20);
+    c.head = 1_003n;
+    c.logs = [copied(TRADER, 1_001n, 0, 1n, "01"), copied(ME, 1_002n, 0, 2n, "02")];
+    sock.live.tick();
+    await wait(30);
+    expect(sizes(got)).toEqual([2n]);
     await h.stop();
   });
 
-  it("keeps retrying with backoff while the socket refuses", async () => {
+  it("a tick with a malformed payload still triggers a fetch", async () => {
+    const c = world();
+    c.head = 1_000n;
+    const sock = new FakeSocket();
+    const { h, got } = await start(c, sock);
+    await wait(20);
+    c.head = 1_002n;
+    c.logs = [copied(ME, 1_002n, 0, 7n, "07")];
+    // the transport hands over no usable payload at all; the tick alone is the signal
+    (sock.live.tick as (x?: unknown) => void)({ garbage: true });
+    await wait(30);
+    expect(sizes(got)).toEqual([7n]);
+    await h.stop();
+  });
+
+  it("two consecutive reconnects with overlapping windows deliver every event exactly once", async () => {
+    const c = world();
+    c.head = 1_000n;
+    const sock = new FakeSocket();
+    const { h, got } = await start(c, sock);
+    await wait(20);
+    c.head = 1_002n;
+    c.logs = [copied(ME, 1_001n, 0, 1n, "01")];
+    sock.live.tick();
+    await wait(30);
+    // first drop: an event lands while down
+    c.head = 1_005n;
+    c.logs.push(copied(ME, 1_004n, 0, 2n, "02"));
+    sock.live.drop(new Error("closed"));
+    await wait(60);
+    expect(sock.subs).toHaveLength(2);
+    // second drop right away: same window is read again, plus one more event
+    c.head = 1_009n;
+    c.logs.push(copied(ME, 1_008n, 0, 3n, "03"), copied(ME, 1_008n, 1, 4n, "03"));
+    sock.live.drop(new Error("closed again"));
+    await wait(60);
+    expect(sock.subs).toHaveLength(3);
+    sock.live.tick();
+    await wait(30);
+    expect(sizes(got)).toEqual([1n, 2n, 3n, 4n]);
+    expect(got.map((g) => g.source)).toEqual(["live", "backfill", "backfill", "backfill"]);
+    await h.stop();
+  });
+
+  it("ticks that arrive faster than the reads neither duplicate nor miss events", async () => {
+    const c = world();
+    c.head = 1_000n;
+    const sock = new FakeSocket();
+    const { h, got } = await start(c, sock);
+    await wait(20);
+    c.head = 1_010n;
+    c.logs = [copied(ME, 1_005n, 0, 1n, "01")];
+    const before = c.rpc.filter((r) => r.method === "eth_getLogs").length;
+    // a burst of ticks while the first fetch is still in flight, then a late event the first fetch cannot have seen
+    for (let i = 0; i < 20; i++) sock.live.tick();
+    c.logs.push(copied(ME, 1_010n, 0, 2n, "02"));
+    await wait(80);
+    expect(sizes(got)).toEqual([1n, 2n]);
+    // 20 ticks coalesce into at most two fetches, never twenty
+    expect(c.rpc.filter((r) => r.method === "eth_getLogs").length - before).toBeLessThanOrEqual(2);
+    await h.stop();
+  });
+
+  it("keeps retrying with backoff while the socket refuses, and stops when asked", async () => {
     const c = world();
     const sock = new FakeSocket();
-    const errors: unknown[] = [];
-    const h = await watchHub({ publicClient: c.publicClient, deployments, transport: sock, reconnect: { minDelayMs: 5, maxDelayMs: 20 }, onEvent: () => {}, onError: (e) => errors.push(e) });
+    const { h, errors } = await start(c, sock, { reconnect: { minDelayMs: 5, maxDelayMs: 20 } });
     sock.failNext = 2;
     sock.live.drop();
-    await wait(150);
-    expect(errors).toHaveLength(2);
+    await wait(200);
+    expect(errors.filter((e) => String(e).includes("refused"))).toHaveLength(2);
     expect(sock.subs).toHaveLength(2);
     await h.stop();
-    // no further attempts after stop
     sock.live.drop();
     await wait(50);
     expect(sock.subs).toHaveLength(2);
+  });
+
+  it("forgets old keys past the delivered capacity but never repeats a recent one", async () => {
+    const c = world();
+    c.head = 1_000n;
+    const sock = new FakeSocket();
+    const { h, got } = await start(c, sock, { deliveredCapacity: 2 });
+    await wait(20);
+    c.head = 1_003n;
+    c.logs = [copied(ME, 1_001n, 0, 1n, "01"), copied(ME, 1_002n, 0, 2n, "02"), copied(ME, 1_003n, 0, 3n, "03")];
+    sock.live.tick();
+    await wait(30);
+    sock.live.tick();
+    await wait(30);
+    // the cursor sits at the head, so the window holds only the newest block: 3n is re-read and still deduped
+    expect(sizes(got)).toEqual([1n, 2n, 3n]);
+    await h.stop();
   });
 });

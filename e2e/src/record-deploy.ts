@@ -54,6 +54,8 @@ const out = {
   engine: getAddress(engine.tx.contractAddress),
   themes: getAddress(themes.tx.contractAddress),
   marginBank: getAddress(bank),
+  // the venue's registry, not ours: the SDK reads it from here
+  operatorRegistry: "0x6B2FbfeD328FF5F20C0BE7D3C3437613aFFE8D3a",
   groupSize: Number(groupSize),
   owner: getAddress(owner),
   deployBlock: Number(engine.receipt.blockNumber),

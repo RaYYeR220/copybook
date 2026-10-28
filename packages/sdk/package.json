@@ -16,8 +16,6 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@somnia-chain/markets-sdk": "0.32.1",
-    "@somnia-chain/reactivity": "0.2.1",
     "viem": "2.57.12"
   },
   "devDependencies": {

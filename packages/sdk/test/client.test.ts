@@ -258,5 +258,8 @@ describe("revert decoding", () => {
     expect(decodeRevert(wrapped)).toMatchObject({ name: "InvalidPolicy" });
     expect(decodeRevert(wrapped)!.message).toContain("bandBps");
     expect(decodeRevert(new Error("plain"))).toBeUndefined();
+    // viem may already have decoded the error and dropped the hex
+    const named = new Error("outer", { cause: Object.assign(new Error("reverted"), { data: { errorName: "TankTooLow", args: [] } }) });
+    expect(decodeRevert(named)).toMatchObject({ name: "TankTooLow" });
   });
 });

@@ -85,20 +85,38 @@ export function revertDataOf(err: unknown): Hex | undefined {
 
 /** Decodes a revert into a name, arguments and a plain-language message. Undefined when the data is not ours. */
 export function decodeRevert(err: unknown): { name: string; args: readonly unknown[]; message: string } | undefined {
+  let name: string | undefined;
+  let args: readonly unknown[] = [];
   const data = revertDataOf(err);
-  if (!data) return undefined;
-  try {
-    const d = decodeErrorResult({ abi: revertAbi, data });
-    const args = (d.args ?? []) as readonly unknown[];
-    let message = MESSAGES[d.errorName] ?? d.errorName;
-    if (d.errorName === "InvalidPolicy" || d.errorName === "InvalidParam") {
-      const field = ["", "scaleBps", "allocation", "maxNotional", "bandBps"][Number(args[0])] ?? `field ${String(args[0])}`;
-      message = `${MESSAGES.InvalidPolicy ?? d.errorName} (${field}).`;
+  if (data) {
+    try {
+      const d = decodeErrorResult({ abi: revertAbi, data });
+      name = d.errorName;
+      args = (d.args ?? []) as readonly unknown[];
+    } catch {
+      /* fall through to the name viem may already have decoded */
     }
-    return { name: d.errorName, args, message };
-  } catch {
-    return undefined;
   }
+  if (!name) {
+    // viem decodes known errors itself and drops the hex: its ContractFunctionRevertedError carries `data.errorName`
+    let cur: unknown = err;
+    for (let i = 0; i < 12 && cur && typeof cur === "object"; i++) {
+      const d = (cur as { data?: { errorName?: unknown; args?: unknown } }).data;
+      if (d && typeof d === "object" && typeof d.errorName === "string") {
+        name = d.errorName;
+        args = Array.isArray(d.args) ? d.args : [];
+        break;
+      }
+      cur = (cur as { cause?: unknown }).cause;
+    }
+  }
+  if (!name) return undefined;
+  let message = MESSAGES[name] ?? name;
+  if (name === "InvalidPolicy" || name === "InvalidParam") {
+    const field = ["", "scaleBps", "allocation", "maxNotional", "bandBps"][Number(args[0])] ?? `field ${String(args[0])}`;
+    message = `${MESSAGES.InvalidPolicy ?? name} (${field}).`;
+  }
+  return { name, args, message };
 }
 
 /** Wraps a thrown viem error: a known contract revert becomes a CopybookError, anything else passes through. */

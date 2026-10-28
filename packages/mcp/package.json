@@ -1,0 +1,33 @@
+{
+  "name": "@copybook/mcp",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "description": "MCP server (stdio) for discovering and following traders and theses on Copybook.",
+  "bin": {
+    "copybook-mcp": "./bin/copybook-mcp.mjs"
+  },
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "start": "node bin/copybook-mcp.mjs",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@copybook/sdk": "0.1.0",
+    "@copybook/stats": "0.1.0",
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "viem": "2.57.12",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "24.10.1",
+    "typescript": "5.9.3",
+    "vitest": "5.0.5"
+  }
+}

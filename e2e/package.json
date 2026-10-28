@@ -9,7 +9,9 @@
     "record-deploy": "tsx src/record-deploy.ts",
     "live": "tsx src/live.ts",
     "risk": "tsx src/risk.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "eval": "tsx src/eval.ts",
+    "eval:test": "tsx --test ../eval/rubric.test.ts"
   },
   "dependencies": {
     "@somnia-chain/markets-sdk": "0.32.1",

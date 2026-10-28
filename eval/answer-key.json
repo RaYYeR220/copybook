@@ -1,0 +1,780 @@
+{
+  "about": "Pre-registered answer key: each trader's summary from the public endpoint and the rubric's tier for it, committed before any review of this sample was requested.",
+  "generatedAt": "2026-10-28T13:55:11.853Z",
+  "endpoint": "https://copybook-eosin.vercel.app/api/risk/",
+  "windowDays": 30,
+  "rubric": [
+    "BLOCK if liquidations30d >= 2, or maxDrawdownPct30d is present and >= 50.",
+    "CAUTION if (not BLOCK and) any of: liquidations30d == 1; trades30d < 10; history=none; partial=1; maxDrawdownPct30d present and >= 25.",
+    "OK otherwise.",
+    "Inputs are the summary keys; n/a means unknown, not safe."
+  ],
+  "systemPrompt": "You review perpetual-futures traders for people who copy their positions automatically. Apply this rubric exactly to the 30-day stats (key=value; n/a means unknown, not safe). BLOCK if liquidations30d is 2 or more, or maxDrawdownPct30d is present and at least 50. Otherwise CAUTION if liquidations30d is 1, or trades30d is below 10, or history=none, or partial=1, or maxDrawdownPct30d is present and at least 25. Otherwise OK. Answer with exactly one word: OK, CAUTION or BLOCK.",
+  "summaryHash": "keccak256 of the summary's UTF-8 bytes, as RiskReviewer hashes the agreed summary",
+  "selection": {
+    "rule": "Pools are read in order and each pool in its fixed order; a screened account is taken when the quota of its category (from packages/stats over the endpoint's row cap) is open. Our own wallets and contracts are excluded, except the leader, which is added last.",
+    "quotas": {
+      "liquidated-2+": 6,
+      "liquidated-1": 4,
+      "thin": 3,
+      "clean": 6
+    },
+    "pools": [
+      {
+        "name": "first live run",
+        "target": "clean",
+        "size": 2
+      },
+      {
+        "name": "2+ liquidations in the latest 1000 liquidation rows",
+        "target": "liquidated-2+",
+        "size": 63
+      },
+      {
+        "name": "1 liquidation in the latest 1000 liquidation rows",
+        "target": "liquidated-1",
+        "size": 365
+      },
+      {
+        "name": "fewest rows in the latest 1000 position changes",
+        "target": "thin",
+        "size": 73
+      },
+      {
+        "name": "largest single realized gains",
+        "target": "clean",
+        "size": 25
+      },
+      {
+        "name": "latest position changes",
+        "target": "clean",
+        "size": 73
+      }
+    ],
+    "screened": [
+      {
+        "trader": "0xfc2fb08cccf87bfc472cded8e7ebef588fcf7fd2",
+        "pool": "first live run",
+        "category": "clean",
+        "taken": true
+      },
+      {
+        "trader": "0xa14d4561f2697859ab6c2d5eb62e1172a6cc3d14",
+        "pool": "first live run",
+        "category": "liquidated-2+",
+        "taken": true
+      },
+      {
+        "trader": "0x220c695efb9a6914a334ac7b783012f43c0baf00",
+        "pool": "2+ liquidations in the latest 1000 liquidation rows",
+        "category": "liquidated-2+",
+        "taken": true
+      },
+      {
+        "trader": "0x5521160e05bb130783e003f746f03d9d31ea1e69",
+        "pool": "2+ liquidations in the latest 1000 liquidation rows",
+        "category": "liquidated-2+",
+        "taken": true
+      },
+      {
+        "trader": "0x1faed318fced713cc5764bd7b4974b39ddf5bfc7",
+        "pool": "2+ liquidations in the latest 1000 liquidation rows",
+        "category": "liquidated-2+",
+        "taken": true
+      },
+      {
+        "trader": "0x7c30179b81212f592f7d24d37acbec408e905b96",
+        "pool": "2+ liquidations in the latest 1000 liquidation rows",
+        "category": "liquidated-2+",
+        "taken": true
+      },
+      {
+        "trader": "0x2e6c0cd1c011ec7e7a2d22fb464d7c63d53842b7",
+        "pool": "2+ liquidations in the latest 1000 liquidation rows",
+        "category": "liquidated-2+",
+        "taken": true
+      },
+      {
+        "trader": "0xb8700e8d07bd029f7dd3ce6cc97fe936d70c50a8",
+        "pool": "1 liquidation in the latest 1000 liquidation rows",
+        "category": "liquidated-1",
+        "taken": true
+      },
+      {
+        "trader": "0x3c85a44b59aef479f4a5758a524137857f7f21fc",
+        "pool": "1 liquidation in the latest 1000 liquidation rows",
+        "category": "liquidated-2+",
+        "taken": false
+      },
+      {
+        "trader": "0xcd509d80cdb707dd1871a8ad10b8a399696a2d7f",
+        "pool": "1 liquidation in the latest 1000 liquidation rows",
+        "category": "liquidated-1",
+        "taken": true
+      },
+      {
+        "trader": "0x8b834ce8f8d18d4247f600fbf91c74a8f0abe1e4",
+        "pool": "1 liquidation in the latest 1000 liquidation rows",
+        "category": "liquidated-1",
+        "taken": true
+      },
+      {
+        "trader": "0xf3ed3f5b90a13b39f30759e9800ec638711008f8",
+        "pool": "1 liquidation in the latest 1000 liquidation rows",
+        "category": "liquidated-1",
+        "taken": true
+      },
+      {
+        "trader": "0x857387a56f7cee3246860a8a470123c31bb0d02c",
+        "pool": "fewest rows in the latest 1000 position changes",
+        "category": "clean",
+        "taken": true
+      },
+      {
+        "trader": "0x0a72b2e45fb68a8ff4b0945ee8104cb5a97d8ff4",
+        "pool": "fewest rows in the latest 1000 position changes",
+        "category": "clean",
+        "taken": true
+      },
+      {
+        "trader": "0x20a0d517f1b60fd3041b49d7b97b529964c7ba88",
+        "pool": "fewest rows in the latest 1000 position changes",
+        "category": "clean",
+        "taken": true
+      },
+      {
+        "trader": "0xfed46fe76ac5e98f1c969bc10efb96014dc17749",
+        "pool": "fewest rows in the latest 1000 position changes",
+        "category": "clean",
+        "taken": true
+      },
+      {
+        "trader": "0xffc2d88f6836a48a127766813167dc42a35c512b",
+        "pool": "fewest rows in the latest 1000 position changes",
+        "category": "liquidated-1",
+        "taken": false
+      },
+      {
+        "trader": "0xe46cd08b8921afd922051ee4d11701aef68d9999",
+        "pool": "fewest rows in the latest 1000 position changes",
+        "category": "clean",
+        "taken": true
+      },
+      {
+        "trader": "0x2c12a7432362e335b7a0b2acca2f6ae17a1f2fd8",
+        "pool": "fewest rows in the latest 1000 position changes",
+        "category": "thin",
+        "taken": true
+      },
+      {
+        "trader": "0x600696005f1171cd73ecd7588175ec423ee808ac",
+        "pool": "fewest rows in the latest 1000 position changes",
+        "category": "clean",
+        "taken": false
+      },
+      {
+        "trader": "0x80a9a4015420f2a654af4e71dae5956e65b4baf4",
+        "pool": "fewest rows in the latest 1000 position changes",
+        "category": "clean",
+        "taken": false
+      },
+      {
+        "trader": "0x99657f6ad33d44985d1b31890a2fee1f74ff832f",
+        "pool": "fewest rows in the latest 1000 position changes",
+        "category": "clean",
+        "taken": false
+      },
+      {
+        "trader": "0xd62273ed2379e85c2e4f4e6ff8e68ce2cdba412c",
+        "pool": "fewest rows in the latest 1000 position changes",
+        "category": "clean",
+        "taken": false
+      },
+      {
+        "trader": "0xe8c7addd3877a5f36dea281288e704352c6a5be3",
+        "pool": "fewest rows in the latest 1000 position changes",
+        "category": "clean",
+        "taken": false
+      },
+      {
+        "trader": "0x240338da1be44a80fb58a75a5fc9c72b6937c02d",
+        "pool": "fewest rows in the latest 1000 position changes",
+        "category": "clean",
+        "taken": false
+      },
+      {
+        "trader": "0x75b8d70ff39c6cbb7f071ae17397be23b93c439b",
+        "pool": "fewest rows in the latest 1000 position changes",
+        "category": "clean",
+        "taken": false
+      },
+      {
+        "trader": "0x07393aec47412b82cbc4ed8b5ac30e83c3156747",
+        "pool": "fewest rows in the latest 1000 position changes",
+        "category": "clean",
+        "taken": false
+      },
+      {
+        "trader": "0xd563cc29f543e16b5f2e3e7f854772e0018e9ccb",
+        "pool": "fewest rows in the latest 1000 position changes",
+        "category": "clean",
+        "taken": false
+      },
+      {
+        "trader": "0xb9c0424b350be6bb438ee3fdda981212d42037f3",
+        "pool": "fewest rows in the latest 1000 position changes",
+        "category": "thin",
+        "taken": true
+      },
+      {
+        "trader": "0x1de94e5945ce7d5ed0ca76bc640f4760f6c4321e",
+        "pool": "fewest rows in the latest 1000 position changes",
+        "category": "clean",
+        "taken": false
+      },
+      {
+        "trader": "0xb9f7aa33f19a698b45250ed4cb697b69f002ec0c",
+        "pool": "fewest rows in the latest 1000 position changes",
+        "category": "clean",
+        "taken": false
+      },
+      {
+        "trader": "0x09f6903f56dc6e33e329b02bf039871ff6519b32",
+        "pool": "fewest rows in the latest 1000 position changes",
+        "category": "clean",
+        "taken": false
+      },
+      {
+        "trader": "0x9158911a0f24b30414a3556f5cb8361905272fd3",
+        "pool": "fewest rows in the latest 1000 position changes",
+        "category": "clean",
+        "taken": false
+      },
+      {
+        "trader": "0xe3b4d12a3b85843009cceaf5deaea5199fa8e984",
+        "pool": "fewest rows in the latest 1000 position changes",
+        "category": "clean",
+        "taken": false
+      },
+      {
+        "trader": "0xcb2853a0e7b98871a60433686783391cad32e36a",
+        "pool": "fewest rows in the latest 1000 position changes",
+        "category": "clean",
+        "taken": false
+      },
+      {
+        "trader": "0x2b0ff474d10e86fa10849b42ff016496323da0ec",
+        "pool": "fewest rows in the latest 1000 position changes",
+        "category": "liquidated-1",
+        "taken": false
+      },
+      {
+        "trader": "0x52d4f81ce78cd6ab5840f61957343184eeae98b0",
+        "pool": "fewest rows in the latest 1000 position changes",
+        "category": "clean",
+        "taken": false
+      },
+      {
+        "trader": "0x24973f7fe63d2bda001ac9fe0495f2719d0baa1f",
+        "pool": "fewest rows in the latest 1000 position changes",
+        "category": "clean",
+        "taken": false
+      },
+      {
+        "trader": "0x091fd7146a64854e710da689cbd5965ff197aba2",
+        "pool": "fewest rows in the latest 1000 position changes",
+        "category": "clean",
+        "taken": false
+      },
+      {
+        "trader": "0xd3a66fa81ee43c0c3608efc90b1067c38ff7a0cd",
+        "pool": "fewest rows in the latest 1000 position changes",
+        "category": "clean",
+        "taken": false
+      },
+      {
+        "trader": "0xb4afe0c2572c2be485752aff64b2d5d96ed2758a",
+        "pool": "fewest rows in the latest 1000 position changes",
+        "category": "clean",
+        "taken": false
+      },
+      {
+        "trader": "0x303f296084763d15a3d9c2540a94853da6441454",
+        "pool": "fewest rows in the latest 1000 position changes",
+        "category": "clean",
+        "taken": false
+      },
+      {
+        "trader": "0x304acf77e12d67b5cb50fbbb23064ae77abfe81f",
+        "pool": "fewest rows in the latest 1000 position changes",
+        "category": "clean",
+        "taken": false
+      },
+      {
+        "trader": "0x352644d4c4621de0d08092d342e53c1906285007",
+        "pool": "fewest rows in the latest 1000 position changes",
+        "category": "clean",
+        "taken": false
+      },
+      {
+        "trader": "0xce0382c4b8f0b3f7e83e0518d5db072bdf032fae",
+        "pool": "fewest rows in the latest 1000 position changes",
+        "category": "clean",
+        "taken": false
+      },
+      {
+        "trader": "0x5ab9671f43e3aa560645207904317c592b5311be",
+        "pool": "fewest rows in the latest 1000 position changes",
+        "category": "clean",
+        "taken": false
+      },
+      {
+        "trader": "0xf1b92aacbcfadfa95edb758ff943643e3c08e2bb",
+        "pool": "fewest rows in the latest 1000 position changes",
+        "category": "clean",
+        "taken": false
+      },
+      {
+        "trader": "0xfd5c747b3f6d9d55afed182b94f794ed396ef3cf",
+        "pool": "fewest rows in the latest 1000 position changes",
+        "category": "clean",
+        "taken": false
+      },
+      {
+        "trader": "0xbc03d0ec13a83ea98ceb5930e1fe482bee18d4c4",
+        "pool": "fewest rows in the latest 1000 position changes",
+        "category": "clean",
+        "taken": false
+      },
+      {
+        "trader": "0x472ac157e1bdb96f3b5224bc14987246a7bbb793",
+        "pool": "fewest rows in the latest 1000 position changes",
+        "category": "clean",
+        "taken": false
+      },
+      {
+        "trader": "0x3c1f5b3ade7580fd625de9798ffb257d44b796e2",
+        "pool": "fewest rows in the latest 1000 position changes",
+        "category": "clean",
+        "taken": false
+      },
+      {
+        "trader": "0x48199db9eb8292c2f85877511603030e1b3892e1",
+        "pool": "fewest rows in the latest 1000 position changes",
+        "category": "clean",
+        "taken": false
+      },
+      {
+        "trader": "0xb4f1933b3e3d2aaa2ba2d7e3aa0f09c27ee52fa8",
+        "pool": "fewest rows in the latest 1000 position changes",
+        "category": "clean",
+        "taken": false
+      },
+      {
+        "trader": "0x2643e68da65942a3ffbee373ed40dd03a408c97b",
+        "pool": "fewest rows in the latest 1000 position changes",
+        "category": "clean",
+        "taken": false
+      },
+      {
+        "trader": "0xd9987fe7e9408767d7c96406c149761a4b74597a",
+        "pool": "fewest rows in the latest 1000 position changes",
+        "category": "clean",
+        "taken": false
+      },
+      {
+        "trader": "0x7308c01c53aedaf696d2d86ffe86fdab9a3b1265",
+        "pool": "fewest rows in the latest 1000 position changes",
+        "category": "clean",
+        "taken": false
+      },
+      {
+        "trader": "0xcdc153f74db75da2b6612083b0a5da58950d92cf",
+        "pool": "fewest rows in the latest 1000 position changes",
+        "category": "clean",
+        "taken": false
+      },
+      {
+        "trader": "0x1605371c730334604ce25ce2aba19bd037e02c50",
+        "pool": "fewest rows in the latest 1000 position changes",
+        "category": "clean",
+        "taken": false
+      },
+      {
+        "trader": "0x10eae18964db8ee7981b51fd93b3b163e8df2e90",
+        "pool": "fewest rows in the latest 1000 position changes",
+        "category": "thin",
+        "taken": true
+      }
+    ]
+  },
+  "counts": {
+    "pickedAs": {
+      "clean": 6,
+      "liquidated-2+": 6,
+      "liquidated-1": 4,
+      "thin": 3,
+      "leader": 1
+    },
+    "expectedTier": {
+      "OK": 5,
+      "BLOCK": 6,
+      "CAUTION": 9
+    }
+  },
+  "traders": [
+    {
+      "trader": "0xfc2Fb08CCCF87BFC472cded8E7eBEF588fCF7fd2",
+      "pickedAs": "clean",
+      "pool": "first live run",
+      "summary": "trades30d=113 activeDays30d=7 markets=3 realizedPnl30d=+3773.3 liquidations30d=0 maxDrawdown30d=679.3 avgLeverage=n/a lastActive=2026-10-22",
+      "summaryHash": "0xe791bfc7d479670c680919dfe06e94183a02ac964a5eb76a055844b0e7b0fd63",
+      "expectedTier": "OK",
+      "reasons": [],
+      "fetchedAt": "2026-10-28T13:54:21.890Z",
+      "endpoint": {
+        "url": "https://copybook-eosin.vercel.app/api/risk/0xfc2fb08cccf87bfc472cded8e7ebef588fcf7fd2",
+        "asOf": "2026-10-28T13:54:23.636Z",
+        "cache": "MISS",
+        "age": "0"
+      }
+    },
+    {
+      "trader": "0xA14d4561F2697859AB6c2d5eb62E1172a6cc3D14",
+      "pickedAs": "liquidated-2+",
+      "pool": "first live run",
+      "summary": "trades30d=115 activeDays30d=6 markets=3 realizedPnl30d=-979.7 liquidations30d=3 maxDrawdown30d=2609.9 maxDrawdownPct30d=92.2 avgLeverage=17.0 lastActive=2026-10-26",
+      "summaryHash": "0xb73cbe60dd9aeb2003a25abe405df0f47366b8de9dc96cc66a066fcb0aa36d50",
+      "expectedTier": "BLOCK",
+      "reasons": [
+        "liquidations30d=3 >= 2",
+        "maxDrawdownPct30d=92.2 >= 50"
+      ],
+      "fetchedAt": "2026-10-28T13:54:24.718Z",
+      "endpoint": {
+        "url": "https://copybook-eosin.vercel.app/api/risk/0xa14d4561f2697859ab6c2d5eb62e1172a6cc3d14",
+        "asOf": "2026-10-28T13:54:26.162Z",
+        "cache": "MISS",
+        "age": "0"
+      }
+    },
+    {
+      "trader": "0x220c695eFB9a6914a334Ac7b783012F43C0BAF00",
+      "pickedAs": "liquidated-2+",
+      "pool": "2+ liquidations in the latest 1000 liquidation rows",
+      "summary": "trades30d=633 activeDays30d=12 markets=10 realizedPnl30d=+3086.5 liquidations30d=6 maxDrawdown30d=10649.7 avgLeverage=n/a lastActive=2026-10-26",
+      "summaryHash": "0xf50ccbaa074eadeba3503a7f3c35bca58bd94368e69d57eed96c6cf2288d923d",
+      "expectedTier": "BLOCK",
+      "reasons": [
+        "liquidations30d=6 >= 2"
+      ],
+      "fetchedAt": "2026-10-28T13:54:27.243Z",
+      "endpoint": {
+        "url": "https://copybook-eosin.vercel.app/api/risk/0x220c695efb9a6914a334ac7b783012f43c0baf00",
+        "asOf": "2026-10-28T13:54:28.983Z",
+        "cache": "MISS",
+        "age": "0"
+      }
+    },
+    {
+      "trader": "0x5521160E05bB130783E003F746F03d9D31ea1e69",
+      "pickedAs": "liquidated-2+",
+      "pool": "2+ liquidations in the latest 1000 liquidation rows",
+      "summary": "trades30d=334 activeDays30d=11 markets=5 realizedPnl30d=-2056.9 liquidations30d=3 maxDrawdown30d=2923.4 avgLeverage=n/a lastActive=2026-10-28",
+      "summaryHash": "0x28295756eb5bea160988b316d2e28c473b4612459a75e1c6b79f9daefbf70b14",
+      "expectedTier": "BLOCK",
+      "reasons": [
+        "liquidations30d=3 >= 2"
+      ],
+      "fetchedAt": "2026-10-28T13:54:30.070Z",
+      "endpoint": {
+        "url": "https://copybook-eosin.vercel.app/api/risk/0x5521160e05bb130783e003f746f03d9d31ea1e69",
+        "asOf": "2026-10-28T13:54:31.377Z",
+        "cache": "MISS",
+        "age": "0"
+      }
+    },
+    {
+      "trader": "0x1fAeD318FCeD713cC5764BD7B4974b39DDF5BFc7",
+      "pickedAs": "liquidated-2+",
+      "pool": "2+ liquidations in the latest 1000 liquidation rows",
+      "summary": "trades30d=38 activeDays30d=6 markets=3 realizedPnl30d=-1653.6 liquidations30d=3 maxDrawdown30d=2437.7 avgLeverage=n/a lastActive=2026-10-27",
+      "summaryHash": "0x16e17a8d2ad53664f81faf03789c80f9bdf6e1586b56e818af72239e6f98310a",
+      "expectedTier": "BLOCK",
+      "reasons": [
+        "liquidations30d=3 >= 2"
+      ],
+      "fetchedAt": "2026-10-28T13:54:32.462Z",
+      "endpoint": {
+        "url": "https://copybook-eosin.vercel.app/api/risk/0x1faed318fced713cc5764bd7b4974b39ddf5bfc7",
+        "asOf": "2026-10-28T13:54:33.740Z",
+        "cache": "MISS",
+        "age": "0"
+      }
+    },
+    {
+      "trader": "0x7c30179b81212f592f7D24d37aCbEC408e905b96",
+      "pickedAs": "liquidated-2+",
+      "pool": "2+ liquidations in the latest 1000 liquidation rows",
+      "summary": "trades30d=60 activeDays30d=5 markets=9 realizedPnl30d=-1758.5 liquidations30d=3 maxDrawdown30d=4942.4 avgLeverage=n/a lastActive=2026-10-27",
+      "summaryHash": "0x94c9214e230372a0864001f19f97988dcddbef609abfd700fd8d113b3507fa67",
+      "expectedTier": "BLOCK",
+      "reasons": [
+        "liquidations30d=3 >= 2"
+      ],
+      "fetchedAt": "2026-10-28T13:54:34.815Z",
+      "endpoint": {
+        "url": "https://copybook-eosin.vercel.app/api/risk/0x7c30179b81212f592f7d24d37acbec408e905b96",
+        "asOf": "2026-10-28T13:54:36.104Z",
+        "cache": "MISS",
+        "age": "0"
+      }
+    },
+    {
+      "trader": "0x2E6c0CD1c011Ec7e7a2d22fB464d7c63d53842b7",
+      "pickedAs": "liquidated-2+",
+      "pool": "2+ liquidations in the latest 1000 liquidation rows",
+      "summary": "trades30d=9 activeDays30d=2 markets=1 realizedPnl30d=-1350.9 liquidations30d=4 maxDrawdown30d=1350.9 avgLeverage=n/a lastActive=2026-10-26",
+      "summaryHash": "0xbfa3de6725506fd004c9abb9736ef0776bcb4bf4e9d998c219f8cfe3de989f84",
+      "expectedTier": "BLOCK",
+      "reasons": [
+        "liquidations30d=4 >= 2"
+      ],
+      "fetchedAt": "2026-10-28T13:54:37.186Z",
+      "endpoint": {
+        "url": "https://copybook-eosin.vercel.app/api/risk/0x2e6c0cd1c011ec7e7a2d22fb464d7c63d53842b7",
+        "asOf": "2026-10-28T13:54:38.495Z",
+        "cache": "MISS",
+        "age": "0"
+      }
+    },
+    {
+      "trader": "0xb8700E8d07Bd029f7dD3CE6CC97Fe936D70c50a8",
+      "pickedAs": "liquidated-1",
+      "pool": "1 liquidation in the latest 1000 liquidation rows",
+      "summary": "trades30d=695 activeDays30d=1 markets=14 realizedPnl30d=-43.1 liquidations30d=1 maxDrawdown30d=43.1 avgLeverage=n/a lastActive=2026-10-28",
+      "summaryHash": "0x01702353bdac404f1e9b069e24a62d54f6ca8936f3b04dc7f480b29eec2a5acf",
+      "expectedTier": "CAUTION",
+      "reasons": [
+        "liquidations30d=1"
+      ],
+      "fetchedAt": "2026-10-28T13:54:39.568Z",
+      "endpoint": {
+        "url": "https://copybook-eosin.vercel.app/api/risk/0xb8700e8d07bd029f7dd3ce6cc97fe936d70c50a8",
+        "asOf": "2026-10-28T13:54:41.145Z",
+        "cache": "MISS",
+        "age": "0"
+      }
+    },
+    {
+      "trader": "0xCd509d80cDB707dD1871a8aD10b8A399696a2D7f",
+      "pickedAs": "liquidated-1",
+      "pool": "1 liquidation in the latest 1000 liquidation rows",
+      "summary": "trades30d=5 activeDays30d=1 markets=1 realizedPnl30d=-578.0 liquidations30d=1 maxDrawdown30d=578.0 avgLeverage=n/a lastActive=2026-10-28",
+      "summaryHash": "0x4694a39be1e7aaa9dcca735b780245fdacfbf63cffc06d5c80cc25b08769a6b5",
+      "expectedTier": "CAUTION",
+      "reasons": [
+        "liquidations30d=1",
+        "trades30d=5 < 10"
+      ],
+      "fetchedAt": "2026-10-28T13:54:42.225Z",
+      "endpoint": {
+        "url": "https://copybook-eosin.vercel.app/api/risk/0xcd509d80cdb707dd1871a8ad10b8a399696a2d7f",
+        "asOf": "2026-10-28T13:54:43.510Z",
+        "cache": "MISS",
+        "age": "0"
+      }
+    },
+    {
+      "trader": "0x8B834Ce8F8D18D4247F600FBF91C74A8F0ABe1e4",
+      "pickedAs": "liquidated-1",
+      "pool": "1 liquidation in the latest 1000 liquidation rows",
+      "summary": "trades30d=5 activeDays30d=1 markets=1 realizedPnl30d=-516.7 liquidations30d=1 maxDrawdown30d=516.7 avgLeverage=n/a lastActive=2026-10-28",
+      "summaryHash": "0x6b725dcabaf74952dc522f5226f0b695c4c0fdff303b7aede6eb6f60844dae8a",
+      "expectedTier": "CAUTION",
+      "reasons": [
+        "liquidations30d=1",
+        "trades30d=5 < 10"
+      ],
+      "fetchedAt": "2026-10-28T13:54:44.589Z",
+      "endpoint": {
+        "url": "https://copybook-eosin.vercel.app/api/risk/0x8b834ce8f8d18d4247f600fbf91c74a8f0abe1e4",
+        "asOf": "2026-10-28T13:54:45.884Z",
+        "cache": "MISS",
+        "age": "0"
+      }
+    },
+    {
+      "trader": "0xF3ed3F5b90A13b39f30759E9800ec638711008F8",
+      "pickedAs": "liquidated-1",
+      "pool": "1 liquidation in the latest 1000 liquidation rows",
+      "summary": "trades30d=555 activeDays30d=16 markets=5 realizedPnl30d=+1156.3 liquidations30d=1 maxDrawdown30d=4916.4 avgLeverage=n/a lastActive=2026-10-28",
+      "summaryHash": "0x55af9749cbdf7bb03a20348ff3b29ae1d53d55b4e83edc830c1fde3d1ea68b70",
+      "expectedTier": "CAUTION",
+      "reasons": [
+        "liquidations30d=1"
+      ],
+      "fetchedAt": "2026-10-28T13:54:46.962Z",
+      "endpoint": {
+        "url": "https://copybook-eosin.vercel.app/api/risk/0xf3ed3f5b90a13b39f30759e9800ec638711008f8",
+        "asOf": "2026-10-28T13:54:48.543Z",
+        "cache": "MISS",
+        "age": "0"
+      }
+    },
+    {
+      "trader": "0x857387a56F7ceE3246860a8A470123C31bB0d02c",
+      "pickedAs": "clean",
+      "pool": "fewest rows in the latest 1000 position changes",
+      "summary": "trades30d=2000 activeDays30d=1 markets=1 realizedPnl30d=+192.3 liquidations30d=0 maxDrawdown30d=0.0 avgLeverage=n/a lastActive=2026-10-28 partial=1",
+      "summaryHash": "0xf4c23904141377c242cfe433a173159c769724c7d784f0b31d3fe34069c81255",
+      "expectedTier": "CAUTION",
+      "reasons": [
+        "partial=1"
+      ],
+      "fetchedAt": "2026-10-28T13:54:49.617Z",
+      "endpoint": {
+        "url": "https://copybook-eosin.vercel.app/api/risk/0x857387a56f7cee3246860a8a470123c31bb0d02c",
+        "asOf": "2026-10-28T13:54:51.853Z",
+        "cache": "MISS",
+        "age": "0"
+      }
+    },
+    {
+      "trader": "0x0a72b2e45fB68a8Ff4B0945Ee8104cb5a97D8Ff4",
+      "pickedAs": "clean",
+      "pool": "fewest rows in the latest 1000 position changes",
+      "summary": "trades30d=2000 activeDays30d=1 markets=1 realizedPnl30d=-38.7 liquidations30d=0 maxDrawdown30d=57.6 avgLeverage=n/a lastActive=2026-10-28 partial=1",
+      "summaryHash": "0xfb4da8293d34c77117098faf640c83eed2098b7279366afc8c7479e4d2e49198",
+      "expectedTier": "CAUTION",
+      "reasons": [
+        "partial=1"
+      ],
+      "fetchedAt": "2026-10-28T13:54:52.941Z",
+      "endpoint": {
+        "url": "https://copybook-eosin.vercel.app/api/risk/0x0a72b2e45fb68a8ff4b0945ee8104cb5a97d8ff4",
+        "asOf": "2026-10-28T13:54:55.293Z",
+        "cache": "MISS",
+        "age": "0"
+      }
+    },
+    {
+      "trader": "0x20A0d517f1b60fd3041B49d7B97b529964c7bA88",
+      "pickedAs": "clean",
+      "pool": "fewest rows in the latest 1000 position changes",
+      "summary": "trades30d=15 activeDays30d=2 markets=2 realizedPnl30d=-464.9 liquidations30d=0 maxDrawdown30d=572.7 avgLeverage=n/a lastActive=2026-10-28",
+      "summaryHash": "0xdd0326d504b3afab000b40497b80664425e35f87936f579e4a0d09e069da74c6",
+      "expectedTier": "OK",
+      "reasons": [],
+      "fetchedAt": "2026-10-28T13:54:56.366Z",
+      "endpoint": {
+        "url": "https://copybook-eosin.vercel.app/api/risk/0x20a0d517f1b60fd3041b49d7b97b529964c7ba88",
+        "asOf": "2026-10-28T13:54:57.657Z",
+        "cache": "MISS",
+        "age": "0"
+      }
+    },
+    {
+      "trader": "0xfed46fe76Ac5e98f1C969Bc10eFB96014Dc17749",
+      "pickedAs": "clean",
+      "pool": "fewest rows in the latest 1000 position changes",
+      "summary": "trades30d=13 activeDays30d=2 markets=2 realizedPnl30d=-73.3 liquidations30d=0 maxDrawdown30d=208.0 avgLeverage=n/a lastActive=2026-10-28",
+      "summaryHash": "0x0712bec0a25c08dfe09278223f295fac59da211400d20b76150a8e10456f4490",
+      "expectedTier": "OK",
+      "reasons": [],
+      "fetchedAt": "2026-10-28T13:54:58.732Z",
+      "endpoint": {
+        "url": "https://copybook-eosin.vercel.app/api/risk/0xfed46fe76ac5e98f1c969bc10efb96014dc17749",
+        "asOf": "2026-10-28T13:55:00.014Z",
+        "cache": "MISS",
+        "age": "0"
+      }
+    },
+    {
+      "trader": "0xE46cd08B8921aFD922051Ee4D11701aEf68d9999",
+      "pickedAs": "clean",
+      "pool": "fewest rows in the latest 1000 position changes",
+      "summary": "trades30d=125 activeDays30d=7 markets=4 realizedPnl30d=-1018.8 liquidations30d=0 maxDrawdown30d=1908.7 avgLeverage=n/a lastActive=2026-10-28",
+      "summaryHash": "0xc19ff386a7bb0815070804829984d6caa3e58c22ba6d1447cb7ecf435f17843a",
+      "expectedTier": "OK",
+      "reasons": [],
+      "fetchedAt": "2026-10-28T13:55:01.092Z",
+      "endpoint": {
+        "url": "https://copybook-eosin.vercel.app/api/risk/0xe46cd08b8921afd922051ee4d11701aef68d9999",
+        "asOf": "2026-10-28T13:55:02.381Z",
+        "cache": "MISS",
+        "age": "0"
+      }
+    },
+    {
+      "trader": "0x2c12A7432362E335B7A0B2ACCA2F6Ae17a1f2fd8",
+      "pickedAs": "thin",
+      "pool": "fewest rows in the latest 1000 position changes",
+      "summary": "trades30d=3 activeDays30d=1 markets=1 realizedPnl30d=-0.2 liquidations30d=0 maxDrawdown30d=0.2 avgLeverage=n/a lastActive=2026-10-28",
+      "summaryHash": "0x84da893cdabe6df7ef4362d44a7d24d47c6d2d3965692d6a58797b306124afed",
+      "expectedTier": "CAUTION",
+      "reasons": [
+        "trades30d=3 < 10"
+      ],
+      "fetchedAt": "2026-10-28T13:55:03.451Z",
+      "endpoint": {
+        "url": "https://copybook-eosin.vercel.app/api/risk/0x2c12a7432362e335b7a0b2acca2f6ae17a1f2fd8",
+        "asOf": "2026-10-28T13:55:04.728Z",
+        "cache": "MISS",
+        "age": "0"
+      }
+    },
+    {
+      "trader": "0xb9c0424B350be6Bb438eE3fdda981212d42037F3",
+      "pickedAs": "thin",
+      "pool": "fewest rows in the latest 1000 position changes",
+      "summary": "trades30d=7 activeDays30d=2 markets=2 realizedPnl30d=+273.6 liquidations30d=0 maxDrawdown30d=0.0 avgLeverage=n/a lastActive=2026-10-28",
+      "summaryHash": "0xc1f6aae6b4e87eff9b6c9e3c129ba9d7b18384a0d98f322bd6200a259070f652",
+      "expectedTier": "CAUTION",
+      "reasons": [
+        "trades30d=7 < 10"
+      ],
+      "fetchedAt": "2026-10-28T13:55:05.816Z",
+      "endpoint": {
+        "url": "https://copybook-eosin.vercel.app/api/risk/0xb9c0424b350be6bb438ee3fdda981212d42037f3",
+        "asOf": "2026-10-28T13:55:07.124Z",
+        "cache": "MISS",
+        "age": "0"
+      }
+    },
+    {
+      "trader": "0x10eae18964db8EE7981B51fd93b3B163e8dF2E90",
+      "pickedAs": "thin",
+      "pool": "fewest rows in the latest 1000 position changes",
+      "summary": "trades30d=5 activeDays30d=1 markets=1 realizedPnl30d=-0.2 liquidations30d=0 maxDrawdown30d=0.2 avgLeverage=n/a lastActive=2026-10-28",
+      "summaryHash": "0x17382283b4d6ecd7dd0ffce1e0a3a2328574ea2fc84427359a64142bb6382db8",
+      "expectedTier": "CAUTION",
+      "reasons": [
+        "trades30d=5 < 10"
+      ],
+      "fetchedAt": "2026-10-28T13:55:08.198Z",
+      "endpoint": {
+        "url": "https://copybook-eosin.vercel.app/api/risk/0x10eae18964db8ee7981b51fd93b3b163e8df2e90",
+        "asOf": "2026-10-28T13:55:09.481Z",
+        "cache": "MISS",
+        "age": "0"
+      }
+    },
+    {
+      "trader": "0xA1d0CB85c869e534Fe1e0c22af3b238301157b5d",
+      "pickedAs": "leader",
+      "pool": "our e2e leader",
+      "summary": "trades30d=45 activeDays30d=2 markets=2 realizedPnl30d=-0.3 liquidations30d=0 maxDrawdown30d=0.3 avgLeverage=n/a lastActive=2026-10-28",
+      "summaryHash": "0x3b7946020b8212fd4c91d981817cb62367ef13d542c82eb884598de564f286a1",
+      "expectedTier": "OK",
+      "reasons": [],
+      "fetchedAt": "2026-10-28T13:55:10.560Z",
+      "endpoint": {
+        "url": "https://copybook-eosin.vercel.app/api/risk/0xa1d0cb85c869e534fe1e0c22af3b238301157b5d",
+        "asOf": "2026-10-28T13:51:34.089Z",
+        "cache": "HIT",
+        "age": "216"
+      }
+    }
+  ]
+}

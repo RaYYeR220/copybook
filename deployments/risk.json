@@ -1,8 +1,8 @@
 {
   "shannon": {
-    "reviewer": "0x45b46d39697Cfd191BfEb215512d012d28E6ECc3",
-    "constructorGate": "0x5397812d66F3233E0972b7AEB5e195a945504632",
-    "constructorBaseUrl": "https://copybook.invalid/api/risk/",
+    "reviewer": "0xc999B6924179a0dc9649DA7eBa8F3aC8b7CF7c25",
+    "constructorGate": "0xEe54c49E9e70a0e5C2218Eec1b1BDBd4e1Cb20f1",
+    "constructorBaseUrl": "https://copybook-eosin.vercel.app/api/risk/",
     "chainId": 50312,
     "owner": "0x5397812d66F3233E0972b7AEB5e195a945504632",
     "gate": "0xEe54c49E9e70a0e5C2218Eec1b1BDBd4e1Cb20f1",
@@ -22,22 +22,26 @@
       "total": "0.36"
     },
     "baseUrl": "https://copybook-eosin.vercel.app/api/risk/",
+    "summarySelector": "rubric",
     "systemPrompt": "You review perpetual-futures traders for people who copy their positions automatically. Apply this rubric exactly to the 30-day stats (key=value; n/a means unknown, not safe). BLOCK if liquidations30d is 2 or more, or maxDrawdownPct30d is present and at least 50. Otherwise CAUTION if liquidations30d is 1, or trades30d is below 10, or history=none, or partial=1, or maxDrawdownPct30d is present and at least 25. Otherwise OK. Answer with exactly one word: OK, CAUTION or BLOCK.",
-    "balance": "11.3533936752",
-    "explorer": "https://shannon-explorer.somnia.network/address/0x45b46d39697Cfd191BfEb215512d012d28E6ECc3",
+    "balance": "10",
+    "explorer": "https://shannon-explorer.somnia.network/address/0xc999B6924179a0dc9649DA7eBa8F3aC8b7CF7c25",
     "verification": {
       "verifier": "blockscout",
       "result": "Pass - Verified",
-      "readBack": "api/v2/smart-contracts: is_fully_verified true, compiler v0.8.30+commit.73712a01"
+      "readBack": "api/v2/smart-contracts: is_fully_verified true, compiler v0.8.30+commit.73712a01; source has DEFAULT_SUMMARY_SELECTOR = \"rubric\" and the rubric prompt"
     },
-    "previousSystemPrompt": "You review perpetual-futures traders for people who copy their positions automatically. Read the 30-day stats (key=value). n/a means unknown, not safe. partial=1 means only the most recent activity was read. history=none means no trades. Answer with exactly one word: BLOCK if a follower copying this trader is likely to be wiped out (repeated liquidations or a drawdown near or above the margin), CAUTION if risk is elevated or the data is too thin to judge, OK otherwise."
+    "deployedWith": {
+      "gate": "GATE=<live gate> in the constructor, so no setGate was needed",
+      "commit": "0053108"
+    }
   },
   "hideki": {
     "gate": "0xEe54c49E9e70a0e5C2218Eec1b1BDBd4e1Cb20f1",
     "hub": "0xdF73BBbB6517B712BBeD9bfAe6253A5E1FCDE154",
     "chainId": 50383,
     "owner": "0x5397812d66F3233E0972b7AEB5e195a945504632",
-    "reviewer": "0x45b46d39697Cfd191BfEb215512d012d28E6ECc3",
+    "reviewer": "0xc999B6924179a0dc9649DA7eBa8F3aC8b7CF7c25",
     "mailbox": "0xD7C2E95c62De3c0ad95b2C1cf08E4B85DF6b332D",
     "reviewerDomain": 50312,
     "reviewFee": "0.5",
@@ -62,11 +66,15 @@
       "https://copybook-eosin.vercel.app",
       "https://copybook-rayyer220s-projects.vercel.app"
     ],
-    "deployment": "https://copybook-11377caea-rayyer220s-projects.vercel.app",
-    "commit": "5ceee83",
-    "checked": "2026-10-28",
-    "valid": "GET /api/risk/0xa1d0cb85c869e534fe1e0c22af3b238301157b5d -> 200 with summary",
-    "invalid": "GET /api/risk/0x1234 -> 400 {\"error\":\"invalid trader address\"}"
+    "deployment": "https://copybook-pp4fo05ms-rayyer220s-projects.vercel.app",
+    "commit": "29bfd79 (app code from 40bb139)",
+    "checked": "2026-10-28T14:26Z",
+    "valid": "GET /api/risk/0xa14d4561f2697859ab6c2d5eb62e1172a6cc3d14 -> 200 with rubric \"liquidations30d=3 trades30d=115 maxDrawdownPct30d=92.2 history=yes partial=0\" and summary",
+    "invalid": "GET /api/risk/0x1234 -> 400 {\"error\":\"invalid trader address\"}",
+    "fields": {
+      "rubric": "the line the validators classify (only the rubric's inputs)",
+      "summary": "the fuller line for people"
+    }
   },
   "reviewTargets": {
     "steady": "0xfc2fb08cccf87bfc472cded8e7ebef588fcf7fd2",
@@ -1740,6 +1748,54 @@
       "from": "0xcCC32990233cB34008777b2eDB62236F8e432046",
       "to": "0xD7C2E95c62De3c0ad95b2C1cf08E4B85DF6b332D",
       "url": "https://explorer.testnet.somnia.network/tokyo/tx/0x38c4a22e487a66c2e8897d512bb607fbede6b3fa1fc13aac625060f4ea603f0e"
+    },
+    {
+      "chain": "shannon",
+      "step": "swap-reviewer",
+      "label": "deploy RiskReviewer",
+      "hash": "0x99765a02b814805036c8293ff919d1cb1f0130829d6983272463ed4f919a3ced",
+      "block": 526233904,
+      "gasUsed": 47234479,
+      "status": "success",
+      "from": "0x5397812d66F3233E0972b7AEB5e195a945504632",
+      "to": "0x0000000000000000000000000000000000000000",
+      "url": "https://shannon-explorer.somnia.network/tx/0x99765a02b814805036c8293ff919d1cb1f0130829d6983272463ed4f919a3ced"
+    },
+    {
+      "chain": "shannon",
+      "step": "swap-reviewer",
+      "label": "old reviewer.withdraw(owner, 7.014741015)",
+      "hash": "0x8d096cde6588fa5860035d953606c7d05c82343fe4e15bbb20fad357cd78ebe2",
+      "block": 526234086,
+      "gasUsed": 58705,
+      "status": "success",
+      "from": "0x5397812d66F3233E0972b7AEB5e195a945504632",
+      "to": "0x45b46d39697Cfd191BfEb215512d012d28E6ECc3",
+      "url": "https://shannon-explorer.somnia.network/tx/0x8d096cde6588fa5860035d953606c7d05c82343fe4e15bbb20fad357cd78ebe2"
+    },
+    {
+      "chain": "shannon",
+      "step": "swap-reviewer",
+      "label": "fund reviewer 10 STT",
+      "hash": "0x49d4a8016ba5783c0b156822319f86b3bc21b9877e6690ebfa32c15b6275a84a",
+      "block": 526234096,
+      "gasUsed": 21067,
+      "status": "success",
+      "from": "0x5397812d66F3233E0972b7AEB5e195a945504632",
+      "to": "0xc999B6924179a0dc9649DA7eBa8F3aC8b7CF7c25",
+      "url": "https://shannon-explorer.somnia.network/tx/0x49d4a8016ba5783c0b156822319f86b3bc21b9877e6690ebfa32c15b6275a84a"
+    },
+    {
+      "chain": "hideki",
+      "step": "swap-reviewer",
+      "label": "gate.setReviewer(reviewer)",
+      "hash": "0xf759ef8170f5fbae91a43c94a96261055bf280afee4375723bf73f7eb782e6b2",
+      "block": 35444833,
+      "gasUsed": 41403,
+      "status": "success",
+      "from": "0x5397812d66F3233E0972b7AEB5e195a945504632",
+      "to": "0xEe54c49E9e70a0e5C2218Eec1b1BDBd4e1Cb20f1",
+      "url": "https://explorer.testnet.somnia.network/tokyo/tx/0xf759ef8170f5fbae91a43c94a96261055bf280afee4375723bf73f7eb782e6b2"
     }
   ],
   "checks": {
@@ -1946,6 +2002,17 @@
       "ok: review 23: the reviewer replied (tier Ok)",
       "ok: review 23 verdict delivered to the gate: delivered on hideki (found after ~7s of polling)",
       "ok: review 23: the gate settled it (BlockHeld)"
+    ],
+    "swap-reviewer": [
+      "ok: deploy RiskReviewer succeeded",
+      "ok: old reviewer 0x45b46d39697Cfd191BfEb215512d012d28E6ECc3 holds 0 STT",
+      "ok: reviewer.gate() = 0xEe54c49E9e70a0e5C2218Eec1b1BDBd4e1Cb20f1",
+      "ok: gate.reviewer() = 0xc999B6924179a0dc9649DA7eBa8F3aC8b7CF7c25",
+      "ok: reviewer.baseUrl() = https://copybook-eosin.vercel.app/api/risk/",
+      "ok: reviewer.summarySelector() = rubric",
+      "ok: the reviewer's system prompt is the published rubric",
+      "ok: the hub still consults the same gate",
+      "ok: owner keeps >= 40 STT on Hideki (73.124921466)"
     ]
   },
   "measurements": {
@@ -5942,6 +6009,43 @@
         "summaryHash": "0x6988ede7b0e93085cb85ba4ebe1bfac6460124df2353058eb71935a50a75935f"
       },
       "summary": "trades30d=45 activeDays30d=2 markets=2 realizedPnl30d=-0.3 liquidations30d=0 maxDrawdown30d=0.3 avgLeverage=n/a lastActive=2026-10-28"
+    }
+  ],
+  "previousReviewers": [
+    {
+      "reviewer": "0x45b46d39697Cfd191BfEb215512d012d28E6ECc3",
+      "constructorGate": "0x5397812d66F3233E0972b7AEB5e195a945504632",
+      "constructorBaseUrl": "https://copybook.invalid/api/risk/",
+      "chainId": 50312,
+      "owner": "0x5397812d66F3233E0972b7AEB5e195a945504632",
+      "gate": "0xEe54c49E9e70a0e5C2218Eec1b1BDBd4e1Cb20f1",
+      "mailbox": "0xF805734aAC42cf238eAef9E905e3A04F2Ab554f9",
+      "gateDomain": 50383,
+      "agentPlatform": "0x037Bb9C718F3f7fe5eCBDB0b600D607b52706776",
+      "jsonAgentId": "13174292974160097713",
+      "llmAgentId": "12847293847561029384",
+      "committee": {
+        "size": 3,
+        "threshold": 2,
+        "timeoutSeconds": 300
+      },
+      "depositsPerReview": {
+        "summary": "0.12",
+        "verdict": "0.24",
+        "total": "0.36"
+      },
+      "baseUrl": "https://copybook-eosin.vercel.app/api/risk/",
+      "systemPrompt": "You review perpetual-futures traders for people who copy their positions automatically. Apply this rubric exactly to the 30-day stats (key=value; n/a means unknown, not safe). BLOCK if liquidations30d is 2 or more, or maxDrawdownPct30d is present and at least 50. Otherwise CAUTION if liquidations30d is 1, or trades30d is below 10, or history=none, or partial=1, or maxDrawdownPct30d is present and at least 25. Otherwise OK. Answer with exactly one word: OK, CAUTION or BLOCK.",
+      "balance": "11.3533936752",
+      "explorer": "https://shannon-explorer.somnia.network/address/0x45b46d39697Cfd191BfEb215512d012d28E6ECc3",
+      "verification": {
+        "verifier": "blockscout",
+        "result": "Pass - Verified",
+        "readBack": "api/v2/smart-contracts: is_fully_verified true, compiler v0.8.30+commit.73712a01"
+      },
+      "previousSystemPrompt": "You review perpetual-futures traders for people who copy their positions automatically. Read the 30-day stats (key=value). n/a means unknown, not safe. partial=1 means only the most recent activity was read. history=none means no trades. Answer with exactly one word: BLOCK if a follower copying this trader is likely to be wiped out (repeated liquidations or a drawdown near or above the margin), CAUTION if risk is elevated or the data is too thin to judge, OK otherwise.",
+      "replacedAt": "2026-10-28T14:27:35.504Z",
+      "withdrawn": "7.014741015"
     }
   ]
 }

@@ -328,19 +328,50 @@ function score() {
     md.push("| expected \\ committee | OK | CAUTION | BLOCK | no verdict |", "|---|---|---|---|---|");
     for (const t of TIERS) md.push(`| **${t}** | ${outcomes.map((o) => (o === t ? `**${m[t][o]}**` : String(m[t][o]))).join(" | ")} |`);
   };
-  md.push(`agreement (pre-registered): ${summary.agreementPreRegistered}/${summary.reviewed}; on the summary seen: ${summary.agreementOnSeenSummary}/${summary.reviewed}; failures ${summary.failures}; summaries changed ${summary.summaryChanged}; validator answers agreeing ${summary.validatorAnswersAgreeing}/${summary.validatorAnswers}`, "");
+  md.push(
+    `agreement with the pre-registered key: ${summary.agreementPreRegistered}/${summary.reviewed}; with the rubric on the summary the validators saw: ${summary.agreementOnSeenSummary}/${summary.reviewed}; no verdict: ${summary.failures}; summaries changed after pre-registration: ${summary.summaryChanged}; false BLOCKs: ${summary.falseBlocks}; missed BLOCKs: ${summary.missedBlocks}; validator answers matching the rubric: ${summary.validatorAnswersAgreeing}/${summary.validatorAnswers}`,
+    "",
+  );
   cm(summary.confusionPreRegistered);
+  const same = JSON.stringify(summary.confusionPreRegistered) === JSON.stringify(summary.confusionOnSeenSummary);
   md.push("");
-  cm(summary.confusionOnSeenSummary);
-  md.push("", "| # | trader | picked as | summary the validators saw | same as key | expected | votes OK/CAU/BLK | committee | gate | txs |", "|---|---|---|---|---|---|---|---|---|---|");
+  if (same) md.push("(identical on the summaries the validators saw)");
+  else cm(summary.confusionOnSeenSummary);
+
+  const inputs = (line?: string) => {
+    if (!line) return "–";
+    const kv = new Map(line.split(" ").map((t) => [t.slice(0, t.indexOf("=")), t.slice(t.indexOf("=") + 1)] as const));
+    const parts = [`liq ${kv.get("liquidations30d")}`, `trades ${kv.get("trades30d")}`];
+    if (kv.has("maxDrawdownPct30d")) parts.push(`dd% ${kv.get("maxDrawdownPct30d")}`);
+    if (kv.get("partial") === "1") parts.push("partial=1");
+    if (kv.get("history") === "none") parts.push("history=none");
+    return parts.join(" · ");
+  };
+  const tick = "`";
+  const addr = (a: string) => `[${tick}${a.slice(0, 6)}…${a.slice(-4)}${tick}](https://explorer.testnet.somnia.network/tokyo/address/${a})`;
+  md.push("", "| # | trader | picked as | rule inputs seen | seen = key | expected | committee (OK/CAU/BLK) | gate |", "|---|---|---|---|---|---|---|---|");
   rows.forEach((x, i) => {
-    const short = (h?: string) => (h ? `[${h.split("/").pop()!.slice(0, 10)}…](${h})` : "–");
     const v = x.votes ? `${x.votes.ok}/${x.votes.caution}/${x.votes.block}` : "–";
-    const exp = x.summaryMatch === false ? `${x.expected} → ${x.expectedOnSeen} (on seen)` : x.expected;
-    md.push(
-      `| ${i + 1} | \`${x.trader}\` | ${x.pickedAs} | \`${x.seenSummary ?? "–"}\` | ${x.summaryMatch === undefined ? "–" : x.summaryMatch ? "yes" : "**no**"} | ${exp} | ${v} | **${x.committee}** | ${x.gate ? `${x.gate.event}${x.gate.tier ? ` (${x.gate.tier})` : ""}` : "–"} | req ${short(x.txs.gateRequest)} · summary ${short(x.txs.summaryRequest)} · verdict req ${short(x.txs.verdictRequest)} · verdict ${short(x.txs.verdict)} · back ${short(x.txs.gateDelivery)} |`,
-    );
+    const tier = x.committee === x.expectedOnSeen ? x.committee : `**${x.committee}**`;
+    const gate = x.gate ? `${x.gate.event}${x.gate.tier ? ` ${x.gate.tier}` : ""}` : "–";
+    const seen = x.summaryMatch === undefined ? "–" : x.summaryMatch ? "yes" : "no";
+    md.push(`| ${i + 1} | ${addr(x.trader)} | ${x.pickedAs} | ${inputs(x.seenSummary)} | ${seen} | ${x.expected} | ${tier} (${v}) | ${gate} |`);
   });
+  const link = (h?: string) => (h ? `[${h.split("/").pop()!.slice(0, 10)}…](${h})` : "–");
+  md.push("", "| # | Hideki: requestReview | Shannon: summary request | Shannon: verdict request | Shannon: verdict | Hideki: verdict delivered |", "|---|---|---|---|---|---|");
+  rows.forEach((x, i) => md.push(`| ${i + 1} | ${link(x.txs.gateRequest)} | ${link(x.txs.summaryRequest)} | ${link(x.txs.verdictRequest)} | ${link(x.txs.verdict)} | ${link(x.txs.gateDelivery)} |`));
+  const vals = new Map<string, { llm: number; agree: number; json: number }>();
+  const entry = (v: string) => vals.get(v) ?? vals.set(v, { llm: 0, agree: 0, json: 0 }).get(v)!;
+  for (const x of reviewed) {
+    for (const a of x.answers ?? []) {
+      const e = entry(a.validator);
+      e.llm += 1;
+      if ((/[A-Za-z]+/.exec(a.answer)?.[0] ?? "").toUpperCase() === x.expectedOnSeen) e.agree += 1;
+    }
+    for (const j of x.jsonStage?.validators ?? []) entry(j.validator).json += 1;
+  }
+  md.push("", "| validator | summary fetches | LLM answers | answers matching the rubric |", "|---|---|---|---|");
+  for (const [v, e] of [...vals].sort((a, b) => b[1].llm - a[1].llm)) md.push(`| ${tick}${v}${tick} | ${e.json} | ${e.llm} | ${e.agree} |`);
   console.log(md.join("\n"));
   console.log(`\n  wrote ${RESULTS_FILE}`);
 }

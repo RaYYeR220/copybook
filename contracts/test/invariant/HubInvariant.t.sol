@@ -788,12 +788,14 @@ contract HubInvariantTest is Test {
         assertEq(seated, active);
     }
 
-    /// The hub never orders, copies or refuses on a pool outside the follow's allowlist (R10/R14).
+    /// The hub never orders, copies or refuses on a pool outside the follow's allowlist: the markets joined,
+    /// every market for an all-markets follow, or every pool that has been a leg of the followed theme.
     function invariant_noTouchOutsideAllowlist() public view {
         assertEq(handler.outsideTouches(), 0);
     }
 
-    /// A follow whose exits or stop closes are latched gets no order or copy from the handler (R35).
+    /// A follow whose exits or stop closes are latched gets no order or copy from the handler until a caller's
+    /// own transaction finishes that work.
     function invariant_latchedNeverTradedReactively() public view {
         assertEq(handler.latchedOrders(), 0);
     }

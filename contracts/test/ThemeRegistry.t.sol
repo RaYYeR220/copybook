@@ -67,7 +67,7 @@ contract ThemeRegistryTest is Base {
         reg.createTheme("n", "", legs);
     }
 
-    // R27: every leg carries at least MIN_LEG_WEIGHT_BPS either way, at create and at rebalance, so a
+    // Every leg carries at least MIN_LEG_WEIGHT_BPS either way, at create and at rebalance, so a
     // creator cannot park followers in dust legs that only ever reduce.
     function test_rejects_weightBelowMinimum() public {
         assertEq(reg.MIN_LEG_WEIGHT_BPS(), 500);
@@ -126,7 +126,7 @@ contract ThemeRegistryTest is Base {
         reg.createTheme("n", "", legs);
     }
 
-    // Regression (R24): a contract that only claims the bank is not one of its markets, at create and at
+    // A contract that only claims the bank is not one of its markets, at create and at
     // rebalance; neither is a real pool the bank never registered.
     function test_rejects_fakePoolClaimingBank() public {
         FakePool fake = new FakePool(address(bank));

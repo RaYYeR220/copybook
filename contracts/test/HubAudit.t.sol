@@ -34,7 +34,8 @@ contract AllowGate is IRiskGate {
     }
 }
 
-/// Regressions for the task review and self-audit findings: each test failed (or proved the bug) before its fix.
+/// Hardening: gas exhaustion inside the handler, latches, hostile gates and subscriptions, and venue edge cases.
+/// Each test pins a behaviour the hub must keep where the happy-path suites do not reach.
 contract HubAuditTest is Base {
     using stdStorage for StdStorage;
 
@@ -174,7 +175,7 @@ contract HubAuditTest is Base {
         vm.etch(g, "");
     }
 
-    // ================================================================== R29: the risk gate never rolls back exits
+    // ================================================================== the risk gate never rolls back exits
 
     /// A long follower whose source flipped short, with `gate` in place.
     function _flipWithGate(address gate) internal {
@@ -271,7 +272,7 @@ contract HubAuditTest is Base {
         assertEq(_size(address(sol), follower), 0);
     }
 
-    // ================================================================== R33: exits stand whatever the increases do
+    // ================================================================== exits stand whatever the increases do
 
     /// Three Hideki-heavy markets (7.5M gas per order) the source and the follower hold long, with a floor.
     function _heavyStop() internal returns (HeavyPerpPool a, HeavyPerpPool b, HeavyPerpPool c) {
@@ -300,8 +301,9 @@ contract HubAuditTest is Base {
         _heavyTrade(a, false, 100_000);
     }
 
-    // M-1. Before: the stop's flatten ran out of the 20M member slot, the whole member frame reverted (the flip's
-    // close, the pause), the member was Deferred and billed ~0.118 STT, again on every event.
+    // An equity stop raised in the handler on heavy markets: the pause is written first and the closes run on
+    // everything above the reserve, so the flip's close, the pause and the closes land in one delivery instead of
+    // the member's frame reverting (and being billed) on every event.
     function test_equityStopInHandler_pausesThenCloses() public {
         (HeavyPerpPool a, HeavyPerpPool b, HeavyPerpPool c) = _heavyStop();
         bytes32[] memory topics = _topics(trader, address(a));
@@ -323,7 +325,7 @@ contract HubAuditTest is Base {
         assertLt(t0 - hub.tankOf(follower), (1_000_000 + uint256(overhead)) * 6 gwei);
     }
 
-    // M-1, the closes themselves out of gas: the pause and the flip's close still stand, the closes are
+    // The stop's closes themselves out of gas: the pause and the flip's close still stand, the closes are
     // Deferred and not billed, and a keeper's poke finishes them.
     function test_equityStopInHandler_pauseStandsWhenClosesRunOut() public {
         (HeavyPerpPool a, HeavyPerpPool b, HeavyPerpPool c) = _heavyStop();
@@ -376,9 +378,8 @@ contract HubAuditTest is Base {
         topics[1] = bytes32(tid);
     }
 
-    // M-2. Before: phase A and B shared one 90M slot; the 16 orders (~96M) ran it out, every reduction rolled
-    // back, and the member was billed ~0.52 STT for nothing. Now the exits have their own call and the
-    // increases theirs: the whole flip lands in one delivery.
+    // A theme flip whose 16 orders (~96M gas) exceed one member slot: the exits run in their own call and the
+    // increases in theirs, so the whole flip lands in one delivery instead of every reduction rolling back.
     function test_themeFlipLargerThanSlot_completesInTwoPhases() public {
         (HeavyPerpPool[] memory ps, bytes32 tsid, bytes32[] memory topics) = _heavyFlip();
         assertTrue(_deliverHub(hub.subscriptionOf(tsid, 0), address(themes), topics, HANDLER_GAS));
@@ -387,7 +388,7 @@ contract HubAuditTest is Base {
         }
     }
 
-    // M-2, increases larger than their slot: the member is Deferred for them (billed, as R15b), but every
+    // Increases larger than their slot: the member is Deferred for them (billed: it had a full slot), but every
     // reduction already stands, and catchUp opens the rest.
     function test_themeIncreasesOutOfSlot_reductionsStand() public {
         (HeavyPerpPool[] memory ps, bytes32 tsid, bytes32[] memory topics) = _heavyFlip();
@@ -406,7 +407,7 @@ contract HubAuditTest is Base {
         }
     }
 
-    // M-1/M-2, exits heavier than the whole handler: Deferred and never billed (a source cannot drain tanks
+    // Exits heavier than the whole handler: Deferred and never billed (a source cannot drain tanks
     // with exits too heavy to finish).
     function test_exitsOutOfGas_deferredUnbilled() public {
         (,, bytes32[] memory topics) = _heavyFlip();
@@ -494,7 +495,7 @@ contract HubAuditTest is Base {
         assertEq(_size(address(eth), follower), 0);
     }
 
-    // ================================================================== R35: latches for work the handler cannot finish
+    // ================================================================== latches for work the handler cannot finish
 
     function _pending(address who) internal view returns (bool exitPending, bool flattenPending) {
         return hub.pendingOf(who);
@@ -506,10 +507,9 @@ contract HubAuditTest is Base {
         }
     }
 
-    // N-1 (exits): a creator's rebalance whose exits cost more than the whole handler. Before: every round
-    // burnt the handler budget on the same exits, unbilled, and GroupDeferred the co-member. Now the first
-    // round latches the member; later rounds skip it with a bare Deferred, and catchUp on the caller's gas
-    // finishes the exits and hands the follow back.
+    // A creator's rebalances whose exits cost more than the whole handler: the first round spends the budget
+    // once and latches the member; later rounds skip it with a bare Deferred (no budget burnt, no co-member
+    // deferred, nothing billed), and catchUp on the caller's gas finishes the exits and hands the follow back.
     function test_exitOOG_latchesThenSkips() public {
         HeavyPerpPool[] memory ps = new HeavyPerpPool[](8);
         Leg[] memory legs = new Leg[](8);
@@ -623,9 +623,9 @@ contract HubAuditTest is Base {
         c.setBurn(70_000_000);
     }
 
-    // N-1 (stop): before, a follower could re-arm its floor and resume after every stop whose closes ran out of
-    // the handler, unbilled, so every source increase burnt the handler. Now the closes latch: resume waits,
-    // the handler skips the follow, and poke finishes the closes on its caller's gas.
+    // A stop whose closes run out of the handler latches them: resume waits (so a follower cannot re-arm its
+    // floor and make every source increase burn the handler unbilled), the handler skips the follow, and poke
+    // finishes the closes on its caller's gas.
     function test_stopFlattenOOG_latchesResumeWaits() public {
         (HeavyPerpPool a, HeavyPerpPool b, HeavyPerpPool c, Policy memory p) = _stopCycleSetup();
         p.equityFloor = 2_000e18; // armed above its equity
@@ -721,7 +721,7 @@ contract HubAuditTest is Base {
         assertFalse(exitPending);
     }
 
-    // R36: at the admin minimums (tailBase 1.1M, perDefer 20k) with a member left behind the one whose exits run
+    // At the admin minimums (tailBase 1.1M, perDefer 20k) with a member left behind the one whose exits run
     // out of gas, the handler never reverts, at any gas from too little for one member to plenty.
     function test_reserveFloor_exitOOGAtAdminMinimums_handlerSurvives() public {
         address mate = address(0xF022);
@@ -754,12 +754,12 @@ contract HubAuditTest is Base {
         assertGt(mateDeferred, 0, "with the member behind it deferred from the reserve");
     }
 
-    // ================================================================== R37-R39: latches on an all-markets follow
+    // ================================================================== latches on an all-markets follow
 
-    // Poc7c A. Before: an all-markets follow's exit on a market it never synced (a manual position) latched, and an
-    // empty catchUp released it without the exit, so every event burnt the handler again and deferred the mate.
-    // Now the event's market joins the synced set with the latch: the catchUp that releases it runs the close
-    // first, and while that close cannot run the latch holds and the mate is copied.
+    // An all-markets follow whose exit on a market it never synced (a manual position) runs out of gas: the
+    // event's market joins the synced set with the latch, so the catchUp that releases it runs the close first
+    // (an empty catchUp cannot release it without the exit), and while that close cannot run the latch holds
+    // and the mate is copied.
     function test_allowAllUnsynced_latchHoldsUntilTheClose() public {
         address mate = address(0xF022);
         _followTrader(follower, new address[](0)); // all markets
@@ -811,8 +811,8 @@ contract HubAuditTest is Base {
         assertEq(_size(address(btc), follower), 76_000);
     }
 
-    // Poc7c A2. Before: with the source flat, even a keeper naming the market released the latch without the
-    // exit (the market was neither synced nor held by the source). Now the close runs first.
+    // With the source flat, a keeper's catchUp naming the market still runs the latched close before it
+    // releases the latch, although the market is neither synced nor held by the source.
     function test_allowAllSourceFlat_catchUpClosesBeforeRelease() public {
         _move(btc, trader, 50_000);
         _followTrader(follower, new address[](0));
@@ -866,9 +866,8 @@ contract HubAuditTest is Base {
         assertEq(_size(address(btc), follower), 20_000, "the follower's own position");
     }
 
-    // Poc7c B (R38). Before: a stop's closes that left dust the venue cannot take kept flattenPending forever:
-    // resume reverted for good and the handler skipped the follow for good. Now poke's completed pass releases
-    // the follow and reports the residue.
+    // A stop's closes that leave dust the venue cannot take do not hold flattenPending forever (resume and the
+    // handler would be locked out for good): poke's completed pass releases the follow and reports the residue.
     function test_flattenPendingDust_releasedAndReported() public {
         _followTrader(follower, _one(address(btc)));
         _move(btc, trader, 50_000);
@@ -911,10 +910,10 @@ contract HubAuditTest is Base {
         assertGt(_size(address(btc), follower), 4_500);
     }
 
-    // Poc7c A3, documented residual (R39). Unfollowing and following again starts a follow clean, so it could
-    // re-arm a latched all-markets follow; but with the subscription gas limits at their minimum (40M for traders)
-    // or default (200M), a single venue order at Hideki's heaviest (7.7M gas) always fits a member's exits, so
-    // such an exit never latches. (Pools are venue-registered, R24, so no order is heavier.)
+    // Unfollowing and following again starts a follow clean, so it could re-arm a latched all-markets follow;
+    // but with the subscription gas limits at their minimum (40M for traders) or default (200M), a single venue
+    // order at Hideki's heaviest (7.7M gas) always fits a member's exits, so such an exit never latches. (Pools
+    // must be registered with the venue's bank, so no order is heavier.)
     function test_singleVenueOrderExit_neverLatches() public {
         HeavyPerpPool a = _heavy(0);
         address mate = address(0xF022);
@@ -956,9 +955,9 @@ contract HubAuditTest is Base {
         }
     }
 
-    // ================================================================== R34: only the hub's own subscription
+    // ================================================================== only the hub's own subscription
 
-    // M-3. Before: a stranger's subscription on the hub's relay re-ran the group and billed every member.
+    // A stranger's subscription pointed at the hub's relay can neither re-run the group nor bill its members.
     function test_foreignSubscription_cannotDriveRelay() public {
         _followTrader(follower, new address[](0));
         _move(btc, trader, 50_000);
@@ -990,9 +989,9 @@ contract HubAuditTest is Base {
         hub.onSourceEvent(sid, 0, address(bank), _topics(trader, address(btc)), "");
     }
 
-    // ================================================================== L-1: allowAll scope for catchUp
+    // ================================================================== allowAll scope for catchUp
 
-    // Before: a stranger's catchUp closed a position the follower opened by hand in a market the source never
+    // A stranger's catchUp leaves alone a position the follower opened by hand in a market the source never
     // traded.
     function test_allowAll_catchUpLeavesUntradedMarkets() public {
         _followTrader(follower, new address[](0));
@@ -1016,10 +1015,10 @@ contract HubAuditTest is Base {
         assertEq(_size(address(eth), follower), 0);
     }
 
-    // ================================================================== I-2: whole lots only
+    // ================================================================== whole lots only
 
-    // Before: the full close sent the exact non-lot size, the venue refused it (InvalidQuantity) and nothing
-    // closed. Now the whole lots close and the residue below one lot stays as dust, with no refusal.
+    // A full close of a position off the lot grid sends the whole lots (the exact size would be refused with
+    // InvalidQuantity and close nothing); the residue below one lot stays as dust, with no refusal.
     function test_offLotPosition_closesWholeLots() public {
         _followTrader(follower, _one(address(btc)));
         btc.approve(follower, address(this));
@@ -1073,9 +1072,9 @@ contract HubAuditTest is Base {
         assertEq(_size(address(btc), follower), 0);
     }
 
-    // ================================================================== R31 minors
+    // ================================================================== subscriptions and the library
 
-    // M2: a new subscription id is never left marked as an orphan.
+    // A new subscription id is never left marked as an orphan.
     function test_subscribe_clearsOrphanFlag() public {
         _followTrader(follower, new address[](0)); // subscription 1
         _store.target(address(hub)).sig("orphanSubs(uint256)").with_key(uint256(2)).checked_write(true);
@@ -1105,9 +1104,9 @@ contract HubAuditTest is Base {
         assertFalse(ok, "flatten");
     }
 
-    // ================================================================== Info
+    // ================================================================== source reads and billing
 
-    // I-1 (documented): the source's size is read once per delivery, so when an earlier member's copy fills
+    // Documented: the source's size is read once per delivery, so when an earlier member's copy fills
     // against the source's own resting order, later members still copy the size read for the event.
     function test_info_sourceSizeReadOncePerDelivery() public {
         HeavyPerpPool a = _heavy(0);
@@ -1128,7 +1127,7 @@ contract HubAuditTest is Base {
         assertEq(_size(address(a), trader), -50_000);
     }
 
-    // L-2 (measured): a delivery to a group with nothing to do bills at least the gas the handler used.
+    // A delivery to a group with nothing to do bills at least the gas the handler used.
     function test_noOpGroup_billsAtLeastHandlerGas() public {
         address[] memory onlyEth = _one(address(eth));
         for (uint256 i = 1; i <= 8; ++i) {

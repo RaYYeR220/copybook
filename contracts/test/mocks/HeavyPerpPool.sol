@@ -5,7 +5,7 @@ import {IPerpPool} from "../../src/interfaces/IDreamPerps.sol";
 import {MockMarginBank} from "./MockMarginBank.sol";
 
 /// @dev MockPerpPool with a configurable gas cost per placeOrderFor, to model Hideki's measured 1.5-7.7M
-/// gas per order (RECON: "IOC crossing levels up to 7.7M"). An order given less gas than it needs runs
+/// gas per order (an IOC crossing several levels went up to 7.7M). An order given less gas than it needs runs
 /// out of gas (empty revert after burning everything), exactly like a real out-of-gas order.
 /// Optionally mirrors every fill onto a `counterparty` account, as if the order matched that account's
 /// resting order (used to model the source being the maker).

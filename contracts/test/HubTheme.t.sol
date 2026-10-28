@@ -871,7 +871,7 @@ contract HubThemeTest is Base {
         assertEq(hub.THEME_REBALANCED_TOPIC(), THEME_REBALANCED);
     }
 
-    // ---------- fix round 1: dust legs, churn, rebalance spam, short fills ----------
+    // ---------- dust legs, churn, rebalance spam, short fills ----------
 
     // A leg too small to open (it rounds below the venue minimum) holds the whole basket back: a pair trade
     // never opens as a naked short.
@@ -1020,7 +1020,7 @@ contract HubThemeTest is Base {
     }
 
     // The registry refuses a rebalance that changes nothing, or that comes too soon. A rebalance that leaves
-    // a member's book inside the drift band still bills it the gas its sync measured, silently (R28): the
+    // a member's book inside the drift band still bills it the gas its sync measured, silently: the
     // theme's followers pay for a creator's quiet rebalances, not the hub.
     function test_theme_quietRebalance_billsMeasuredGasSilently() public {
         address a = _f(1);

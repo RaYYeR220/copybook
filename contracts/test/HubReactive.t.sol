@@ -668,7 +668,7 @@ contract HubReactiveTest is Base {
         assertEq(reactivity.count(), 2);
     }
 
-    // Regression (review B): an unreadable answer for a live subscription must not let anyone mint
+    // An unreadable answer for a live subscription must not let anyone mint
     // duplicate hub-owned subscriptions on the same relay.
     function test_ensureSubscribed_unreadableInfo_failsClosed() public {
         address a = _f(1);

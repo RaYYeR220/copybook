@@ -161,7 +161,7 @@ contract HubAdminTest is Base {
         vm.stopPrank();
     }
 
-    // R31: ownership cannot be renounced, so the admin surface stays reachable; it still moves in two steps.
+    // Ownership cannot be renounced, so the admin surface stays reachable; it still moves in two steps.
     function test_renounceOwnership_disabled() public {
         vm.prank(owner);
         vm.expectRevert(CopybookHub.RenounceDisabled.selector);
@@ -207,7 +207,7 @@ contract HubAdminTest is Base {
         assertEq(_size(btc, a), 0);
     }
 
-    // R29: the gate must be a contract (address(0) turns it off).
+    // The gate must be a contract (address(0) turns it off).
     function test_setRiskGate_rejectsAccountsWithoutCode() public {
         vm.startPrank(owner);
         vm.expectRevert(abi.encodeWithSelector(CopybookHub.InvalidParam.selector, uint8(1)));
@@ -220,7 +220,7 @@ contract HubAdminTest is Base {
 
     // ---------- subscription parameters ----------
 
-    // R30/R31/R39: fees capped at MAX_FEE_PER_GAS with room for the 6 gwei base fee; the trader gas limit in
+    // Fees capped at MAX_FEE_PER_GAS with room for the 6 gwei base fee; the trader gas limit in
     // 40M..200M and the theme one in 120M..200M, so a member's exits always fit; and both enough for the
     // handler's floor and tail reserve.
     function test_setSubParams_bounds() public {
@@ -270,8 +270,8 @@ contract HubAdminTest is Base {
         vm.stopPrank();
     }
 
-    // Regression (review I2): no fee ceiling let the owner set a live group's priority fee to ~2^64 wei per gas
-    // through forceResubscribe. The ceiling now refuses it, so the live group keeps sane fees.
+    // The fee ceiling refuses a priority fee of ~2^64 wei per gas, which forceResubscribe would otherwise apply
+    // to a live group: the live group keeps sane fees.
     function test_feeCeiling_keepsLiveGroupFees() public {
         _follow(_f(1), trader);
         vm.startPrank(owner);
@@ -353,7 +353,7 @@ contract HubAdminTest is Base {
         assertEq(overhead, 2_000_000);
     }
 
-    // R32: the fixed charge overhead is a gas parameter (default 300k), billed on top of measured gas.
+    // The fixed charge overhead is a gas parameter (default 300k), billed on top of measured gas.
     function test_chargeOverhead_isTunable() public {
         (,,,,, uint64 overhead,) = hub.gasParams();
         assertEq(overhead, 300_000);

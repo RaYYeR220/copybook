@@ -123,7 +123,7 @@ async function copied(
     saveProof();
     check(s, false, `${label}: hub reacted for ${follower}`);
     if (runs.some((r) => r.status !== "success")) {
-      throw new Abort(`handler transactions reverted after ${label}: check R34 (tx.origin == hub)`);
+      throw new Abort(`handler transactions reverted after ${label}: check that the handler's tx.origin is the hub`);
     }
     return undefined;
   }
@@ -140,7 +140,7 @@ async function copied(
   saveProof();
   for (const l of entry.logs) console.log(`    ${l}`);
   check(s, entry.delta === 0, `${label}: handler in the trigger's block (delta ${entry.delta}, trigger idx ${entry.triggerIndex}, handler idx ${entry.handlerIndex})`);
-  check(s, getAddress(rx.tx.from) === HUB, `${label}: handler tx.origin is the hub (R34), to ${rx.tx.to}`);
+  check(s, getAddress(rx.tx.from) === HUB, `${label}: handler tx.origin is the hub, to ${rx.tx.to}`);
   return rx;
 }
 
@@ -549,7 +549,7 @@ async function guaranteed(s: Scenario) {
   check(s, (await size(FOLLOWER, pools.BTC)) === 0n, "follower flat");
 }
 
-/** R40: the handler floor covers the largest single exit measured live plus EXIT_MARK_GAS and a margin. */
+/** The handler floor covers the largest single exit measured live plus EXIT_MARK_GAS and a margin. */
 async function gasTuning(s: Scenario) {
   const exits = proof.sameBlock
     .filter((e) => e.memberGas !== undefined && e.logs?.some((l) => l.startsWith("Copied") && /toSize=0[,)]/.test(l)))
@@ -566,8 +566,8 @@ async function gasTuning(s: Scenario) {
   const need = maxExit + EXIT_MARK_GAS + margin;
   let floor = ((need + 999_999n) / 1_000_000n) * 1_000_000n;
   if (floor < gp.floor) floor = gp.floor;
-  note(s, "R40 floor", { maxExit, exitMark: EXIT_MARK_GAS, margin, need, floor });
-  proof.measurements.r40 = { maxExit: Number(maxExit), need: Number(need), floor: Number(floor) };
+  note(s, "handler floor", { maxExit, exitMark: EXIT_MARK_GAS, margin, need, floor });
+  proof.measurements.handlerFloor = { maxExit: Number(maxExit), need: Number(need), floor: Number(floor) };
 
   // chargeOverhead: what a handler run costs beyond the member's own measured phases (one-member groups, so this is
   // the whole relay, event check and charge around it: an upper bound on one member's share)

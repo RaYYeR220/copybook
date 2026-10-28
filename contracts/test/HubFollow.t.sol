@@ -310,7 +310,7 @@ contract HubFollowTest is Base {
         hub.follow{value: 0.5 ether}(SourceKind.Trader, uint256(uint160(trader)), _policy(), _none());
     }
 
-    // Regression (R24): joinPools takes only markets the bank itself registered. A contract that merely
+    // joinPools takes only markets the bank itself registered. A contract that merely
     // claims the bank, or a pool the bank never registered, is refused before anything is allowlisted.
     function test_follow_fakePoolClaimingBank_rejected() public {
         address[] memory pools = new address[](2);
@@ -388,7 +388,7 @@ contract HubFollowTest is Base {
         assertEq(_size(btc, follower), 50_000);
     }
 
-    // Regression (review I1): a position the follower kept in a pool its new follow does not allow
+    // A position the follower kept in a pool its new follow does not allow
     // must not be closed by a stranger through catchUp or by a source event.
     function test_strangerCannotTouchNonAllowlistedPool() public {
         _traderTo(btc, 50_000);
@@ -907,7 +907,7 @@ contract HubFollowTest is Base {
         hub.onSourceEvent(sid, 0, address(bank), short, data);
     }
 
-    // Regression (review I2): the event only names the pool; the size comes from the trader's live position.
+    // The event only names the pool; the size comes from the trader's live position.
     function test_staleEventUsesLiveTraderSize() public {
         _follow(follower, _policy(), _none());
         vm.recordLogs();

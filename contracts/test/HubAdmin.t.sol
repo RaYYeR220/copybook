@@ -205,45 +205,54 @@ contract HubAdminTest is Base {
 
     // ---------- subscription parameters ----------
 
-    // R30/R31: fees capped at MAX_FEE_PER_GAS with room for the 6 gwei base fee; every gas limit at most 200M
-    // and enough for the handler's floor and tail reserve (8M + 1.2M + 30k + 2M = 11.23M by default).
+    // R30/R31/R39: fees capped at MAX_FEE_PER_GAS with room for the 6 gwei base fee; the trader gas limit in
+    // 40M..200M and the theme one in 120M..200M, so a member's exits always fit; and both enough for the
+    // handler's floor and tail reserve.
     function test_setSubParams_bounds() public {
-        uint64 need = 11_230_000;
+        uint64 trader = 40_000_000;
+        uint64 theme = 120_000_000;
         vm.startPrank(owner);
         assertEq(hub.MAX_FEE_PER_GAS(), 100 gwei);
         vm.expectRevert(abi.encodeWithSelector(CopybookHub.InvalidParam.selector, uint8(2)));
-        hub.setSubParams(0, 100 gwei + 1, need, need, false);
+        hub.setSubParams(0, 100 gwei + 1, trader, theme, false);
         vm.expectRevert(abi.encodeWithSelector(CopybookHub.InvalidParam.selector, uint8(2)));
-        hub.setSubParams(0, 6 gwei - 1, need, need, false);
+        hub.setSubParams(0, 6 gwei - 1, trader, theme, false);
         vm.expectRevert(abi.encodeWithSelector(CopybookHub.InvalidParam.selector, uint8(2)));
-        hub.setSubParams(type(uint64).max - 6 gwei, type(uint64).max, need, need, false);
+        hub.setSubParams(type(uint64).max - 6 gwei, type(uint64).max, trader, theme, false);
         vm.expectRevert(abi.encodeWithSelector(CopybookHub.InvalidParam.selector, uint8(1)));
-        hub.setSubParams(1 gwei, 7 gwei - 1, need, need, false);
+        hub.setSubParams(1 gwei, 7 gwei - 1, trader, theme, false);
         vm.expectRevert(abi.encodeWithSelector(CopybookHub.InvalidParam.selector, uint8(1)));
-        hub.setSubParams(94 gwei + 1, 100 gwei, need, need, false);
+        hub.setSubParams(94 gwei + 1, 100 gwei, trader, theme, false);
         vm.expectRevert(abi.encodeWithSelector(CopybookHub.InvalidParam.selector, uint8(3)));
-        hub.setSubParams(0, 20 gwei, uint64(MAX_GAS + 1), need, false);
+        hub.setSubParams(0, 20 gwei, uint64(MAX_GAS + 1), theme, false);
+        vm.expectRevert(abi.encodeWithSelector(CopybookHub.InvalidParam.selector, uint8(3)));
+        hub.setSubParams(0, 20 gwei, trader - 1, theme, false);
+        vm.expectRevert(abi.encodeWithSelector(CopybookHub.InvalidParam.selector, uint8(3)));
+        hub.setSubParams(0, 20 gwei, 0, theme, false);
         vm.expectRevert(abi.encodeWithSelector(CopybookHub.InvalidParam.selector, uint8(4)));
-        hub.setSubParams(0, 20 gwei, need, uint64(MAX_GAS + 1), false);
-        vm.expectRevert(CopybookHub.GasLimitTooLow.selector);
-        hub.setSubParams(0, 20 gwei, need - 1, need, false);
-        vm.expectRevert(CopybookHub.GasLimitTooLow.selector);
-        hub.setSubParams(0, 20 gwei, need, need - 1, false);
-        vm.expectRevert(CopybookHub.GasLimitTooLow.selector);
-        hub.setSubParams(0, 20 gwei, 0, need, false);
+        hub.setSubParams(0, 20 gwei, trader, uint64(MAX_GAS + 1), false);
+        vm.expectRevert(abi.encodeWithSelector(CopybookHub.InvalidParam.selector, uint8(4)));
+        hub.setSubParams(0, 20 gwei, trader, theme - 1, false);
 
         // the edges are accepted
         vm.expectEmit(false, false, false, true, address(hub));
-        emit CopybookHub.SubParamsSet(94 gwei, 100 gwei, need, uint64(MAX_GAS), true);
-        hub.setSubParams(94 gwei, 100 gwei, need, uint64(MAX_GAS), true);
-        hub.setSubParams(0, 6 gwei, need, need, false);
-        vm.stopPrank();
+        emit CopybookHub.SubParamsSet(94 gwei, 100 gwei, trader, uint64(MAX_GAS), true);
+        hub.setSubParams(94 gwei, 100 gwei, trader, uint64(MAX_GAS), true);
+        hub.setSubParams(0, 6 gwei, trader, theme, false);
         (uint64 prio, uint64 maxFee, uint64 traderGas, uint64 themeGas, bool guaranteed) = hub.subParams();
         assertEq(prio, 0);
         assertEq(maxFee, 6 gwei);
-        assertEq(traderGas, need);
-        assertEq(themeGas, need);
+        assertEq(traderGas, trader);
+        assertEq(themeGas, theme);
         assertFalse(guaranteed);
+
+        // with a larger handler budget the floor and tail reserve must still fit: 40M + 1.1M + 20k + 2M
+        hub.setSubParams(0, 20 gwei, uint64(MAX_GAS), uint64(MAX_GAS), false);
+        hub.setGasParams(40_000_000, 40_000_000, 40_000_000, 1_100_000, 20_000, 300_000);
+        vm.expectRevert(CopybookHub.GasLimitTooLow.selector);
+        hub.setSubParams(0, 20 gwei, 43_119_999, theme, false);
+        hub.setSubParams(0, 20 gwei, 43_120_000, 120_000_000, false);
+        vm.stopPrank();
     }
 
     // Regression (review I2): no fee ceiling let the owner set a live group's priority fee to ~2^64 wei per gas

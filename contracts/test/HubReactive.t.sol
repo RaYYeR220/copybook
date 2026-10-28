@@ -411,8 +411,9 @@ contract HubReactiveTest is Base {
         uint256 subId = hub.subscriptionOf(sid, 0);
         address[] memory m = hub.membersOf(sid, 0);
         (uint64 floor,,, uint64 tailBase, uint64 perDefer,) = hub.gasParams();
-        // what the handler must hold to start member #0: its slot plus the reserve for deferring all n
-        uint256 first = floor + tailBase + n * perDefer;
+        // what the handler must hold to start member #0: its slot, the reserve for deferring all n, and what a
+        // trader member's exits keep back
+        uint256 first = floor + tailBase + n * perDefer + hub.DEFER_ALLOWANCE_GAS() + hub.EXIT_MARK_GAS();
 
         // below the floor from the start: one GroupDeferred from index 0, nothing is sent
         vm.recordLogs();
@@ -758,9 +759,8 @@ contract HubReactiveTest is Base {
         _follow(b, 10_000);
         Vm.Log memory ev = _traderTo(btc, 50_000);
         bytes memory halted = abi.encodeWithSelector(GasBurner.Halted.selector);
-        vm.mockFunction(
-            address(bank), address(new GasBurner()), abi.encodeCall(IMarginBank.getPosition, (b, address(btc)))
-        );
+        // the increase reads the market: that read spends its slot (the exits before it read nothing)
+        vm.mockFunction(address(btc), address(new GasBurner()), abi.encodeCall(IPerpPool.getMarkPrice, ()));
         uint256 subId = hub.subscriptionOf(sid, 0);
 
         // with gas to spare the refusal is billed as usual
@@ -778,8 +778,9 @@ contract HubReactiveTest is Base {
         vm.expectEmit(true, true, true, true, address(hub));
         emit CopybookHub.Refused(b, sid, address(btc), Reason.VenueRejected, halted);
         vm.recordLogs();
+        uint256 hold = hub.DEFER_ALLOWANCE_GAS() + hub.EXIT_MARK_GAS();
         vm.prank(address(this), address(hub));
-        reactivity.fire{gas: (floor + tailBase + perDefer) * 11 / 10}(subId, ev.emitter, ev.topics, ev.data);
+        reactivity.fire{gas: (floor + tailBase + perDefer + hold) * 11 / 10}(subId, ev.emitter, ev.topics, ev.data);
         logs = vm.getRecordedLogs();
         vm.clearMockedCalls();
         assertEq(_count(logs, CopybookHub.TankCharged.selector, b), 0);

@@ -95,6 +95,9 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
     event SurplusWithdrawn(address indexed to, uint256 amount);
     /// @notice An owner attempt to cancel a recorded orphan; a failed one stays recorded.
     event OrphanCancelled(uint256 subscriptionId, bool cancelled);
+    /// @notice A pending flatten was released with this position still open: dust the venue cannot take, or a
+    /// market it could not price.
+    event FlattenIncomplete(address indexed follower, address indexed pool);
 
     struct SubParams {
         uint64 priorityFeePerGas;
@@ -167,7 +170,15 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
     uint256 internal constant MIN_TAIL_BASE = 1_100_000;
     /// @dev Kept back on top of the reserve so a member Deferred (and latched) out of the reserve still leaves
     /// the next member's read and a GroupDeferred funded.
-    uint256 internal constant DEFER_ALLOWANCE_GAS = 30_000;
+    uint256 public constant DEFER_ALLOWANCE_GAS = 30_000;
+    /// @dev Kept back from a trader member's exits on top of the reserve, so if they run out of gas the event's
+    /// market can still join its synced set: up to four cold or new keys on Somnia (epoch, flag, list length,
+    /// list entry).
+    uint256 public constant EXIT_MARK_GAS = 4 * COLD_KEY_GAS;
+    /// @dev Smallest subscription gas limits, so a member's exits always get a slot well above one venue order
+    /// (up to 7.7M gas on Hideki), and a theme member's several.
+    uint256 internal constant MIN_TRADER_GAS_LIMIT = 40_000_000;
+    uint256 internal constant MIN_THEME_GAS_LIMIT = 120_000_000;
     /// @dev Ceiling for a subscription's maxFeePerGas: handler fees come out of the balance that backs tanks.
     uint256 public constant MAX_FEE_PER_GAS = 100 gwei;
 
@@ -239,6 +250,10 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
     /// Theme (`ref` = themeId, `joinPools` empty): the hub manages every pool that is or becomes a leg of
     /// the theme while followed, sized from `p.allocation`, including a position the follower opened there
     /// by hand; use a dedicated wallet per source. The whole basket opens now, all legs or none.
+    /// If the handler ever runs out of gas on a follow's exits it latches the follow (pendingOf) until a paid
+    /// catchUp, resync or poke; unfollowing and following again also starts clean. With the minimum subscription
+    /// gas limits a single venue order (up to 7.7M gas on Hideki) fits a member's exits unless the handler reaches
+    /// it with barely its floor left, so in practice only exits needing many orders latch.
     function follow(SourceKind kind, uint256 ref, Policy calldata p, address[] calldata joinPools)
         external
         payable
@@ -348,21 +363,27 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
 
     /// @notice Equity-floor check. Below the floor the follow is paused and every synced position closed.
     /// A stop raised in the handler whose closes did not finish (see pendingOf) is finished here, on this
-    /// call's gas, whatever the floor says now.
+    /// call's gas, whatever the floor says now. Once a pass has run to the end (out of gas reverts it) the
+    /// follow is released from pendingOf; any position still open (dust the venue cannot take, or a market
+    /// it cannot price now) is reported with FlattenIncomplete.
     function poke(address follower) external nonReentrant {
         CopyEngine.Follow storage f = _active(follower);
-        bool closed;
         if (f.flattenPending) {
-            closed = CopyEngine.flatten(_books, _env(follower));
+            CopyEngine.flatten(_books, _env(follower));
         } else {
             uint256 floor = f.policy.equityFloor;
             if (floor == 0) return;
             (int256 equity,,,) = bank.getAccountHealth(follower);
             if (equity >= int256(floor)) return;
-            closed = CopyEngine.stop(_books, _env(follower), equity);
+            CopyEngine.stop(_books, _env(follower), equity);
         }
-        // every synced position is flat: no exit or close is left pending
-        if (closed && (f.exitPending || f.flattenPending)) (f.exitPending, f.flattenPending) = (false, false);
+        if (f.exitPending || f.flattenPending) {
+            address[] storage pools = _books.synced[follower];
+            for (uint256 i; i < pools.length; ++i) {
+                if (bank.getPosition(follower, pools[i]).size != 0) emit FlattenIncomplete(follower, pools[i]);
+            }
+            (f.exitPending, f.flattenPending) = (false, false);
+        }
     }
 
     /// @notice Subscribes a group again, with its relay and the current subParams, when the chain dropped its
@@ -440,7 +461,7 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
             // read before measuring, so a cold member slot is not paid out of the reserve
             address follower = members[i];
             uint256 reserve = gp.tailBase + (n - i) * gp.perDefer + DEFER_ALLOWANCE_GAS;
-            if (gasleft() < gp.floor + reserve) {
+            if (gasleft() < gp.floor + reserve + (d.theme ? 0 : EXIT_MARK_GAS)) {
                 emit GroupDeferred(sourceId, group, i);
                 return;
             }
@@ -462,8 +483,10 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
             return true;
         }
         uint256 start = gasleft();
+        // a trader member's exits keep back room to add the event's market to its synced set if they run out
+        uint256 exitSlot = start - reserve - (d.theme ? 0 : EXIT_MARK_GAS);
         bytes memory args = abi.encode(d.sourceId, follower, d.pool, d.size, d.legs, d.version);
-        (bool ok, bytes memory ret) = _phase(this.exitFromEvent.selector, args, start - reserve);
+        (bool ok, bytes memory ret) = _phase(this.exitFromEvent.selector, args, exitSlot);
         uint256 spent;
         bool reported = true;
         if (ok) {
@@ -473,9 +496,12 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
             if (!entered) return false;
             spent += entrySpent;
             reported = reported || entryActed;
-        } else if (_outOfGas(ret, start, start - reserve)) {
+        } else if (_outOfGas(ret, start, exitSlot)) {
             // never billed: a source must not drain tanks with exits too heavy to finish. Latched, so the next
-            // events skip the member instead of burning the handler on the same exits again.
+            // events skip the member instead of burning the handler on the same exits again. A trader's event
+            // market joins its synced set (an all-markets follow may not have it yet), so the catchUp that
+            // releases the latch runs this exit first.
+            if (!d.theme) CopyEngine._markSynced(_books, follower, d.pool);
             f.exitPending = true;
             emit Deferred(follower, d.sourceId);
             return true;
@@ -652,8 +678,8 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
     /// @notice Subscription settings for groups opened or subscribed again from now on (by a new member,
     /// ensureSubscribed or forceResubscribe); live subscriptions keep theirs. maxFeePerGas at most
     /// MAX_FEE_PER_GAS and at least the priority fee plus Somnia's 6 gwei base fee: handler fees come out of
-    /// the balance that backs the tanks. Each gas limit at most 200M and enough for the handler's floor and
-    /// tail reserve (see gasParams).
+    /// the balance that backs the tanks. Each gas limit at most 200M, at least 40M (trader) or 120M (theme) so a
+    /// member's exits always fit, and enough for the handler's floor and tail reserve (see gasParams).
     function setSubParams(
         uint64 priorityFeePerGas,
         uint64 maxFeePerGas,
@@ -665,8 +691,8 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
             revert InvalidParam(2);
         }
         if (priorityFeePerGas > maxFeePerGas - MIN_CHARGE_GAS_PRICE) revert InvalidParam(1);
-        if (traderGasLimit > MAX_HANDLER_GAS) revert InvalidParam(3);
-        if (themeGasLimit > MAX_HANDLER_GAS) revert InvalidParam(4);
+        if (traderGasLimit < MIN_TRADER_GAS_LIMIT || traderGasLimit > MAX_HANDLER_GAS) revert InvalidParam(3);
+        if (themeGasLimit < MIN_THEME_GAS_LIMIT || themeGasLimit > MAX_HANDLER_GAS) revert InvalidParam(4);
         GasParams memory gp = gasParams;
         _checkFits(gp.floor, gp.tailBase, gp.perDefer, traderGasLimit, themeGasLimit);
         subParams = SubParams(priorityFeePerGas, maxFeePerGas, traderGasLimit, themeGasLimit, guaranteed);

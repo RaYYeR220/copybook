@@ -738,7 +738,7 @@ contract HubAuditTest is Base {
         uint256 latched;
         uint256 mateDeferred;
         uint256 snap = vm.snapshotState();
-        for (uint256 gas = 2_000_000; gas <= 4_500_000; gas += 25_000) {
+        for (uint256 gas = 6_000_000; gas <= 8_500_000; gas += 25_000) {
             vm.recordLogs();
             assertTrue(_deliverHub(hub.subscriptionOf(sid, 0), address(bank), _topics(trader, address(btc)), gas));
             Vm.Log[] memory logs = vm.getRecordedLogs();
@@ -752,6 +752,173 @@ contract HubAuditTest is Base {
         }
         assertGt(latched, 0, "the exit ran out of gas and latched");
         assertGt(mateDeferred, 0, "with the member behind it deferred from the reserve");
+    }
+
+    // ================================================================== R37-R39: latches on an all-markets follow
+
+    // Poc7c A. Before: an all-markets follow's exit on a market it never synced (a manual position) latched, and an
+    // empty catchUp released it without the exit, so every event burnt the handler again and deferred the mate.
+    // Now the event's market joins the synced set with the latch: the catchUp that releases it runs the close
+    // first, and while that close cannot run the latch holds and the mate is copied.
+    function test_allowAllUnsynced_latchHoldsUntilTheClose() public {
+        address mate = address(0xF022);
+        _followTrader(follower, new address[](0)); // all markets
+        _followTrader(mate, _one(address(btc)));
+        btc.approve(follower, address(this));
+        _move(btc, follower, -20_000); // by hand: never synced
+        assertEq(hub.syncedPools(follower).length, 0);
+        btc.setBombFor(follower, true); // any btc order of the follower burns all it gets
+        vm.fee(6 gwei);
+        uint256 tank0 = hub.tankOf(follower);
+        for (uint256 k; k < 3; ++k) {
+            _move(btc, trader, int256(50_000 + k * 13_000));
+            vm.recordLogs();
+            uint256 g0 = gasleft();
+            assertTrue(
+                _deliverHub(hub.subscriptionOf(sid, 0), address(bank), _topics(trader, address(btc)), HANDLER_GAS)
+            );
+            uint256 used = g0 - gasleft();
+            Vm.Log[] memory logs = vm.getRecordedLogs();
+            (bool ep,) = _pending(follower);
+            assertTrue(ep, "latched");
+            assertEq(_count(logs, CopybookHub.Deferred.selector, follower), 1);
+            if (k == 0) {
+                assertEq(_groupDeferred(logs), 1, "the first round spends the budget once");
+                address[] memory synced = hub.syncedPools(follower);
+                assertEq(synced.length, 1, "the event's market joined the synced set");
+                assertEq(synced[0], address(btc));
+            } else {
+                assertEq(_groupDeferred(logs), 0, "the mate is not deferred");
+                assertLt(used, 2_000_000, "no budget burnt");
+            }
+            // an empty catchUp must run that close before releasing: it still runs out of gas, so it reverts
+            vm.prank(follower);
+            vm.expectRevert(CopybookHub.OutOfGasInSync.selector);
+            hub.catchUp{gas: 30_000_000}(follower, new address[](0));
+            (ep,) = _pending(follower);
+            assertTrue(ep, "still latched");
+            assertEq(_size(address(btc), follower), -20_000);
+        }
+        assertEq(hub.tankOf(follower), tank0, "never billed");
+        assertEq(_size(address(btc), mate), 76_000, "the mate is copied");
+
+        // the venue recovers: the same empty catchUp closes, follows the source, then releases
+        btc.setBombFor(follower, false);
+        vm.prank(follower);
+        hub.catchUp(follower, new address[](0));
+        (bool pending,) = _pending(follower);
+        assertFalse(pending);
+        assertEq(_size(address(btc), follower), 76_000);
+    }
+
+    // Poc7c A2. Before: with the source flat, even a keeper naming the market released the latch without the
+    // exit (the market was neither synced nor held by the source). Now the close runs first.
+    function test_allowAllSourceFlat_catchUpClosesBeforeRelease() public {
+        _move(btc, trader, 50_000);
+        _followTrader(follower, new address[](0));
+        btc.approve(follower, address(this));
+        _move(btc, follower, -20_000);
+        _move(btc, trader, 0);
+        btc.setBombFor(follower, true);
+        assertTrue(_deliverHub(hub.subscriptionOf(sid, 0), address(bank), _topics(trader, address(btc)), HANDLER_GAS));
+        (bool ep,) = _pending(follower);
+        assertTrue(ep);
+        btc.setBombFor(follower, false); // the close is cheap now
+        vm.prank(stranger);
+        hub.catchUp(follower, _one(address(btc)));
+        (ep,) = _pending(follower);
+        assertFalse(ep);
+        assertEq(_size(address(btc), follower), 0, "the exit the latch stood for ran first");
+    }
+
+    // Poc7c B (R38). Before: a stop's closes that left dust the venue cannot take kept flattenPending forever:
+    // resume reverted for good and the handler skipped the follow for good. Now poke's completed pass releases
+    // the follow and reports the residue.
+    function test_flattenPendingDust_releasedAndReported() public {
+        _followTrader(follower, _one(address(btc)));
+        _move(btc, trader, 50_000);
+        hub.catchUp(follower, _one(address(btc)));
+        Policy memory p = _policy();
+        p.equityFloor = 2_000e18;
+        bank.setEquity(follower, 1_000e18);
+        vm.prank(follower);
+        hub.updatePolicy(p);
+
+        // the stop's closes run out of gas in the handler
+        btc.setBombFor(follower, true);
+        _move(btc, trader, 63_000);
+        assertTrue(_deliverHub(hub.subscriptionOf(sid, 0), address(bank), _topics(trader, address(btc)), HANDLER_GAS));
+        (, bool fp) = _pending(follower);
+        assertTrue(fp);
+        btc.setBombFor(follower, false);
+
+        // poke's IOC close meets thin bids: 45_500 fills, 4_500 stays (below the 13_000 venue minimum)
+        btc.setLiquidity(45_500, 10_000_000, 10);
+        vm.expectEmit(true, true, false, true, address(hub));
+        emit CopybookHub.FlattenIncomplete(follower, address(btc));
+        vm.prank(stranger);
+        hub.poke(follower);
+        assertEq(_size(address(btc), follower), 4_500);
+        bool ep;
+        (ep, fp) = _pending(follower);
+        assertFalse(fp, "released");
+        assertFalse(ep);
+
+        // equity back: resume works, and the handler takes the follow back
+        btc.setLiquidity(10_000_000, 10_000_000, 10);
+        bank.setEquity(follower, 5_000e18);
+        vm.prank(follower);
+        hub.resume();
+        _move(btc, trader, 80_000);
+        vm.recordLogs();
+        assertTrue(_deliverHub(hub.subscriptionOf(sid, 0), address(bank), _topics(trader, address(btc)), HANDLER_GAS));
+        assertEq(_count(vm.getRecordedLogs(), CopybookHub.Deferred.selector, follower), 0);
+        assertGt(_size(address(btc), follower), 4_500);
+    }
+
+    // Poc7c A3, documented residual (R39). Unfollowing and following again starts a follow clean, so it could
+    // re-arm a latched all-markets follow; but with the subscription gas limits at their minimum (40M for traders)
+    // or default (200M), a single venue order at Hideki's heaviest (7.7M gas) always fits a member's exits, so
+    // such an exit never latches. (Pools are venue-registered, R24, so no order is heavier.)
+    function test_singleVenueOrderExit_neverLatches() public {
+        HeavyPerpPool a = _heavy(0);
+        address mate = address(0xF022);
+        vm.deal(mate, 2 ether);
+        a.approve(mate, address(hub));
+        vm.prank(mate);
+        hub.follow{value: 1 ether}(SourceKind.Trader, uint256(uint160(trader)), _policy(), _one(address(a)));
+        vm.deal(follower, 10 ether);
+        a.approve(follower, address(hub));
+        a.approve(follower, address(this));
+        vm.prank(follower);
+        hub.follow{value: 1 ether}(SourceKind.Trader, uint256(uint160(trader)), _policy(), new address[](0));
+        // the follower's own short on A, by hand
+        a.placeOrderFor(follower, false, 0, 70_000e18, 20_000, type(uint64).max, 2, 0, address(0), 0);
+        assertEq(_size(address(a), follower), -20_000);
+
+        uint256 snap = vm.snapshotState();
+        uint256[2] memory budgets = [uint256(40_000_000), HANDLER_GAS];
+        for (uint256 b; b < 2; ++b) {
+            for (uint256 k; k < 3; ++k) {
+                // the source flips every round, so the follower's exits close a position each time
+                a.setBurn(0);
+                _heavyTrade(a, k % 2 == 0, k == 0 ? 50_000 : 100_000);
+                a.setBurn(7_700_000);
+                assertTrue(
+                    _deliverHub(hub.subscriptionOf(sid, 0), address(bank), _topics(trader, address(a)), budgets[b])
+                );
+                (bool ep, bool fp) = _pending(follower);
+                assertFalse(ep, "a single order's exit never latches");
+                assertFalse(fp);
+                assertEq(_size(address(a), follower), k % 2 == 0 ? int256(50_000) : int256(-50_000));
+                // and a refollow (what would re-arm a latch) changes nothing here
+                vm.startPrank(follower);
+                hub.unfollow(false);
+                hub.follow{value: 0.2 ether}(SourceKind.Trader, uint256(uint160(trader)), _policy(), new address[](0));
+                vm.stopPrank();
+            }
+            vm.revertToState(snap);
+        }
     }
 
     // ================================================================== R34: only the hub's own subscription

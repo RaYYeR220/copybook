@@ -116,7 +116,7 @@ contract HubReactiveGasTest is Base {
         // with every member after it, unbilled
         vm.recordLogs();
         uint256 used;
-        (ok, used) = _fire(12_000_000, ev);
+        (ok, used) = _fire(16_000_000, ev); // room for the trader exit hold too
         logs = vm.getRecordedLogs();
         assertTrue(ok, "handler survives");
         assertGt(used, 8_000_000, "member #0 spent its slot");
@@ -144,7 +144,7 @@ contract HubReactiveGasTest is Base {
 
         vm.recordLogs();
         uint256 used;
-        (ok, used) = _fire(14_000_000, ev);
+        (ok, used) = _fire(18_000_000, ev); // room for the trader exit hold too
         logs = vm.getRecordedLogs();
         assertTrue(ok, "one member's out-of-gas does not abort the handler");
         assertGt(used, 8_000_000, "member #0 spent its slot");
@@ -180,7 +180,7 @@ contract HubReactiveGasTest is Base {
         _setup(64, 64);
         Vm.Log memory ev = _traderEvent();
         vm.recordLogs();
-        (bool ok,) = _fire(14_000_000, ev);
+        (bool ok,) = _fire(18_000_000, ev); // room for the trader exit hold too
         Vm.Log[] memory logs = vm.getRecordedLogs();
         assertTrue(ok);
         uint256 copied = _count(logs, CopybookHub.Copied.selector);

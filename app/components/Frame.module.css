@@ -1,0 +1,55 @@
+.frame {
+  position: relative;
+  max-width: 1280px;
+  margin: 0 auto;
+  border: 1px solid var(--hair-n2);
+  padding: 92px clamp(22px, 5.4vw, 80px) 84px;
+}
+
+.frame::after {
+  content: "";
+  position: absolute;
+  inset: 5px;
+  border: 1px solid var(--hair-n);
+  pointer-events: none;
+}
+
+.tab {
+  position: absolute;
+  top: -9px;
+  left: 44px;
+  z-index: 2;
+  background: var(--night-0);
+  padding: 0 14px;
+  font: 400 10.5px/18px var(--mono);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--night-4);
+}
+
+.tab b {
+  font-weight: 400;
+  color: var(--bone);
+}
+
+.end {
+  left: auto;
+  right: 44px;
+}
+
+@media (max-width: 760px) {
+  .frame {
+    padding: 64px 20px 56px;
+  }
+
+  .tab {
+    left: 20px;
+    font-size: 9.5px;
+    letter-spacing: 0.18em;
+    padding: 0 10px;
+  }
+
+  .end {
+    display: none;
+  }
+}

@@ -1,0 +1,59 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 26px;
+  padding: 0 11px;
+  border-radius: var(--r-pill);
+  font: 400 11px/1 var(--mono);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.badge svg {
+  width: 13px;
+  height: 13px;
+  flex: none;
+}
+
+.gold {
+  border: 1px solid var(--gold-line);
+  background: var(--gold-wash);
+  color: var(--gold);
+}
+
+:global(.dusk) .gold {
+  color: var(--gold-deep);
+}
+
+.refused {
+  border: 1px dashed var(--hair-n3);
+  color: var(--night-4);
+}
+
+.verdict {
+  border: 1px solid var(--hair-n3);
+  color: var(--bone);
+}
+
+.ext {
+  display: inline-flex;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--hair-2);
+  color: var(--fg-3);
+  font: 400 12px var(--mono);
+  transition:
+    color 0.3s var(--ease),
+    border-color 0.3s var(--ease);
+}
+
+.ext:hover {
+  color: var(--fg);
+  border-color: var(--hair-3);
+}

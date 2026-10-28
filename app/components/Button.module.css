@@ -1,0 +1,109 @@
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  border-radius: var(--r-pill);
+  border: 1px solid transparent;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background 0.3s var(--ease),
+    color 0.3s var(--ease),
+    border-color 0.3s var(--ease);
+}
+
+.btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.lg {
+  height: 54px;
+  padding: 0 28px 0 30px;
+  font: 600 16px/1 var(--body);
+  letter-spacing: -0.005em;
+}
+
+.md {
+  height: 40px;
+  padding: 0 20px;
+  gap: 8px;
+  font: 500 13.5px/1 var(--body);
+}
+
+.arrow {
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
+
+.md .arrow {
+  width: 14px;
+  height: 14px;
+}
+
+/* primary · night: gold fill */
+.primary {
+  background: var(--gold);
+  border-color: var(--gold);
+  color: var(--gold-ink);
+}
+
+.md.primary {
+  font-weight: 600;
+}
+
+.primary:hover:not(:disabled) {
+  background: transparent;
+  color: var(--mark);
+}
+
+/* primary · dusk: ink fill, gold arrow */
+:global(.dusk) .primary {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--dusk-0);
+}
+
+:global(.dusk) .primary .arrow {
+  color: var(--gold);
+}
+
+:global(.dusk) .primary:hover:not(:disabled) {
+  background: transparent;
+  color: var(--ink);
+}
+
+/* secondary: outlined, fills on hover */
+.secondary {
+  border-color: var(--fg);
+  color: var(--fg);
+}
+
+.secondary:hover:not(:disabled) {
+  background: var(--fg);
+  color: var(--night-0);
+}
+
+:global(.dusk) .secondary:hover:not(:disabled) {
+  color: var(--dusk-0);
+}
+
+/* quiet: a hairline pill */
+.quiet {
+  border-color: var(--hair-2);
+  color: var(--fg-3);
+}
+
+.quiet:hover:not(:disabled) {
+  border-color: var(--hair-3);
+  color: var(--fg);
+}
+
+@media (max-width: 760px) {
+  .lg {
+    height: 52px;
+    padding: 0 26px;
+  }
+}

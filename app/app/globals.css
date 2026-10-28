@@ -1,0 +1,319 @@
+/* Copybook · "Dusk to night". Tokens, base, texture floor, motion and the type primitives every page shares. */
+
+:root {
+  /* dusk */
+  --dusk-0: #faf4ee;
+  --dusk-1: #f2e8df;
+  --dusk-2: #e6d6cc;
+  --dusk-3: #b39c97;
+  --apricot: #f6d2b8;
+  --mauve: #ebc9d0;
+  --ink: #2a2124;
+  --ink-2: #55474a;
+  --ink-3: #74645f;
+
+  /* night */
+  --night-0: #0c0b09;
+  --night-1: #15130f;
+  --night-2: #221f19;
+  --night-3: #5d564a;
+  --night-4: #a79e8a;
+  --bone: #e6dfcc;
+  --bone-2: #cfc7b3;
+
+  /* the one accent: the last light at dusk, the meridian at night */
+  --gold: #caa063;
+  --gold-deep: #835e22;
+  --gold-ink: #1a140c;
+  --gold-wash: rgba(202, 160, 99, 0.08);
+  --gold-line: rgba(202, 160, 99, 0.55);
+
+  /* hairlines */
+  --hair-d: rgba(42, 33, 36, 0.1);
+  --hair-d2: rgba(42, 33, 36, 0.17);
+  --wire: rgba(42, 33, 36, 0.38);
+  --hair-n: rgba(230, 223, 204, 0.09);
+  --hair-n2: rgba(230, 223, 204, 0.17);
+  --hair-n3: rgba(230, 223, 204, 0.3);
+
+  /* shadcn-style contract (the app lives at night) */
+  --background: var(--night-0);
+  --foreground: var(--bone);
+  --card: rgba(12, 11, 9, 0.55);
+  --card-foreground: var(--bone);
+  --primary: var(--gold);
+  --primary-foreground: var(--gold-ink);
+  --muted: var(--night-1);
+  --muted-foreground: var(--night-4);
+  --accent: var(--night-2);
+  --accent-foreground: var(--bone);
+  --destructive: var(--bone); /* refusals are shape-coded, never red */
+  --border: var(--hair-n2);
+  --input: var(--hair-n2);
+  --ring: var(--gold);
+  --radius: 0px;
+
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --r-0: 0;
+  --r-pill: 999px;
+  --display: var(--font-fraunces), Georgia, serif;
+  --body: var(--font-figtree), system-ui, sans-serif;
+  --mono: var(--font-fragment-mono), ui-monospace, monospace;
+  --gut: clamp(16px, 4.4vw, 64px);
+
+  /* tone defaults to night; .dusk re-reads the same roles */
+  --fg: var(--bone);
+  --fg-2: var(--bone-2);
+  --fg-3: var(--night-4);
+  --hair: var(--hair-n);
+  --hair-2: var(--hair-n2);
+  --hair-3: var(--hair-n3);
+  --mark: var(--gold);
+  --soft: 0;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  background: var(--night-0);
+  -webkit-text-size-adjust: 100%;
+  color-scheme: dark;
+}
+
+body {
+  min-height: 100svh;
+  background: var(--night-0);
+  color: var(--bone);
+  font: 400 16px/1.6 var(--body);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  color: inherit;
+  font: inherit;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+ul,
+ol {
+  list-style: none;
+}
+
+:focus-visible {
+  outline: 1px solid var(--gold);
+  outline-offset: 5px;
+  border-radius: var(--r-pill);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.mono {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- tone: the same tokens, read at dusk and at night ---------- */
+.dusk {
+  --fg: var(--ink);
+  --fg-2: var(--ink-2);
+  --fg-3: var(--ink-3);
+  --hair: var(--hair-d);
+  --hair-2: var(--hair-d2);
+  --hair-3: var(--wire);
+  --mark: var(--gold-deep);
+  --soft: 100;
+  color: var(--ink);
+}
+
+.night {
+  --fg: var(--bone);
+  --fg-2: var(--bone-2);
+  --fg-3: var(--night-4);
+  --hair: var(--hair-n);
+  --hair-2: var(--hair-n2);
+  --hair-3: var(--hair-n3);
+  --mark: var(--gold);
+  --soft: 0;
+  color: var(--bone);
+}
+
+/* ---------- texture floor: grain, pools, 64px grid ---------- */
+.grain {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-size: 180px 180px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* dusk grain multiplies, night grain screens */
+.grain-dusk {
+  opacity: 0.075;
+  mix-blend-mode: multiply;
+}
+
+.grain-night {
+  opacity: 0.055;
+  mix-blend-mode: screen;
+}
+
+.tex {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* the 64px pitch: telegraph wires at dusk */
+.wires {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: repeating-linear-gradient(180deg, transparent 0 63px, rgba(42, 33, 36, 0.068) 63px 64px);
+}
+
+/* … and star-chart registration dots at night */
+.dots {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: radial-gradient(circle at 1px 1px, rgba(230, 223, 204, 0.12) 1px, transparent 1.6px);
+  background-size: 64px 64px;
+  background-position: 32px 20px;
+}
+
+/* ---------- entrance, reveal and the failsafe ---------- */
+/* .rise plays on load; .reveal waits for the observer to add .in. Either way, everything is visible by 3.5 s. */
+.rise {
+  animation:
+    rise 0.8s var(--ease) var(--d, 0s) both,
+    failsafe 0s 3.5s forwards;
+}
+
+.reveal {
+  opacity: 0;
+  transform: translateY(18px);
+  animation: failsafe 0s 3.5s forwards;
+}
+
+.reveal.in {
+  animation: rise 0.8s var(--ease) var(--d, 0s) both;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes failsafe {
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ---------- type primitives ---------- */
+.kicker {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font: 400 11.5px/1 var(--mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--fg-2);
+}
+
+.kicker svg {
+  width: 14px;
+  height: 7px;
+  flex: none;
+  overflow: visible;
+}
+
+.h2 {
+  margin-top: 20px;
+  font: 560 clamp(38px, 4.6vw, 66px) / 1 var(--display);
+  font-variation-settings:
+    "opsz" 144,
+    "SOFT" var(--soft);
+  letter-spacing: -0.04em;
+  color: var(--fg);
+}
+
+.h3 {
+  font: 560 26px/1.12 var(--display);
+  font-variation-settings:
+    "opsz" 72,
+    "SOFT" var(--soft);
+  letter-spacing: -0.025em;
+  color: var(--fg);
+}
+
+.h2 em,
+.h3 em,
+h1 em {
+  font-style: italic;
+  font-weight: 500;
+}
+
+.lead {
+  margin-top: 20px;
+  max-width: 35em;
+  font-size: 17.5px;
+  line-height: 1.6;
+  color: var(--fg-2);
+}
+
+.lnk {
+  color: var(--fg);
+  border-bottom: 1px solid var(--hair-2);
+  padding-bottom: 2px;
+  transition: border-color 0.25s var(--ease);
+}
+
+.lnk:hover {
+  border-color: var(--fg);
+}
+
+/* ---------- reduced motion: no entrances, no reveals, no transitions ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .rise,
+  .reveal,
+  .reveal.in {
+    animation: none !important;
+    opacity: 1;
+    transform: none;
+  }
+
+  *,
+  *::before,
+  *::after {
+    transition: none !important;
+  }
+}

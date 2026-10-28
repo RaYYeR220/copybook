@@ -1,0 +1,57 @@
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: var(--r-pill);
+  border: 1px dashed var(--hair-n3);
+  color: var(--bone);
+  white-space: nowrap;
+}
+
+.chip::before {
+  content: "";
+  border-radius: 50%;
+  border: 1px dashed var(--bone);
+  opacity: 0.8;
+}
+
+.md {
+  height: 26px;
+  padding: 0 11px;
+  font: 400 11.5px/1 var(--mono);
+}
+
+.md::before {
+  width: 7px;
+  height: 7px;
+}
+
+.sm {
+  height: 24px;
+  padding: 0 10px;
+  font: 400 11px/1 var(--mono);
+}
+
+.sm::before {
+  width: 6px;
+  height: 6px;
+}
+
+.ai {
+  border-style: solid;
+  border-color: var(--gold-line);
+}
+
+.ai::before {
+  border-style: solid;
+  border-color: var(--gold);
+}
+
+.zero {
+  color: var(--night-4);
+  border-color: var(--hair-n2);
+}
+
+.zero::before {
+  border-color: var(--night-3);
+}

@@ -12,10 +12,14 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@copybook/sdk": "*",
     "@copybook/stats": "*",
+    "@tanstack/react-query": "5.104.3",
     "next": "15.5.28",
     "react": "19.1.1",
-    "react-dom": "19.1.1"
+    "react-dom": "19.1.1",
+    "viem": "2.57.12",
+    "wagmi": "2.19.5"
   },
   "devDependencies": {
     "@types/node": "24.10.1",

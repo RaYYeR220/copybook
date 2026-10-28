@@ -1,0 +1,32 @@
+.row {
+  display: flex;
+  gap: 30px;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.end {
+  margin-left: auto;
+  text-align: right;
+}
+
+.label {
+  font: 400 11px var(--mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fg-3);
+}
+
+.value {
+  font: 560 22px/1 var(--display);
+  font-variation-settings: "opsz" 48, "SOFT" var(--soft);
+  letter-spacing: -0.02em;
+  color: var(--fg);
+  font-variant-numeric: tabular-nums;
+}

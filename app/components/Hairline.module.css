@@ -1,0 +1,17 @@
+.rule {
+  border: 0;
+  height: 1px;
+  width: 100%;
+}
+
+.s1 {
+  background: var(--hair);
+}
+
+.s2 {
+  background: var(--hair-2);
+}
+
+.s3 {
+  background: var(--hair-3);
+}

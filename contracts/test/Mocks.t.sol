@@ -88,7 +88,7 @@ contract MocksTest is Base {
 
     function test_fokRevertsWhenDepthShort() public {
         _seedLiquidity(btc, 20_000, 10);
-        vm.expectRevert(MockPerpPool.FillOrKillNotFilled.selector);
+        vm.expectRevert(MockPerpPool.FillOrKillNotFillable.selector);
         _order(btc, true, BID_PRICE, 30_000, 1);
         _order(btc, true, BID_PRICE, 20_000, 1);
         assertEq(bank.getPosition(user, address(btc)).size, 20_000);

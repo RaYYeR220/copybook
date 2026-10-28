@@ -15,7 +15,7 @@ contract HeavyPerpPool is IPerpPool {
     error InvalidQuantity();
     error InvalidPrice();
     error ImmediateOrCancelNoFill();
-    error FillOrKillNotFilled();
+    error FillOrKillNotFillable();
 
     MockMarginBank public immutable bank;
     uint256 public mark;
@@ -115,7 +115,7 @@ contract HeavyPerpPool is IPerpPool {
             if (price <= mark * (1e4 - edgeBps) / 1e4) filled = quantity < bidDepth ? quantity : bidDepth;
             bidDepth -= filled;
         }
-        if (orderType == 1 && filled != quantity) revert FillOrKillNotFilled();
+        if (orderType == 1 && filled != quantity) revert FillOrKillNotFillable();
         if (orderType == 2 && filled == 0) revert ImmediateOrCancelNoFill();
         if (filled > 0) {
             int256 d = isBid ? int256(filled) : -int256(filled);

@@ -117,7 +117,7 @@ library CopyEngine {
     uint8 internal constant FOK = 1;
     uint8 internal constant IOC = 2;
     bytes4 internal constant IOC_NO_FILL = 0xd48c4403; // ImmediateOrCancelNoFill()
-    bytes4 internal constant FOK_NO_FILL = 0xcd74c9c8; // FillOrKillNotFilled()
+    bytes4 internal constant FOK_NO_FILL = 0xc04ad919; // FillOrKillNotFillable()
 
     // ---------------------------------------------------------------- entry points (delegatecall)
 

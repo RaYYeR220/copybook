@@ -217,7 +217,7 @@ contract HubThemeTest is Base {
     }
 
     function _fok() internal pure returns (bytes memory) {
-        return abi.encodeWithSelector(MockPerpPool.FillOrKillNotFilled.selector);
+        return abi.encodeWithSelector(MockPerpPool.FillOrKillNotFillable.selector);
     }
 
     // ---------- follow ----------

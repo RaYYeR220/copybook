@@ -10,7 +10,7 @@ contract MockPerpPool is IPerpPool {
     error InvalidQuantity();
     error InvalidPrice();
     error ImmediateOrCancelNoFill();
-    error FillOrKillNotFilled();
+    error FillOrKillNotFillable();
 
     event MockFill(address owner, bool isBid, uint256 qty, uint256 price);
 
@@ -121,7 +121,7 @@ contract MockPerpPool is IPerpPool {
             bidDepth -= filled;
         }
 
-        if (orderType == 1 && filled != quantity) revert FillOrKillNotFilled();
+        if (orderType == 1 && filled != quantity) revert FillOrKillNotFillable();
         if (orderType == 2 && filled == 0) revert ImmediateOrCancelNoFill();
 
         if (filled > 0) {

@@ -444,7 +444,7 @@ contract HubFollowTest is Base {
             sid,
             address(btc),
             Reason.BandUnfilled,
-            abi.encodeWithSelector(MockPerpPool.FillOrKillNotFilled.selector)
+            abi.encodeWithSelector(MockPerpPool.FillOrKillNotFillable.selector)
         );
         _follow(follower, _policy(), _one(btc));
         assertEq(_size(btc, follower), 0);
@@ -650,6 +650,19 @@ contract HubFollowTest is Base {
         hub.catchUp(follower, _one(btc));
         assertEq(_size(btc, follower), 0);
         vm.clearMockedCalls();
+    }
+
+    /// @dev dreamDEX on Hideki reverts an unfillable fill-or-kill with FillOrKillNotFillable() (0xc04ad919).
+    function test_liveFokNoFillSelector_isBandUnfilled() public {
+        bytes memory err = hex"c04ad919";
+        assertEq(bytes4(err), MockPerpPool.FillOrKillNotFillable.selector);
+        _follow(follower, _policy(), _none());
+        _traderTo(btc, 50_000);
+        btc.setRevertFor(follower, err);
+        vm.expectEmit(true, true, true, true, address(hub));
+        emit CopybookHub.Refused(follower, sid, address(btc), Reason.BandUnfilled, err);
+        hub.catchUp(follower, _one(btc));
+        assertEq(_size(btc, follower), 0);
     }
 
     function test_venueRevert_reportedWithBytes() public {

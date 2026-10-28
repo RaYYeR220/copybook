@@ -1,0 +1,39 @@
+.wrap {
+  margin: 14px 20px 0;
+}
+
+.fig {
+  font: 560 20px/1 var(--display);
+  font-variation-settings: "opsz" 48, "SOFT" 0;
+  letter-spacing: -0.015em;
+  color: var(--bone);
+}
+
+.rubric {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--hair);
+  font: 400 11px/1.5 var(--mono);
+  color: var(--night-4);
+}
+
+.rubric span:first-child {
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.rubric code {
+  font: 400 12px/1.5 var(--mono);
+  color: var(--bone-2);
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 720px) {
+  .wrap {
+    margin: 12px 16px 0;
+  }
+}

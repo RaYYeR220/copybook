@@ -1,0 +1,249 @@
+.body {
+  padding: 16px 20px 18px;
+}
+
+.vrow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.vbig {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.vglyph {
+  width: 30px;
+  height: 30px;
+  flex: none;
+}
+
+.vnone {
+  width: 28px;
+  height: 28px;
+  flex: none;
+  border-radius: 50%;
+  border: 1px dashed var(--night-4);
+}
+
+.vbig b {
+  display: block;
+  font: 560 34px/1 var(--display);
+  font-variation-settings: "opsz" 72, "SOFT" 0;
+  letter-spacing: -0.02em;
+  color: var(--bone);
+}
+
+/* CAUTION is the one verdict set in gold */
+.vbig.gold b {
+  color: var(--gold);
+}
+
+.vbig small {
+  display: block;
+  margin-top: 5px;
+  font: 400 11px var(--mono);
+  letter-spacing: 0.04em;
+  color: var(--night-4);
+}
+
+.vmeta {
+  text-align: right;
+  font: 400 11px/1.6 var(--mono);
+  color: var(--night-4);
+}
+
+.vmeta b {
+  font-weight: 400;
+  color: var(--bone);
+}
+
+/* verdict history: readings on one engraved line */
+.hist {
+  margin-top: 18px;
+}
+
+.rule {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  list-style: none;
+}
+
+ol.rule::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 7px;
+  height: 1px;
+  background: rgba(230, 223, 204, 0.22);
+}
+
+ol.rule::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 4px;
+  height: 7px;
+  background: repeating-linear-gradient(90deg, rgba(230, 223, 204, 0.18) 0 1px, transparent 1px 16px);
+  pointer-events: none;
+}
+
+ol.rule li {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+ol.rule li:first-child {
+  align-items: flex-start;
+}
+
+ol.rule li:last-child {
+  align-items: flex-end;
+}
+
+.dot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: var(--night-0);
+}
+
+.dot svg {
+  width: 14px;
+  height: 14px;
+}
+
+ol.rule li a {
+  display: flex;
+  flex-direction: column;
+  align-items: inherit;
+  gap: 2px;
+  font: 400 10px/1.3 var(--mono);
+  color: var(--night-4);
+  text-align: center;
+  white-space: nowrap;
+}
+
+ol.rule li a b {
+  font-weight: 400;
+  letter-spacing: 0.08em;
+  color: var(--bone);
+}
+
+ol.rule li.caution a b {
+  color: var(--gold);
+}
+
+ol.rule li.held .dot {
+  opacity: 0.55;
+}
+
+ol.rule li.held a b {
+  color: var(--night-4);
+}
+
+ol.rule li a:hover b {
+  border-bottom: 1px solid var(--hair-3);
+}
+
+.histNote {
+  margin-top: 10px;
+  font: 400 11px/1.5 var(--mono);
+  color: var(--night-4);
+}
+
+.ledger {
+  margin-top: 16px;
+}
+
+.law {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--hair);
+  font: 400 13px/1.5 var(--body);
+  color: var(--bone-2);
+}
+
+.law b {
+  font-weight: 500;
+  color: var(--bone);
+}
+
+/* ask the validators */
+.ask {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--hair);
+}
+
+.askLead {
+  font: 400 13px/1.55 var(--body);
+  color: var(--bone-2);
+}
+
+.askLead b {
+  font-weight: 500;
+  color: var(--bone);
+}
+
+.askNote {
+  margin-top: 10px;
+  padding-left: 12px;
+  border-left: 1px solid var(--gold-line);
+  font: 400 12px/1.55 var(--mono);
+  color: var(--bone-2);
+}
+
+.askRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.askHint {
+  font: 400 11.5px var(--mono);
+  color: var(--night-4);
+}
+
+@media (max-width: 720px) {
+  .body {
+    padding: 14px 16px 16px;
+  }
+
+  .vrow {
+    flex-wrap: wrap;
+  }
+
+  .vmeta {
+    text-align: left;
+  }
+
+  .vmeta br {
+    display: none;
+  }
+
+  .vbig b {
+    font-size: 30px;
+  }
+
+  ol.rule li a span {
+    font-size: 9px;
+  }
+}

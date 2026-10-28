@@ -51,6 +51,7 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
     error GasLimitTooLow();
     error NotOwnSubscription();
     error RenounceDisabled();
+    error FlattenPending();
 
     event Followed(address indexed follower, bytes32 indexed sourceId, SourceKind kind, uint256 ref);
     event Unfollowed(address indexed follower, bytes32 indexed sourceId, bool flattened);
@@ -106,8 +107,8 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
     /// @dev Gas budget of a group handler. Each member runs its exits in one self-call on everything above
     /// the reserve, then its increases in a second one of at least `floor` and at most `perFollowerCap`
     /// (`themePerFollowerCap` for a theme member, which syncs every leg). The handler always keeps
-    /// `tailBase + perDefer * remainingMembers` back so it can still report the rest of the group as
-    /// deferred. Each member is billed its measured gas plus `chargeOverhead` for the shared work around it
+    /// `tailBase + perDefer * remainingMembers` (plus a fixed allowance for one Deferred and its latch) back so
+    /// it can still report the rest of the group as deferred. Each member is billed its measured gas plus `chargeOverhead` for the shared work around it
     /// (the tank write, a cold key on Somnia).
     struct GasParams {
         uint64 floor;
@@ -162,6 +163,11 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
     /// @dev Room a subscription's gas limit keeps above the handler's floor and tail reserve for its own
     /// dispatch and the event checks.
     uint256 internal constant HANDLER_MARGIN_GAS = 2_000_000;
+    /// @dev Smallest tailBase: a cold member read on Somnia plus the closing GroupDeferred.
+    uint256 internal constant MIN_TAIL_BASE = 1_100_000;
+    /// @dev Kept back on top of the reserve so a member Deferred (and latched) out of the reserve still leaves
+    /// the next member's read and a GroupDeferred funded.
+    uint256 internal constant DEFER_ALLOWANCE_GAS = 30_000;
     /// @dev Ceiling for a subscription's maxFeePerGas: handler fees come out of the balance that backs tanks.
     uint256 public constant MAX_FEE_PER_GAS = 100 gwei;
 
@@ -288,9 +294,11 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
         emit PolicyUpdated(msg.sender);
     }
 
-    /// @notice Lifts a stop. Allowed when the floor is off or equity is back at or above it.
+    /// @notice Lifts a stop. Allowed when the floor is off or equity is back at or above it, and never while
+    /// the stop's closes are still pending (poke finishes them).
     function resume() external {
         CopyEngine.Follow storage f = _active(msg.sender);
+        if (f.flattenPending) revert FlattenPending();
         uint256 floor = f.policy.equityFloor;
         if (floor != 0) {
             (int256 equity,,,) = bank.getAccountHealth(msg.sender);
@@ -323,20 +331,38 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
     /// the target always comes from the source, so a call can only move the follower toward it.
     /// A theme follow ignores `pools` and syncs the whole basket, and only when the theme has a version
     /// the follower's book does not match yet or its last sync did not finish; otherwise nothing happens.
+    /// When the handler ran out of gas on the follow's exits (see pendingOf), this call does them on its own
+    /// gas: the whole basket for a theme, every synced market for a trader. Then the handler takes the
+    /// follow back.
     function catchUp(address follower, address[] calldata pools) external nonReentrant {
         CopyEngine.Follow storage f = _active(follower);
-        if (f.kind == SourceKind.Theme) _syncThemeNow(follower, f, true);
-        else CopyEngine.syncPools(_books, _env(follower), pools);
+        bool pending = f.exitPending;
+        if (f.kind == SourceKind.Theme) {
+            _syncThemeNow(follower, f, !pending);
+        } else {
+            if (pending) CopyEngine.syncPools(_books, _env(follower), _books.synced[follower]);
+            CopyEngine.syncPools(_books, _env(follower), pools);
+        }
+        if (pending) f.exitPending = false;
     }
 
-    /// @notice Equity-floor check. Below the floor every synced position is closed and the follow paused.
+    /// @notice Equity-floor check. Below the floor the follow is paused and every synced position closed.
+    /// A stop raised in the handler whose closes did not finish (see pendingOf) is finished here, on this
+    /// call's gas, whatever the floor says now.
     function poke(address follower) external nonReentrant {
         CopyEngine.Follow storage f = _active(follower);
-        uint256 floor = f.policy.equityFloor;
-        if (floor == 0) return;
-        (int256 equity,,,) = bank.getAccountHealth(follower);
-        if (equity >= int256(floor)) return;
-        CopyEngine.stop(_books, _env(follower), equity);
+        bool closed;
+        if (f.flattenPending) {
+            closed = CopyEngine.flatten(_books, _env(follower));
+        } else {
+            uint256 floor = f.policy.equityFloor;
+            if (floor == 0) return;
+            (int256 equity,,,) = bank.getAccountHealth(follower);
+            if (equity >= int256(floor)) return;
+            closed = CopyEngine.stop(_books, _env(follower), equity);
+        }
+        // every synced position is flat: no exit or close is left pending
+        if (closed && (f.exitPending || f.flattenPending)) (f.exitPending, f.flattenPending) = (false, false);
     }
 
     /// @notice Subscribes a group again, with its relay and the current subParams, when the chain dropped its
@@ -362,9 +388,10 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
     /// never open what the source no longer holds.
     /// Each member runs in two self-calls (see GasParams), so one member's failure stays with it. First its
     /// exits, on everything above the reserve: they only reduce and stand whatever follows; if they run out
-    /// of gas the member is Deferred, unbilled. Then its increases in a bounded slot; an equity stop they
-    /// report is written here, before the closes it calls for, so the pause stands even if the closes run
-    /// out of gas (Deferred, that part unbilled). The handler always keeps enough back to stop cleanly with
+    /// of gas the member is Deferred, unbilled, and latched (pendingOf). Then its increases in a bounded slot;
+    /// an equity stop they report is written here, before the closes it calls for, so the pause stands even if
+    /// the closes run out of gas (Deferred, that part unbilled, latched). A latched member is skipped with a bare
+    /// Deferred until a caller's own catchUp, resync or poke finishes its work. The handler always keeps enough back to stop cleanly with
     /// GroupDeferred, the rest waiting for catchUp: when the next slot cannot be funded, or when a member's
     /// increases run out of gas in a slot the handler had to cut short; increases that run out of a full slot
     /// leave that member Deferred alone. Members pay their own gas from their tank. One with nothing to do is
@@ -412,7 +439,7 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
         for (uint256 i; i < n; ++i) {
             // read before measuring, so a cold member slot is not paid out of the reserve
             address follower = members[i];
-            uint256 reserve = gp.tailBase + (n - i) * gp.perDefer;
+            uint256 reserve = gp.tailBase + (n - i) * gp.perDefer + DEFER_ALLOWANCE_GAS;
             if (gasleft() < gp.floor + reserve) {
                 emit GroupDeferred(sourceId, group, i);
                 return;
@@ -427,6 +454,13 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
         internal
         returns (bool more)
     {
+        CopyEngine.Follow storage f = _books.follows[follower];
+        if (f.exitPending || f.flattenPending) {
+            // work the handler could not finish before waits for a caller's own transaction (catchUp, resync,
+            // poke): until then the member is left alone, without a venue read or a bill
+            emit Deferred(follower, d.sourceId);
+            return true;
+        }
         uint256 start = gasleft();
         bytes memory args = abi.encode(d.sourceId, follower, d.pool, d.size, d.legs, d.version);
         (bool ok, bytes memory ret) = _phase(this.exitFromEvent.selector, args, start - reserve);
@@ -440,7 +474,9 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
             spent += entrySpent;
             reported = reported || entryActed;
         } else if (_outOfGas(ret, start, start - reserve)) {
-            // never billed: a source must not drain tanks with exits too heavy to finish
+            // never billed: a source must not drain tanks with exits too heavy to finish. Latched, so the next
+            // events skip the member instead of burning the handler on the same exits again.
+            f.exitPending = true;
             emit Deferred(follower, d.sourceId);
             return true;
         } else {
@@ -551,6 +587,7 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
         CopyEngine.Follow storage f = _active(msg.sender);
         if (f.kind != SourceKind.Theme) revert NotThemeFollow();
         _syncThemeNow(msg.sender, f, false);
+        if (f.exitPending) f.exitPending = false;
     }
 
     // ---------------------------------------------------------------- views
@@ -581,6 +618,14 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
 
     function membersOf(bytes32 sourceId, uint32 group) external view returns (address[] memory) {
         return _members[sourceId][group];
+    }
+
+    /// @return exitPending the handler ran out of gas on the follow's exits; catchUp or resync finishes them
+    /// @return flattenPending a stop's closes did not finish in the handler; poke finishes them, and resume waits
+    /// for it. While either is set the handler skips the follow.
+    function pendingOf(address follower) external view returns (bool exitPending, bool flattenPending) {
+        CopyEngine.Follow storage f = _books.follows[follower];
+        return (f.exitPending, f.flattenPending);
     }
 
     /// @return group the follower's group of its source
@@ -629,7 +674,7 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
     }
 
     /// @notice The group handler's budget (see GasParams), used from the next event on. `floor` at least 1M;
-    /// both caps between `floor` and 200M; `tailBase` at least 1M (Somnia's cold-key cost, so the handler can
+    /// both caps between `floor` and 200M; `tailBase` at least 1.1M (Somnia's cold-key cost, so the handler can
     /// always report a deferral); `perDefer` at least 20k; `chargeOverhead` 20k..2M. The subscription gas
     /// limits in subParams must still fund the floor and the tail reserve.
     function setGasParams(
@@ -643,7 +688,7 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
         if (floor < MIN_SLOT_GAS) revert InvalidParam(1);
         if (perFollowerCap < floor || perFollowerCap > MAX_HANDLER_GAS) revert InvalidParam(2);
         if (themePerFollowerCap < floor || themePerFollowerCap > MAX_HANDLER_GAS) revert InvalidParam(3);
-        if (tailBase < COLD_KEY_GAS) revert InvalidParam(4);
+        if (tailBase < MIN_TAIL_BASE) revert InvalidParam(4);
         if (perDefer < MIN_PER_DEFER) revert InvalidParam(5);
         if (chargeOverhead < MIN_CHARGE_OVERHEAD || chargeOverhead > MAX_CHARGE_OVERHEAD) revert InvalidParam(6);
         SubParams memory s = subParams;
@@ -814,7 +859,8 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
 
     /// @dev An equity stop reported inside the handler. The pause is written here, in the handler's own frame,
     /// so it stands even if the closes run out of gas; the closes get everything above the reserve, and when
-    /// that is not enough the member is Deferred (that part unbilled) and poke finishes them.
+    /// that is not enough the member is Deferred (that part unbilled), latched in flattenPending, and poke finishes
+    /// them.
     /// @return spent the gas of the closes, to bill
     function _stopFromEvent(bytes32 sourceId, address follower, int256 equity, uint256 reserve)
         internal
@@ -830,10 +876,13 @@ contract CopybookHub is Ownable2Step, ReentrancyGuard {
                 address(this).call{gas: start - reserve}(abi.encodeCall(this.flattenFromEvent, (sourceId, follower)));
             if (ok) return start - gasleft();
             if (!_outOfGas(ret, start, start - reserve)) {
+                f.flattenPending = true;
                 emit Refused(follower, sourceId, address(0), Reason.VenueRejected, ret);
                 return start - gasleft();
             }
         }
+        // latched: the handler skips the member, and resume waits, until poke finishes the closes
+        f.flattenPending = true;
         emit Deferred(follower, sourceId);
     }
 

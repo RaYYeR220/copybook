@@ -494,6 +494,266 @@ contract HubAuditTest is Base {
         assertEq(_size(address(eth), follower), 0);
     }
 
+    // ================================================================== R35: latches for work the handler cannot finish
+
+    function _pending(address who) internal view returns (bool exitPending, bool flattenPending) {
+        return hub.pendingOf(who);
+    }
+
+    function _groupDeferred(Vm.Log[] memory logs) internal view returns (uint256 n) {
+        for (uint256 j; j < logs.length; ++j) {
+            if (logs[j].emitter == address(hub) && logs[j].topics[0] == CopybookHub.GroupDeferred.selector) n++;
+        }
+    }
+
+    // N-1 (exits): a creator's rebalance whose exits cost more than the whole handler. Before: every round
+    // burnt the handler budget on the same exits, unbilled, and GroupDeferred the co-member. Now the first
+    // round latches the member; later rounds skip it with a bare Deferred, and catchUp on the caller's gas
+    // finishes the exits and hands the follow back.
+    function test_exitOOG_latchesThenSkips() public {
+        HeavyPerpPool[] memory ps = new HeavyPerpPool[](8);
+        Leg[] memory legs = new Leg[](8);
+        for (uint256 i; i < 8; ++i) {
+            ps[i] = _heavy(0);
+            legs[i] = Leg(address(ps[i]), 1_000);
+        }
+        vm.prank(creator);
+        uint256 tid = themes.createTheme("basket", "", legs);
+        bytes32 tsid = hub.sourceIdOf(SourceKind.Theme, tid);
+        address mate = address(0xF099);
+        vm.deal(follower, 2 ether);
+        vm.deal(mate, 2 ether);
+        for (uint256 i; i < 8; ++i) {
+            ps[i].approve(follower, address(hub));
+            ps[i].approve(mate, address(hub));
+        }
+        vm.prank(follower);
+        hub.follow{value: 1 ether}(SourceKind.Theme, tid, _themePolicy(400e18), new address[](0));
+        vm.prank(mate);
+        hub.follow{value: 1 ether}(SourceKind.Theme, tid, _themePolicy(400e18), new address[](0));
+        for (uint256 i; i < 8; ++i) {
+            ps[i].setBurn(26_000_000);
+        }
+        bytes32[] memory topics = new bytes32[](2);
+        topics[0] = THEME_REBALANCED;
+        topics[1] = bytes32(tid);
+
+        vm.fee(6 gwei);
+        uint256 tank0 = hub.tankOf(follower);
+        uint256 mateTank0 = hub.tankOf(mate);
+        for (uint256 k; k < 4; ++k) {
+            for (uint256 i; i < 8; ++i) {
+                legs[i].weightBps = k % 2 == 0 ? int32(-1_000) : int32(-900);
+            }
+            vm.warp(block.timestamp + themes.MIN_REBALANCE_INTERVAL());
+            vm.prank(creator);
+            themes.rebalance(tid, legs);
+            vm.recordLogs();
+            uint256 g0 = gasleft();
+            assertTrue(_deliverHub(hub.subscriptionOf(tsid, 0), address(themes), topics, HANDLER_GAS));
+            uint256 used = g0 - gasleft();
+            Vm.Log[] memory logs = vm.getRecordedLogs();
+            assertEq(_count(logs, CopybookHub.Deferred.selector, follower), 1);
+            if (k == 0) {
+                assertEq(_groupDeferred(logs), 1, "the first round spends the budget once");
+            } else if (k >= 2) {
+                // both members' exits are latched by now: the handler only reads two latches
+                assertEq(_count(logs, CopybookHub.Deferred.selector, mate), 1);
+                assertEq(_groupDeferred(logs), 0, "no co-member deferral");
+                assertLt(used, 1_000_000, "no budget burnt");
+            }
+        }
+        (bool exitPending,) = _pending(follower);
+        assertTrue(exitPending);
+        for (uint256 i; i < 8; ++i) {
+            assertEq(_size(address(ps[i]), follower), 50_000);
+        }
+        assertEq(hub.tankOf(follower), tank0, "never billed");
+        assertEq(hub.tankOf(mate), mateTank0);
+
+        // a keeper's catchUp does the exits (and the opens) on its own gas, then the handler takes the follow back
+        // (orders at a Hideki-typical 6M here, so the test's own gas budget covers both catches)
+        for (uint256 i; i < 8; ++i) {
+            ps[i].setBurn(6_000_000);
+        }
+        vm.prank(stranger);
+        hub.catchUp(follower, new address[](0));
+        (exitPending,) = _pending(follower);
+        assertFalse(exitPending);
+        for (uint256 i; i < 8; ++i) {
+            assertEq(_size(address(ps[i]), follower), -45_000);
+        }
+        // the follower's own resync works the same way
+        vm.prank(mate);
+        hub.resync();
+        (exitPending,) = _pending(mate);
+        assertFalse(exitPending);
+        assertEq(_size(address(ps[0]), mate), -45_000);
+    }
+
+    /// A follower holding three Hideki-heavy markets, a source that adds to the first.
+    function _stopCycleSetup() internal returns (HeavyPerpPool a, HeavyPerpPool b, HeavyPerpPool c, Policy memory p) {
+        a = _heavy(0);
+        b = _heavy(0);
+        c = _heavy(0);
+        vm.deal(follower, 2 ether);
+        a.approve(follower, address(hub));
+        b.approve(follower, address(hub));
+        c.approve(follower, address(hub));
+        bank.setEquity(follower, 1_000e18);
+        _heavyTrade(a, true, 50_000);
+        _heavyTrade(b, true, 50_000);
+        _heavyTrade(c, true, 50_000);
+        address[] memory join = new address[](3);
+        join[0] = address(a);
+        join[1] = address(b);
+        join[2] = address(c);
+        p = _policy();
+        vm.prank(follower);
+        hub.follow{value: 1 ether}(SourceKind.Trader, uint256(uint160(trader)), p, join);
+        assertEq(_size(address(c), follower), 50_000);
+    }
+
+    /// The source adds to `a`; every close then costs 70M (stand-in for ~21 heavy positions).
+    function _addAndMakeHeavy(HeavyPerpPool a, HeavyPerpPool b, HeavyPerpPool c) internal {
+        a.setBurn(0);
+        _heavyTrade(a, true, 20_000);
+        a.setBurn(70_000_000);
+        b.setBurn(70_000_000);
+        c.setBurn(70_000_000);
+    }
+
+    // N-1 (stop): before, a follower could re-arm its floor and resume after every stop whose closes ran out of
+    // the handler, unbilled, so every source increase burnt the handler. Now the closes latch: resume waits,
+    // the handler skips the follow, and poke finishes the closes on its caller's gas.
+    function test_stopFlattenOOG_latchesResumeWaits() public {
+        (HeavyPerpPool a, HeavyPerpPool b, HeavyPerpPool c, Policy memory p) = _stopCycleSetup();
+        p.equityFloor = 2_000e18; // armed above its equity
+        vm.prank(follower);
+        hub.updatePolicy(p);
+        _addAndMakeHeavy(a, b, c);
+        vm.fee(6 gwei);
+        vm.recordLogs();
+        assertTrue(_deliverHub(hub.subscriptionOf(sid, 0), address(bank), _topics(trader, address(a)), HANDLER_GAS));
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        assertEq(_count(logs, CopybookHub.Stopped.selector, follower), 1);
+        assertEq(_count(logs, CopybookHub.Deferred.selector, follower), 1);
+        assertTrue(_paused(follower));
+        (bool exitPending, bool flattenPending) = _pending(follower);
+        assertFalse(exitPending);
+        assertTrue(flattenPending);
+
+        // disarming the floor does not let it resume while the closes are owed
+        p.equityFloor = 0;
+        vm.prank(follower);
+        hub.updatePolicy(p);
+        vm.prank(follower);
+        vm.expectRevert(CopybookHub.FlattenPending.selector);
+        hub.resume();
+
+        // the next source increase: skipped, no stop, no burn, no bill
+        a.setBurn(0);
+        _heavyTrade(a, true, 20_000);
+        a.setBurn(70_000_000);
+        uint256 t0 = hub.tankOf(follower);
+        vm.recordLogs();
+        uint256 g0 = gasleft();
+        assertTrue(_deliverHub(hub.subscriptionOf(sid, 0), address(bank), _topics(trader, address(a)), HANDLER_GAS));
+        assertLt(g0 - gasleft(), 1_000_000);
+        logs = vm.getRecordedLogs();
+        assertEq(_count(logs, CopybookHub.Deferred.selector, follower), 1);
+        assertEq(_count(logs, CopybookHub.Stopped.selector, follower), 0);
+        assertEq(hub.tankOf(follower), t0);
+
+        // poke finishes the closes on its caller's gas, whatever the floor says now; then resume works
+        vm.prank(follower);
+        hub.poke(follower);
+        assertEq(_size(address(a), follower), 0);
+        assertEq(_size(address(b), follower), 0);
+        assertEq(_size(address(c), follower), 0);
+        (exitPending, flattenPending) = _pending(follower);
+        assertFalse(flattenPending);
+        vm.prank(follower);
+        hub.resume();
+        assertFalse(_paused(follower));
+    }
+
+    // Latches clear only after the work is done in the caller's transaction: a catchUp that runs out of gas
+    // reverts and leaves the latch; one that finishes clears it. Unfollowing ends the follow and its latches.
+    function test_latches_clearOnlyAfterTheWork() public {
+        address mate = address(0xF022);
+        _followTrader(follower, _one(address(btc)));
+        _followTrader(mate, _one(address(btc)));
+        _move(btc, trader, 50_000);
+        hub.catchUp(follower, _one(address(btc)));
+        hub.catchUp(mate, _one(address(btc)));
+        _move(btc, trader, 0);
+        btc.setBombFor(follower, true); // its close burns all the gas it gets
+        vm.recordLogs();
+        assertTrue(_deliverHub(hub.subscriptionOf(sid, 0), address(bank), _topics(trader, address(btc)), HANDLER_GAS));
+        assertEq(_count(vm.getRecordedLogs(), CopybookHub.Deferred.selector, follower), 1);
+        (bool exitPending,) = _pending(follower);
+        assertTrue(exitPending);
+
+        // still bombed: the keeper's catchUp runs out of gas and reverts; the latch stands
+        vm.expectRevert(CopybookHub.OutOfGasInSync.selector);
+        hub.catchUp(follower, new address[](0));
+        (exitPending,) = _pending(follower);
+        assertTrue(exitPending);
+        // an empty catchUp cannot clear it without the work: the synced markets are synced first
+        btc.setBombFor(follower, false);
+        hub.catchUp(follower, new address[](0));
+        (exitPending,) = _pending(follower);
+        assertFalse(exitPending);
+        assertEq(_size(address(btc), follower), 0);
+
+        // latched again, then unfollowing ends the follow and its latch
+        _move(btc, trader, 50_000);
+        hub.catchUp(follower, _one(address(btc)));
+        _move(btc, trader, 0);
+        btc.setBombFor(follower, true);
+        assertTrue(_deliverHub(hub.subscriptionOf(sid, 0), address(bank), _topics(trader, address(btc)), HANDLER_GAS));
+        (exitPending,) = _pending(follower);
+        assertTrue(exitPending);
+        vm.prank(follower);
+        hub.unfollow(false);
+        (exitPending,) = _pending(follower);
+        assertFalse(exitPending);
+    }
+
+    // R36: at the admin minimums (tailBase 1.1M, perDefer 20k) with a member left behind the one whose exits run
+    // out of gas, the handler never reverts, at any gas from too little for one member to plenty.
+    function test_reserveFloor_exitOOGAtAdminMinimums_handlerSurvives() public {
+        address mate = address(0xF022);
+        _followTrader(follower, _one(address(btc)));
+        _followTrader(mate, _one(address(btc)));
+        _move(btc, trader, 50_000);
+        hub.catchUp(follower, _one(address(btc)));
+        hub.catchUp(mate, _one(address(btc)));
+        _move(btc, trader, 0);
+        btc.setBombFor(follower, true);
+        vm.prank(owner);
+        hub.setGasParams(1_000_000, 1_000_000, 1_000_000, 1_100_000, 20_000, 20_000);
+
+        uint256 latched;
+        uint256 mateDeferred;
+        uint256 snap = vm.snapshotState();
+        for (uint256 gas = 2_000_000; gas <= 4_500_000; gas += 25_000) {
+            vm.recordLogs();
+            assertTrue(_deliverHub(hub.subscriptionOf(sid, 0), address(bank), _topics(trader, address(btc)), gas));
+            Vm.Log[] memory logs = vm.getRecordedLogs();
+            (bool exitPending,) = _pending(follower);
+            if (exitPending) {
+                ++latched;
+                assertEq(_count(logs, CopybookHub.Deferred.selector, follower), 1);
+                if (_groupDeferred(logs) == 1) ++mateDeferred;
+            }
+            vm.revertToState(snap);
+        }
+        assertGt(latched, 0, "the exit ran out of gas and latched");
+        assertGt(mateDeferred, 0, "with the member behind it deferred from the reserve");
+    }
+
     // ================================================================== R34: only the hub's own subscription
 
     // M-3. Before: a stranger's subscription on the hub's relay re-ran the group and billed every member.

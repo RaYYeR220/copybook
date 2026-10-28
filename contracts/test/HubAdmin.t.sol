@@ -301,7 +301,7 @@ contract HubAdminTest is Base {
         vm.expectRevert(abi.encodeWithSelector(CopybookHub.InvalidParam.selector, uint8(3)));
         hub.setGasParams(8_000_000, 20_000_000, uint64(MAX_GAS + 1), 1_200_000, 30_000, 300_000);
         vm.expectRevert(abi.encodeWithSelector(CopybookHub.InvalidParam.selector, uint8(4)));
-        hub.setGasParams(8_000_000, 20_000_000, 90_000_000, 999_999, 30_000, 300_000);
+        hub.setGasParams(8_000_000, 20_000_000, 90_000_000, 1_099_999, 30_000, 300_000);
         vm.expectRevert(abi.encodeWithSelector(CopybookHub.InvalidParam.selector, uint8(5)));
         hub.setGasParams(8_000_000, 20_000_000, 90_000_000, 1_200_000, 19_999, 300_000);
         vm.expectRevert(abi.encodeWithSelector(CopybookHub.InvalidParam.selector, uint8(6)));
@@ -310,20 +310,20 @@ contract HubAdminTest is Base {
         hub.setGasParams(8_000_000, 20_000_000, 90_000_000, 1_200_000, 30_000, 2_000_001);
         // the subscriptions' 200M gas limits must still fund floor + tail + one deferral + 2M
         vm.expectRevert(CopybookHub.GasLimitTooLow.selector);
-        hub.setGasParams(196_980_001, uint64(MAX_GAS), uint64(MAX_GAS), 1_000_000, 20_000, 300_000);
-        hub.setGasParams(196_980_000, uint64(MAX_GAS), uint64(MAX_GAS), 1_000_000, 20_000, 300_000);
+        hub.setGasParams(196_880_001, uint64(MAX_GAS), uint64(MAX_GAS), 1_100_000, 20_000, 300_000);
+        hub.setGasParams(196_880_000, uint64(MAX_GAS), uint64(MAX_GAS), 1_100_000, 20_000, 300_000);
 
         // the edges are accepted
         vm.expectEmit(false, false, false, true, address(hub));
-        emit CopybookHub.GasParamsSet(1_000_000, 1_000_000, uint64(MAX_GAS), 1_000_000, 20_000, 20_000);
-        hub.setGasParams(1_000_000, 1_000_000, uint64(MAX_GAS), 1_000_000, 20_000, 20_000);
-        hub.setGasParams(1_000_000, 1_000_000, uint64(MAX_GAS), 1_000_000, 20_000, 2_000_000);
+        emit CopybookHub.GasParamsSet(1_000_000, 1_000_000, uint64(MAX_GAS), 1_100_000, 20_000, 20_000);
+        hub.setGasParams(1_000_000, 1_000_000, uint64(MAX_GAS), 1_100_000, 20_000, 20_000);
+        hub.setGasParams(1_000_000, 1_000_000, uint64(MAX_GAS), 1_100_000, 20_000, 2_000_000);
         vm.stopPrank();
         (uint64 floor, uint64 cap, uint64 themeCap, uint64 tailBase, uint64 perDefer, uint64 overhead) = hub.gasParams();
         assertEq(floor, 1_000_000);
         assertEq(cap, 1_000_000);
         assertEq(themeCap, MAX_GAS);
-        assertEq(tailBase, 1_000_000);
+        assertEq(tailBase, 1_100_000);
         assertEq(perDefer, 20_000);
         assertEq(overhead, 2_000_000);
     }
@@ -360,7 +360,7 @@ contract HubAdminTest is Base {
         _follow(a, trader);
         _move(btc, trader, 50_000);
         vm.prank(owner);
-        hub.setGasParams(150_000_000, 150_000_000, 150_000_000, 1_000_000, 20_000, 300_000);
+        hub.setGasParams(150_000_000, 150_000_000, 150_000_000, 1_100_000, 20_000, 300_000);
         vm.expectEmit(true, false, false, true, address(hub));
         emit CopybookHub.GroupDeferred(sid, 0, 0);
         vm.prank(address(this), address(hub));

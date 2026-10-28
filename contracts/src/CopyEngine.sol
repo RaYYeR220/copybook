@@ -49,6 +49,8 @@ library CopyEngine {
         uint32 index; // position in the group's member list
         uint32 syncedVersion; // theme: registry version of the last sync that left every leg at target
         bool lastSyncComplete; // theme: the last sync left every leg at target
+        bool exitPending; // the handler ran out of gas on its exits: they wait for a caller's own transaction
+        bool flattenPending; // the handler ran out of gas (or failed) closing a stop: the closes wait the same way
     }
 
     /// @dev The hub's per-follower books. Allowlist and synced flags are keyed by a per-follower epoch so an
@@ -193,8 +195,9 @@ library CopyEngine {
     }
 
     /// @notice The equity stop: the follow is paused, then every synced position is closed.
-    function stop(Books storage b, Env memory e, int256 equity) external {
-        _stop(b, e, b.follows[e.follower], equity);
+    /// @return closed whether every synced position is zero afterwards
+    function stop(Books storage b, Env memory e, int256 equity) external returns (bool) {
+        return _stop(b, e, b.follows[e.follower], equity);
     }
 
     /// @notice A theme sync's increase set, run inside the hub's self-call: every leg fills completely inside
@@ -709,11 +712,11 @@ library CopyEngine {
     // ---------------------------------------------------------------- stop
 
     /// @dev Pauses first, so the stop stands even if a close cannot complete, then closes every synced position.
-    function _stop(Books storage b, Env memory e, Follow storage f, int256 equity) internal {
+    function _stop(Books storage b, Env memory e, Follow storage f, int256 equity) internal returns (bool closed) {
         f.paused = true;
         f.lastSyncComplete = false;
         emit Stopped(e.follower, equity);
-        _flatten(b, e, f);
+        return _flatten(b, e, f);
     }
 
     /// @return closed whether every synced position is zero afterwards

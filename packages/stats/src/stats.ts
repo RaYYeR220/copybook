@@ -16,12 +16,17 @@ export interface TraderStats {
   liquidations30d: number;
   /** Largest peak-to-trough fall of cumulative realized PnL in the window, in quote units. */
   maxDrawdownAbs30d: number | null;
-  /** maxDrawdownAbs30d as a percentage of the peak estimated margin deployed; null if it cannot be estimated. */
+  /**
+   * maxDrawdownAbs30d as a percentage of the peak estimated margin deployed. Null unless the trader's explicit
+   * leverage settings cover at least half of the window's notional (see README).
+   */
   maxDrawdownPct30d: number | null;
   /** Trade-weighted average of the trader's explicit leverage settings; null when settings cover under half of the trades. */
   avgLeverage: number | null;
   /** ISO timestamp of the account's most recent position update (all time, not just the window). */
   lastActiveAt: string | null;
+  /** False when the trader has no position changes in the window (all counts are then zero, not measured). */
+  hasHistory: boolean;
   /** True when the row cap cut the history short: figures cover only the most recent rows. */
   truncated: boolean;
 }
@@ -38,6 +43,7 @@ export interface StatsOptions extends IndexerOptions {
 export const MIN_LEVERAGE_COVERAGE = 0.5;
 
 const DAY = 86400;
+const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
 
 const big = (s: string | null | undefined): bigint => {
   if (s == null || s === "") return 0n;
@@ -100,6 +106,7 @@ export function computeStats(input: StatsInput): TraderStats {
     maxDrawdownPct30d: dd?.pct == null ? null : round(Math.min(100, dd.pct), 1),
     avgLeverage: avgLeverage(tradesPerPool, leverage),
     lastActiveAt: lastTs == null ? null : new Date(lastTs * 1000).toISOString(),
+    hasHistory: changes.length > 0,
     truncated: input.truncated,
   };
 }
@@ -178,18 +185,26 @@ function drawdown(
     seen.add(pool);
     setMargin(pool, c.sizeBefore, c.entryPriceBefore);
   }
+  let covered = 0;
+  let allNotional = 0;
   const total = () => [...margin.values()].reduce((a, b) => a + b, 0);
   let peakMargin = total();
   for (const c of changes) {
-    setMargin(c.pool.toLowerCase(), c.sizeAfter, c.entryPriceAfter);
+    const pool = c.pool.toLowerCase();
+    setMargin(pool, c.sizeAfter, c.entryPriceAfter);
+    const n = notional(pool, c.sizeAfter, c.entryPriceAfter) ?? 0;
+    allNotional += n;
+    if (lev.has(pool)) covered += n;
     peakMargin = Math.max(peakMargin, total());
   }
 
-  const pct = unknown || peakMargin <= 0 ? null : (maxDd / peakMargin) * 100;
+  const explicitShare = allNotional > 0 ? covered / allNotional : 0;
+  const pct = unknown || peakMargin <= 0 || explicitShare < MIN_LEVERAGE_COVERAGE ? null : (maxDd / peakMargin) * 100;
   return { abs: maxDd, pct };
 }
 
 export async function getTraderStats(trader: Address, opts: StatsOptions = {}): Promise<TraderStats> {
+  if (!ADDRESS_RE.test(trader)) throw new TypeError(`invalid trader address: ${String(trader)}`);
   const ix = opts.indexer ?? new Indexer(opts);
   const windowDays = opts.windowDays ?? 30;
   const now = opts.now ?? Math.floor(Date.now() / 1000);

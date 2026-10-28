@@ -5,46 +5,91 @@ export interface RankedTrader {
   rank: number;
   trader: Address;
   realizedPnl30d: number;
+  /** realizedPnl / max(maxDrawdownAbs30d, 1): PnL per unit of realized drawdown. Informational; ranking is by PnL. */
+  riskAdjusted: number;
   stats: TraderStats;
 }
 
 export interface RankOptions extends StatsOptions {
   /** Wallets never listed (our own hub, test and demo wallets). Case-insensitive. */
   exclude?: Address[];
-  /** Minimum voluntary trades in the window. Default 5. */
+  /** Minimum voluntary trades in the window. Default 20. */
   minTrades?: number;
-  /** Minimum active days in the window. Default 2. */
+  /** Minimum active days in the window. Default 5. */
   minActiveDays?: number;
+  /** Most liquidation transactions tolerated in the window. Default 1. */
+  maxLiquidations?: number;
   /** How many candidate accounts to evaluate. Default 25. */
   candidateLimit?: number;
+  /** Candidate rows per request. Default 150. */
+  candidatePageSize?: number;
+  /** Most candidate pages to read. Default 5. */
+  candidatePages?: number;
+}
+
+export interface SkippedTrader {
+  account: Address;
+  reason: string;
+}
+
+export interface TopTradersResult {
+  traders: RankedTrader[];
+  /** Candidates whose history could not be fetched. */
+  skipped: SkippedTrader[];
+  /** True when fewer than `candidateLimit` candidates were found within the page budget. */
+  candidateShortfall: boolean;
 }
 
 /**
  * Top traders by realized PnL over the last `windowDays` days.
  *
  * Candidates are the accounts behind the largest single realized gains in the window;
- * each is then measured over the whole window and ranked on its total.
- * Accounts whose history exceeds the row cap are skipped, since their window PnL would be partial.
+ * each is then measured over the whole window and ranked on its total. The list can be
+ * shorter than `n`: candidates are limited by the page budget, by the activity and
+ * liquidation filters, and by fetch failures (reported in `skipped`).
+ * Accounts whose history exceeds the row cap are dropped, since their window PnL would be partial.
  */
-export async function topTraders(n: number, windowDays = 30, opts: RankOptions = {}): Promise<RankedTrader[]> {
+export async function topTraders(n: number, windowDays = 30, opts: RankOptions = {}): Promise<TopTradersResult> {
   const exclude = new Set((opts.exclude ?? []).map((a) => a.toLowerCase()));
-  const minTrades = opts.minTrades ?? 5;
-  const minActiveDays = opts.minActiveDays ?? 2;
+  const minTrades = opts.minTrades ?? 20;
+  const minActiveDays = opts.minActiveDays ?? 5;
+  const maxLiquidations = opts.maxLiquidations ?? 1;
   const now = opts.now ?? Math.floor(Date.now() / 1000);
   const ix = opts.indexer ?? new Indexer(opts);
 
   const since = now - windowDays * 86400;
   const want = opts.candidateLimit ?? 25;
-  const found = await ix.candidateAccounts(since, (want + exclude.size) * 3);
-  const candidates = found.filter((a) => !exclude.has(a)).slice(0, want);
+  const candidates = await ix.candidateAccounts(since, want, {
+    exclude,
+    pageSize: opts.candidatePageSize,
+    maxPages: opts.candidatePages,
+  });
 
   const ranked: Omit<RankedTrader, "rank">[] = [];
+  const skipped: SkippedTrader[] = [];
   for (const trader of candidates) {
-    const stats = await getTraderStats(trader, { ...opts, windowDays, now, indexer: ix });
-    if (stats.truncated || stats.trades30d < minTrades || stats.activeDays30d < minActiveDays) continue;
-    ranked.push({ trader, realizedPnl30d: stats.realizedPnl30d, stats });
+    let stats: TraderStats;
+    try {
+      stats = await getTraderStats(trader, { ...opts, windowDays, now, indexer: ix });
+    } catch (e) {
+      skipped.push({ account: trader, reason: e instanceof Error ? e.message : String(e) });
+      continue;
+    }
+    if (
+      stats.truncated ||
+      stats.trades30d < minTrades ||
+      stats.activeDays30d < minActiveDays ||
+      stats.liquidations30d > maxLiquidations
+    )
+      continue;
+    const riskAdjusted = Math.round((stats.realizedPnl30d / Math.max(stats.maxDrawdownAbs30d ?? 0, 1)) * 100) / 100;
+    ranked.push({ trader, realizedPnl30d: stats.realizedPnl30d, riskAdjusted, stats });
   }
 
   ranked.sort((a, b) => b.realizedPnl30d - a.realizedPnl30d || a.trader.localeCompare(b.trader));
-  return ranked.slice(0, n).map((r, i) => ({ rank: i + 1, ...r }));
+  return {
+    traders: ranked.slice(0, n).map((r, i) => ({ rank: i + 1, ...r })),
+    skipped,
+    candidateShortfall: candidates.length < want,
+  };
 }

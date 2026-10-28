@@ -56,6 +56,23 @@ export interface Paged<T> {
   truncated: boolean;
 }
 
+/** Any failure talking to the indexer: transport, HTTP status, or GraphQL errors. */
+export class IndexerError extends Error {
+  readonly operationName: string;
+  readonly status?: number;
+  readonly graphqlErrors?: { message: string }[];
+  constructor(
+    message: string,
+    details: { operationName: string; status?: number; graphqlErrors?: { message: string }[]; cause?: unknown },
+  ) {
+    super(message, details.cause === undefined ? undefined : { cause: details.cause });
+    this.name = "IndexerError";
+    this.operationName = details.operationName;
+    this.status = details.status;
+    this.graphqlErrors = details.graphqlErrors;
+  }
+}
+
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 const CHANGES = `query Changes($account:String!,$since:numeric!,$limit:Int!,$offset:Int!){
@@ -77,8 +94,8 @@ const LEVERAGE = `query Leverage($account:String!){
 const MARKETS = `query Markets{
   Market(where:{marketType:{_eq:PERP}}){ poolAddress baseSymbol baseDecimals initialMarginBps }}`;
 
-const CANDIDATES = `query Candidates($since:numeric!,$limit:Int!){
-  PerpPositionChange(where:{timestamp:{_gte:$since}},order_by:[{realizedPnl:desc}],limit:$limit){ account }}`;
+const CANDIDATES = `query Candidates($since:numeric!,$limit:Int!,$offset:Int!){
+  PerpPositionChange(where:{timestamp:{_gte:$since}},order_by:[{realizedPnl:desc},{id:desc}],limit:$limit,offset:$offset){ account }}`;
 
 export class Indexer {
   readonly url: string;
@@ -101,7 +118,7 @@ export class Indexer {
 
   /** One GraphQL request, sequential by construction, with retry on transient failures. */
   async query<T>(operationName: string, query: string, variables: Record<string, unknown> = {}): Promise<T> {
-    let lastErr: unknown;
+    let lastErr!: IndexerError;
     for (let attempt = 0; attempt <= this.retries; attempt++) {
       if (!this.first && this.delayMs > 0) await sleep(this.delayMs);
       this.first = false;
@@ -112,16 +129,23 @@ export class Indexer {
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ operationName, query, variables }),
         });
-        if (!res.ok) throw new Error(`indexer HTTP ${res.status}`);
+        if (!res.ok) throw new IndexerError(`indexer HTTP ${res.status}`, { operationName, status: res.status });
         const body = (await res.json()) as { data?: T; errors?: { message: string }[] };
-        if (body.errors?.length) throw new Error(`indexer error: ${body.errors[0].message}`);
-        if (!body.data) throw new Error("indexer returned no data");
+        if (body.errors?.length)
+          throw new IndexerError(`indexer error: ${body.errors[0].message}`, { operationName, graphqlErrors: body.errors });
+        if (!body.data) throw new IndexerError("indexer returned no data", { operationName });
         return body.data;
       } catch (e) {
-        lastErr = e;
+        lastErr =
+          e instanceof IndexerError
+            ? e
+            : new IndexerError(`indexer request failed: ${e instanceof Error ? e.message : String(e)}`, {
+                operationName,
+                cause: e,
+              });
       }
     }
-    throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
+    throw lastErr;
   }
 
   private async page<T>(
@@ -177,20 +201,35 @@ export class Indexer {
     return this.marketsCache;
   }
 
-  /** Accounts behind the largest single realized gains in the window (deduplicated, best first). `rowLimit` caps the rows read. */
-  async candidateAccounts(sinceTs: number, rowLimit: number): Promise<Address[]> {
-    const d = await this.query<{ PerpPositionChange: { account: string }[] }>("Candidates", CANDIDATES, {
-      since: String(sinceTs),
-      limit: rowLimit,
-    });
+  /**
+   * Accounts behind the largest single realized gains in the window, best first and deduplicated.
+   * Reads rows page by page until `want` distinct non-excluded accounts are found or `maxPages` is spent,
+   * so the result can be shorter than `want`.
+   */
+  async candidateAccounts(
+    sinceTs: number,
+    want: number,
+    opts: { exclude?: Set<string>; pageSize?: number; maxPages?: number } = {},
+  ): Promise<Address[]> {
+    const pageSize = opts.pageSize ?? 150;
+    const maxPages = opts.maxPages ?? 5;
     const seen = new Set<string>();
     const out: Address[] = [];
-    for (const r of d.PerpPositionChange) {
-      const a = r.account.toLowerCase();
-      if (!seen.has(a)) {
+    for (let p = 0; p < maxPages && out.length < want; p++) {
+      const d = await this.query<{ PerpPositionChange: { account: string }[] }>("Candidates", CANDIDATES, {
+        since: String(sinceTs),
+        limit: pageSize,
+        offset: p * pageSize,
+      });
+      for (const r of d.PerpPositionChange) {
+        const a = r.account.toLowerCase();
+        if (seen.has(a)) continue;
         seen.add(a);
+        if (opts.exclude?.has(a)) continue;
         out.push(a as Address);
+        if (out.length >= want) break;
       }
+      if (d.PerpPositionChange.length < pageSize) break;
     }
     return out;
   }

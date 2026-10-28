@@ -7,7 +7,7 @@ import {MockMailbox} from "./mocks/MockMailbox.sol";
 import {CopybookHub} from "../../src/CopybookHub.sol";
 import {ThemeRegistry} from "../../src/ThemeRegistry.sol";
 import {Policy, Reason, SourceKind} from "../../src/Types.sol";
-import {IMarginBank} from "../../src/interfaces/IDreamPerps.sol";
+import {IMarginBank, IRiskGate} from "../../src/interfaces/IDreamPerps.sol";
 import {RiskGate} from "../../src/risk/RiskGate.sol";
 import {IMailbox} from "../../src/risk/IHyperlane.sol";
 import {Tier, RiskMessages} from "../../src/risk/RiskTypes.sol";
@@ -120,17 +120,26 @@ contract RiskHubTest is Base {
         assertEq(_size(guarded), 50_000, "guarded: no new size");
         assertEq(_size(open), 80_000, "unguarded: copied");
 
-        // an exit never asks the gate
+        // an exit never asks the gate (checked at the end of the test, so nothing after this may increase)
         _move(0);
+        vm.expectCall(address(gate), abi.encodeWithSelector(IRiskGate.allowIncrease.selector), 0);
         _sync();
         assertEq(_size(guarded), 0, "guarded: exit copied");
         assertEq(_size(open), 0);
+    }
 
-        // once the verdict is older than the TTL the guarded follower copies again
-        _move(40_000);
+    // Once the verdict is older than the TTL the guarded follower copies again.
+    function test_liveHub_staleBlockLetsGuardedIncreasesCopy() public {
+        _move(50_000);
+        _sync();
+        _verdict(Tier.Block);
+        _move(80_000);
+        _sync();
+        assertEq(_size(guarded), 50_000, "guarded: refused while the Block is live");
+
         vm.warp(vm.getBlockTimestamp() + 7 days + 1);
         _sync();
-        assertEq(_size(guarded), 40_000);
+        assertEq(_size(guarded), 80_000, "guarded: copies once the Block is stale");
     }
 
     function test_liveHub_cautionAndOkNeverRefuse() public {

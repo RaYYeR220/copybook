@@ -8,6 +8,7 @@
 //   check               both sides' settings; allowIncrease answers true without a verdict; the gate call's gas
 //   trade               the leader opens and closes 0.0005 BTC; the follower's copies pass the gate
 //   base-url <url>      reviewer.setBaseUrl(url)
+//   prompt              reviewer.setSystemPrompt(the published rubric in eval/rubric.ts)
 //   review [trader ...] the hub owner pays for reviews (default: the steady and liquidated fixture traders and the
 //                       leader) and each is followed across both chains to the verdict
 //   guard               the follower's guard against the leader's verdict
@@ -46,6 +47,7 @@ import {
   type Role,
 } from "./env.ts";
 import { HUB, ROOT, artifact, decodeHub, errMsg, fmtEvent, hubAbi, market, reaction, size, sleep, type HubEvent } from "./lib.ts";
+import { SYSTEM_PROMPT } from "../../eval/rubric.ts";
 
 const HIDEKI_MAILBOX = getAddress("0xD7C2E95c62De3c0ad95b2C1cf08E4B85DF6b332D");
 const SHANNON_MAILBOX = getAddress("0xF805734aAC42cf238eAef9E905e3A04F2Ab554f9");
@@ -537,6 +539,19 @@ async function trade() {
 
 // ---------------------------------------------------------------- reviews
 
+/** reviewer.setSystemPrompt with the published rubric (eval/rubric.ts), only when it differs. */
+async function setPrompt() {
+  const before = await readReviewer<string>("systemPrompt");
+  if (before === SYSTEM_PROMPT) {
+    note("system prompt", "already the rubric");
+  } else {
+    rec.shannon.previousSystemPrompt = before;
+    await sendOn("shannon", "HUB_OWNER", "reviewer.setSystemPrompt(rubric)", { address: reviewerAddr(), abi: reviewerAbi, functionName: "setSystemPrompt", args: [SYSTEM_PROMPT] });
+  }
+  check((await readReviewer<string>("systemPrompt")) === SYSTEM_PROMPT, "the reviewer's system prompt is the published rubric");
+  await settings();
+}
+
 async function setBaseUrl(url: string) {
   if (!url.endsWith("/")) throw new Error("the base URL must end in /: the trader address is appended");
   await sendOn("shannon", "HUB_OWNER", `reviewer.setBaseUrl(${url})`, { address: reviewerAddr(), abi: reviewerAbi, functionName: "setBaseUrl", args: [url] });
@@ -753,6 +768,9 @@ try {
     case "base-url":
       await setBaseUrl(args[0]);
       break;
+    case "prompt":
+      await setPrompt();
+      break;
     case "review":
       await review(args.length ? args.map((a) => getAddress(a)) : [STEADY, LIQUIDATED, LEADER]);
       break;
@@ -760,7 +778,7 @@ try {
       await guard();
       break;
     default:
-      throw new Error("steps: bridge <stt> | record | wire | fund <stt> | check | trade | base-url <url> | review [trader ...] | guard");
+      throw new Error("steps: bridge <stt> | record | wire | fund <stt> | check | trade | base-url <url> | prompt | review [trader ...] | guard");
   }
 } catch (e) {
   failed = true;

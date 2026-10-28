@@ -63,7 +63,7 @@ export const constellations: PlacedConstellation[] = CONSTELLATIONS.map((C) => {
   return { name: C.name, stars, segments, label: [mx, my + 28] };
 });
 
-/** A point on the meridian at `q` × the limb radius, in plate units. */
+/** A point on the meridian at `q` × the limb radius, in plate units (multiply by the plate scale for px). */
 export const meridianPoint = (q: number): [number, number] => [LIMB * q * Math.cos(MERIDIAN_ANGLE), LIMB * q * Math.sin(MERIDIAN_ANGLE)];
 
 export function roman(n: number) {

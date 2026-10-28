@@ -16,9 +16,6 @@ const tx = (hash: `0x${string}`, index: number): ChainTx => ({ hash, index });
 
 /** The trader every live scenario copied. */
 export const LEADER = "0xa1d0cb85c869e534fe1e0c22af3b238301157b5d" as const;
-/** The follower account of the live run. */
-export const FOLLOWER = "0x7d736a88978e94e60494ff91c49ba838edfb1932" as const;
-
 /** The leader opens, and the copy lands in the same block: the pair the nightfall scene is drawn from. */
 export const sameBlockOpen = {
   market: "BTC-PERP",
@@ -28,16 +25,6 @@ export const sameBlockOpen = {
   block: 35025602,
   leader: tx("0x6880ee77710e3156184063cce42be51517df7ca1bb835d25037ebe5556b7f44d", 0),
   copy: tx("0xd012c9ad808025ba8ff880bde67e6972b661b3824e839754bb8681cc1b878cbc", 22),
-} as const;
-
-/** The follower held a residue below the venue minimum; one copy order crossed it to the leader's short. */
-export const residueCross = {
-  market: "BTC-PERP",
-  block: 35025759,
-  from: "+0.0001",
-  to: "−0.0005",
-  leader: tx("0x44415234b4210f04e0f036f26696ff4ceb2a25eceb32eba405d0354d557796a7", 0),
-  copy: tx("0xdf3ce2e435557042671ae266f24f2a8adcedc3deb5397592cac97514423e7ecc", 5),
 } as const;
 
 /** A refusal, written in the leader's block: no fill inside the follower's 5 bps band. */

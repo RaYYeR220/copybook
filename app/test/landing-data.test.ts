@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { bandRefusal, guardReview, LEADER, links, residueCross, sameBlockOpen, thesisRebalance } from "@/content/proof";
+import { bandRefusal, guardReview, LEADER, links, sameBlockOpen, thesisRebalance } from "@/content/proof";
 import { atlasGeometry } from "@/components/Nightfall/nightEngine";
 import { LIMB } from "@/lib/atlas";
-import { deployments, riskCommittee } from "@/lib/deployments";
+import { deployments } from "@/lib/deployments";
 import { fmtInt, shortHex } from "@/lib/format";
 import { REASON_LABEL } from "@/lib/reasons";
 
@@ -10,7 +10,7 @@ const isTxHash = (h: string) => /^0x[0-9a-f]{64}$/i.test(h);
 
 describe("landing proof", () => {
   it("names real transactions only", () => {
-    for (const p of [sameBlockOpen, residueCross, bandRefusal]) {
+    for (const p of [sameBlockOpen, bandRefusal]) {
       expect(isTxHash(p.leader.hash)).toBe(true);
       expect(isTxHash(p.copy.hash)).toBe(true);
       expect(p.copy.index).toBeGreaterThan(p.leader.index); // the copy runs after the move, inside the same block
@@ -33,11 +33,14 @@ describe("landing proof", () => {
     }
   });
 
-  it("reads the hub and the committee from deployments/*.json", () => {
+  it("reads the hub from deployments/hideki.json", () => {
     expect(deployments.chainId).toBe(50383);
     expect(shortHex(deployments.hub)).toBe("0xdF73…E154");
-    expect(riskCommittee.size).toBeGreaterThan(0);
-    expect(riskCommittee.threshold).toBeLessThanOrEqual(riskCommittee.size);
+  });
+
+  it("draws the committee as the review it cites", () => {
+    expect(guardReview.votes).toBeLessThanOrEqual(guardReview.answered);
+    expect(guardReview.answered).toBeGreaterThan(0);
   });
 });
 

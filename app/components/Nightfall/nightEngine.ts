@@ -1,4 +1,4 @@
-import { COPIES_AT, LEADER_AT, LIMB, MERIDIAN_ANGLE, constellations } from "@/lib/atlas";
+import { COPIES_AT, LEADER_AT, LIMB, constellations, meridianPoint } from "@/lib/atlas";
 import {
   BONE,
   DEPTH_BUCKETS,
@@ -7,7 +7,6 @@ import {
   TURN_DURATION,
   TURN_EVERY,
   TURNS,
-  depthOf,
   fitCanvas,
   formation,
   pose,
@@ -81,7 +80,10 @@ export function startNightfall(opt: NightfallOptions): () => void {
     C = fitCanvas(canvas);
     geo = atlasGeometry(C.W, C.H);
     const { cx, cy, k, mobile } = geo;
-    const onMeridian = (q: number) => ({ x: cx + LIMB * q * k * Math.cos(MERIDIAN_ANGLE), y: cy + LIMB * q * k * Math.sin(MERIDIAN_ANGLE) });
+    const onMeridian = (q: number) => {
+      const [x, y] = meridianPoint(q);
+      return { x: cx + x * k, y: cy + y * k };
+    };
 
     birds = formation(mobile ? 950 : 1600, 1717);
     birds[0] = { ...birds[0], s: 0.95, w: 0, t: 0 }; // the leader, at its place on the sheet
@@ -170,7 +172,8 @@ export function startNightfall(opt: NightfallOptions): () => void {
       const e = easeInOutCubic(clamp((p - 0.2 - b.j * 0.1) / 0.58));
       const x = o.x + (T.x - o.x) * e;
       const y = o.y + (T.y - o.y) * e;
-      const [kk, d] = depthOf(o.f);
+      const d = clamp((o.f - 0.89) / 0.25); // nearness, and its depth bucket (as in drawFlock)
+      const kk = d < 0.33 ? 0 : d < 0.66 ? 1 : 2;
       const a = (mobile ? 1.25 : 1.5) * (0.62 + 0.55 * d) * b.k * (1 - e);
       if (a > 0.15) {
         const fl = (0.12 + 0.38 * Math.sin(t * 10.5 * b.k + b.ph)) * (1 - e);

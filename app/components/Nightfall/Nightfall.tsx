@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { COPIES_AT, LEADER_AT, LIMB, MERIDIAN_ANGLE } from "@/lib/atlas";
+import { COPIES_AT, LEADER_AT, MERIDIAN_ANGLE, meridianPoint } from "@/lib/atlas";
 import { f1, prefersReducedMotion } from "@/lib/motion";
 import { startNightfall, type AtlasGeometry } from "./nightEngine";
 import styles from "./Nightfall.module.css";
@@ -16,7 +16,10 @@ export interface MeridianLabel {
 /** The gold meridian in stage px: the leader's ring, the copies, and their labels. */
 function Meridian({ geo, leader, copy }: { geo: AtlasGeometry; leader: MeridianLabel; copy: MeridianLabel }) {
   const { cx, cy, k, mobile, W, H } = geo;
-  const at = (q: number): [number, number] => [cx + LIMB * q * k * Math.cos(MERIDIAN_ANGLE), cy + LIMB * q * k * Math.sin(MERIDIAN_ANGLE)];
+  const at = (q: number): [number, number] => {
+    const [x, y] = meridianPoint(q);
+    return [cx + x * k, cy + y * k];
+  };
   const [ax, ay] = at(0.46);
   const [bx, by] = at(0.6);
   const [lx, ly] = at(1.06);

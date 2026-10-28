@@ -124,12 +124,6 @@ export const DEPTH_BUCKETS = [
   [0.76, 1.08],
 ] as const;
 
-/** Depth bucket 0..2 and the 0..1 nearness a bird's perspective factor maps to. */
-export function depthOf(f: number): [bucket: 0 | 1 | 2, nearness: number] {
-  const d = clamp((f - 0.89) / 0.25);
-  return [d < 0.33 ? 0 : d < 0.66 ? 1 : 2, d];
-}
-
 /** A chevron "bird" as SVG path data. */
 export const chevronPath = (x: number, y: number, a: number, flap: number) =>
   `M${(x - a).toFixed(1)} ${(y - a * flap).toFixed(1)}L${x.toFixed(1)} ${y.toFixed(1)}L${(x + a).toFixed(1)} ${(y - a * flap).toFixed(1)}`;
@@ -165,7 +159,9 @@ export function drawFlock(ctx: CanvasRenderingContext2D, birds: readonly Bird[],
       }
     }
     if (o.x < -12 || o.y < -12 || o.x > opt.W + 12 || o.y > opt.H + 12) continue;
-    const [k, d] = depthOf(o.f);
+    // nearness 0..1 from the perspective factor, and its depth bucket (inline: this runs for every bird, every frame)
+    const d = clamp((o.f - 0.89) / 0.25);
+    const k = d < 0.33 ? 0 : d < 0.66 ? 1 : 2;
     const a = opt.size * (0.62 + 0.55 * d) * b.k;
     const fl = 0.12 + 0.38 * Math.sin(P.time * 10.5 * b.k + b.ph);
     paths[k].moveTo(o.x - a, o.y - a * fl);

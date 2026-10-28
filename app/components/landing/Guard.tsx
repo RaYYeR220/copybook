@@ -1,5 +1,4 @@
 import { guardReview, links } from "@/content/proof";
-import { riskCommittee } from "@/lib/deployments";
 import { shortHex } from "@/lib/format";
 import { f1, rad, segmentsPath } from "@/lib/motion";
 import { delay } from "@/lib/style";
@@ -24,9 +23,9 @@ function arcPath(r: number, from: number, to: number) {
   return `M ${x1} ${y1} A ${r} ${r} 0 0 1 ${x2} ${y2}`;
 }
 
-/** The committee round the trader, and the verdict needle. Drawn from a live review. */
+/** The committee round the trader, and the verdict needle. Drawn from one live review: its seats are the validators who answered. */
 function Committee() {
-  const size = riskCommittee.size;
+  const size: number = guardReview.answered;
   // validators spread round the lower 216°, clear of the verdict arc at the top
   const seats = Array.from({ length: size }, (_, i) => (size === 1 ? 90 : -18 + (i * 216) / (size - 1)));
   const ticks: number[] = [];

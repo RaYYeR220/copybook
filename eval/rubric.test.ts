@@ -62,3 +62,34 @@ test("parseSummary reads key=value tokens", () => {
   assert.equal(kv.get("history"), "none");
   assert.equal(kv.has("maxDrawdownPct30d"), false);
 });
+
+test("the rubric line served to the validators gives the same tier as the full summary", async () => {
+  const { riskRubric, riskSummary } = await import("@copybook/stats");
+  const base = {
+    trader: "0x0000000000000000000000000000000000000001" as const,
+    windowDays: 30,
+    trades30d: 40,
+    activeDays30d: 6,
+    marketsTraded: 2,
+    realizedPnl30d: -120,
+    liquidations30d: 0,
+    maxDrawdownAbs30d: 80,
+    maxDrawdownPct30d: null as number | null,
+    avgLeverage: null,
+    lastActiveAt: "2026-10-27T10:00:00.000Z",
+    hasHistory: true,
+    truncated: false,
+  };
+  let cases = 0;
+  for (const liquidations30d of [0, 1, 2, 5])
+    for (const trades30d of [0, 9, 10, 2000])
+      for (const maxDrawdownPct30d of [null, 0, 24.9, 25, 49.96, 50, 100])
+        for (const hasHistory of [true, false])
+          for (const truncated of [false, true]) {
+            const s = { ...base, liquidations30d, trades30d, maxDrawdownPct30d, hasHistory, truncated };
+            const line = riskRubric(s);
+            assert.deepEqual(rubricTier(line), rubricTier(riskSummary(s)), line);
+            cases++;
+          }
+  assert.equal(cases, 448);
+});

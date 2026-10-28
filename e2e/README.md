@@ -170,13 +170,14 @@ forge verify-contract <gate> src/risk/RiskGate.sol:RiskGate --verifier blockscou
 |---|---|
 | `bridge <stt>` | bridges STT from Hideki to the owner on Shannon (the SDK's Hyperlane STT route) and waits for the delivery |
 | `record` | writes both deploy broadcasts into `deployments/risk.json` |
+| `swap-reviewer [stt]` | moves the live gate to the reviewer in the latest Shannon broadcast (deploy it with `GATE=<gate>`): the old reviewer's balance goes back to the owner, the new one is funded (default: what the old one held), `gate.setReviewer`, and the field, prompt and base URL are checked |
 | `wire` | `reviewer.setGate(gate)` on Shannon, then the hub's `setRiskGate(gate)` on Hideki, each only when not yet set |
 | `fund <stt>` | sends STT to the reviewer; each review holds two committee deposits (0.36 STT at today's platform floor) |
 | `check` | both sides' settings; `allowIncrease` answers true without a verdict |
 | `trade` | the leader opens and closes 0.0005 BTC; the increase passes the gate (one staticcall, traced) and the exit never asks it |
 | `base-url <url>` | points the reviewer at the public risk endpoint |
 | `prompt` | sets the reviewer's system prompt to the published rubric in `eval/rubric.ts` |
-| `review [trader ...]` | pays for reviews and follows each one: the Hyperlane delivery to Shannon, both committee stages with every validator's answer and receipt, the reply, and the gate's verdict on Hideki |
+| `review [trader ...]` | pays for reviews and follows each one: the Hyperlane delivery to Shannon, both agent requests as sent (URL and field; user prompt, system message and allowed answers), both committee stages with every validator's answer and receipt, the reply, and the gate's verdict on Hideki |
 | `guard` | with a live `Block` on the leader: an unguarded increase copies, a guarded one is refused `RiskGate`, the exit copies; without one, only the guard switch |
 
 Every transaction lands in `deployments/risk.json` with its explorer link.
@@ -184,3 +185,5 @@ Every transaction lands in `deployments/risk.json` with its explorer link.
 **Evaluate** the committee against the rubric (results in [`eval/SCORECARD.md`](../eval/SCORECARD.md)):
 `npm run eval:test` runs the rubric's tests, `npm run eval select` picks the sample and writes the answer key
 (commit it before any review), `npm run risk review <trader>` runs each review, and `npm run eval score` scores them.
+A later run re-registers the same sample: `npm run eval key v3` writes `eval/v3/answer-key.json`, commit it,
+`npm run eval anchor v3 <commit>` writes the commit and key hash on Hideki, then the reviews, then `npm run eval score v3`.

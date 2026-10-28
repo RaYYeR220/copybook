@@ -3,6 +3,8 @@
 // COPYBOOK_ENV=<env file> tsx src/risk.ts <step> [args]
 //   bridge <stt>        bridges STT from Hideki to Shannon for the hub owner and waits for the delivery
 //   record              writes the two DeployRisk broadcasts into deployments/risk.json
+//   swap-reviewer [stt] moves the gate to the reviewer in the latest Shannon DeployRisk broadcast: the old reviewer's
+//                       balance goes back to the owner, the new one is funded (default: what the old one held)
 //   wire                reviewer.setGate(gate) on Shannon, then the hub's setRiskGate(gate) on Hideki (each only if unset)
 //   fund <stt>          sends STT from the hub owner to the reviewer for agent deposits
 //   check               both sides' settings; allowIncrease answers true without a verdict; the gate call's gas
@@ -103,6 +105,8 @@ type Rec = {
   checks: Record<string, string[]>;
   measurements: Record<string, unknown>;
   reviews: Record<string, unknown>[];
+  /** Reviewers the gate used before the current one, with their last recorded settings. */
+  previousReviewers?: Record<string, unknown>[];
 };
 
 const rec: Rec = existsSync(RISK_FILE)
@@ -319,6 +323,67 @@ async function recordDeploy() {
   await settings();
 }
 
+/** Moves the gate to the reviewer in the latest Shannon broadcast. The old reviewer's record is kept under
+ * `previousReviewers`, its whole balance goes back to the owner, and a fresh reviewer is funded with `amountStt`
+ * (default: what the old one held). Every part is skipped when already done, so the step can be re-run. */
+async function swapReviewer(amountStt?: string) {
+  const s = broadcast(50312);
+  const tx = s.transactions.find((t) => t.contractName === "RiskReviewer" && t.transactionType === "CREATE");
+  if (!tx) throw new Error("RiskReviewer not in the Shannon broadcast");
+  const next = getAddress(tx.contractAddress);
+  if (next !== reviewerAddr()) {
+    rec.previousReviewers = [...(rec.previousReviewers ?? []), { ...rec.shannon, replacedAt: new Date().toISOString() }];
+    const [, , , , gateArg, baseUrl] = tx.arguments ?? [];
+    rec.shannon = { reviewer: next, constructorGate: gateArg, constructorBaseUrl: baseUrl };
+    const r = await shannonPub.getTransactionReceipt({ hash: tx.hash });
+    track("shannon", "deploy RiskReviewer", r);
+    check(r.status === "success", "deploy RiskReviewer succeeded");
+  }
+  const old = getAddress(rec.previousReviewers!.at(-1)!.reviewer as string);
+  note("old reviewer", old);
+  note("new reviewer", next);
+
+  // the old reviewer's balance back to the owner
+  const oldBalance = await shannonPub.getBalance({ address: old });
+  let drained = 0n;
+  if (oldBalance > 0n) {
+    await sendOn("shannon", "HUB_OWNER", `old reviewer.withdraw(owner, ${formatEther(oldBalance)})`, { address: old, abi: reviewerAbi, functionName: "withdraw", args: [OWNER, oldBalance] });
+    drained = oldBalance;
+  }
+  check((await shannonPub.getBalance({ address: old })) === 0n, `old reviewer ${old} holds 0 STT`);
+  if (drained) rec.previousReviewers!.at(-1)!.withdrawn = formatEther(drained);
+
+  // a fresh reviewer is funded once
+  if ((await shannonPub.getBalance({ address: next })) === 0n) {
+    const amount = amountStt ?? formatEther(drained);
+    if (parseEther(amount) === 0n) throw new Error("nothing to fund the new reviewer with: pass an amount");
+    await sendValueOn("shannon", "HUB_OWNER", `fund reviewer ${amount} STT`, next, parseEther(amount));
+  }
+
+  // wiring: the reviewer answers the live gate, the gate asks the new reviewer
+  if (getAddress(await readReviewer<Address>("gate")) !== gateAddr()) {
+    await sendOn("shannon", "HUB_OWNER", "reviewer.setGate(gate)", { address: next, abi: reviewerAbi, functionName: "setGate", args: [gateAddr()] });
+  }
+  if (getAddress(await readGate<Address>("reviewer")) !== next) {
+    await sendOn("hideki", "HUB_OWNER", "gate.setReviewer(reviewer)", { address: gateAddr(), abi: gateAbi, functionName: "setReviewer", args: [next] });
+  }
+  const url = (rec as unknown as { endpoint?: { baseUrl?: string } }).endpoint?.baseUrl;
+  if (url && (await readReviewer<string>("baseUrl")) !== url) {
+    await sendOn("shannon", "HUB_OWNER", `reviewer.setBaseUrl(${url})`, { address: next, abi: reviewerAbi, functionName: "setBaseUrl", args: [url] });
+  }
+
+  check(getAddress(await readReviewer<Address>("gate")) === gateAddr(), `reviewer.gate() = ${gateAddr()}`);
+  check(getAddress(await readGate<Address>("reviewer")) === next, `gate.reviewer() = ${next}`);
+  check(!url || (await readReviewer<string>("baseUrl")) === url, `reviewer.baseUrl() = ${url}`);
+  check((await readReviewer<string>("summarySelector")) === "rubric", "reviewer.summarySelector() = rubric");
+  check((await readReviewer<string>("systemPrompt")) === SYSTEM_PROMPT, "the reviewer's system prompt is the published rubric");
+  check(getAddress(await readHub<Address>("riskGate")) === gateAddr(), "the hub still consults the same gate");
+  const ownerHideki = await pub.getBalance({ address: OWNER });
+  check(ownerHideki >= OWNER_HIDEKI_FLOOR, `owner keeps >= 40 STT on Hideki (${formatEther(ownerHideki)})`);
+  await settings();
+  note("reviewer balance", rec.shannon.balance);
+}
+
 /** Both sides' configuration, read back from chain into the record. */
 async function settings() {
   const reviewer = reviewerAddr();
@@ -341,6 +406,7 @@ async function settings() {
     },
     depositsPerReview: { summary: formatEther(quoteSummary), verdict: formatEther(quoteVerdict), total: formatEther(quoteSummary + quoteVerdict) },
     baseUrl: await readReviewer("baseUrl"),
+    summarySelector: await readReviewer("summarySelector"),
     systemPrompt: await readReviewer("systemPrompt"),
     balance: formatEther(await shannonPub.getBalance({ address: reviewer })),
     explorer: `https://shannon-explorer.somnia.network/address/${reviewer}`,
@@ -559,10 +625,38 @@ async function setBaseUrl(url: string) {
   await settings();
 }
 
-/** Validator answers carried by the platform's callback into the reviewer, read from the callback's trace. */
+const platformAbi = parseAbi([
+  "function createAdvancedRequest(uint256 agentId, address callbackAddress, bytes4 callbackSelector, bytes payload, uint256 subcommitteeSize, uint256 threshold, uint8 consensusType, uint256 timeout) payable returns (uint256)",
+]);
+const agentAbi = parseAbi([
+  "function fetchString(string url, string selector)",
+  "function inferString(string prompt, string system, bool chainOfThought, string[] allowedValues)",
+]);
+
+/** The agent requests the reviewer made inside a traced transaction, with each payload decoded: what the JSON agent
+ * was asked to fetch, or exactly what the LLM agent was given (user prompt, system message, allowed answers). */
+function agentRequests(t: CallFrame | undefined) {
+  const reviewer = reviewerAddr().toLowerCase();
+  const out: Record<string, unknown>[] = [];
+  for (const f of frames(t, (c) => c.from?.toLowerCase() === reviewer && c.input.length > 10)) {
+    try {
+      const d = decodeFunctionData({ abi: platformAbi, data: f.input as Hex });
+      const [agentId, , , payload, size, threshold] = d.args;
+      const call = decodeFunctionData({ abi: agentAbi, data: payload as Hex });
+      out.push({ agentId: agentId.toString(), committee: Number(size), threshold: Number(threshold), call: call.functionName, args: call.args });
+    } catch {
+      /* not an agent request */
+    }
+  }
+  return out;
+}
+
+/** Validator answers carried by the platform's callback into the reviewer, read from the callback's trace, and the
+ * agent requests the callback made (the stage-2 request rides in the stage-1 callback). */
 async function committee(hash: Hex) {
   const reviewer = reviewerAddr().toLowerCase();
   const t = await trace("shannon", hash);
+  const requests = agentRequests(t);
   const out: Record<string, unknown>[] = [];
   for (const f of frames(t, (c) => c.to?.toLowerCase() === reviewer)) {
     try {
@@ -585,7 +679,7 @@ async function committee(hash: Hex) {
       /* not a callback */
     }
   }
-  return out;
+  return { callbacks: out, requests };
 }
 /** An agent result as text when it is an ABI string, else the raw bytes. */
 function text(result: Hex): string {
@@ -600,7 +694,7 @@ async function review(traders: Address[]) {
   const fee = await readGate<bigint>("reviewFee");
   for (const trader of traders) {
     console.log(`\n  -- review of ${trader}`);
-    const entry: Record<string, unknown> = { trader, at: new Date().toISOString(), fee: formatEther(fee) };
+    const entry: Record<string, unknown> = { trader, at: new Date().toISOString(), fee: formatEther(fee), reviewer: reviewerAddr() };
     rec.reviews.push(entry);
     const shannonFrom = await shannonPub.getBlockNumber();
     const r = await sendOn("hideki", "HUB_OWNER", `requestReview(${trader})`, { address: gateAddr(), abi: gateAbi, functionName: "requestReview", args: [trader], value: fee });
@@ -612,6 +706,7 @@ async function review(traders: Address[]) {
     const inbound = toShannon ? await delivery("shannon", toShannon, shannonFrom, `review ${Number(nonce)} delivered to the reviewer`) : undefined;
     if (!inbound) continue;
     entry.deliveryToShannon = inbound.transactionHash;
+    entry.summaryRequest = agentRequests(await trace("shannon", inbound.transactionHash));
 
     // follow the reviewer's events for this review until it replies (two committee stages, up to 300 s each)
     const mine = (d: { args: Record<string, unknown> } | undefined) =>
@@ -654,7 +749,8 @@ async function review(traders: Address[]) {
     for (const h of callbackTxs) {
       const rc = await shannonPub.getTransactionReceipt({ hash: h });
       track("shannon", `review ${Number(nonce)} committee callback`, rc);
-      callbacks.push({ tx: h, submittedBy: rc.from, committee: await committee(h) });
+      const c = await committee(h);
+      callbacks.push({ tx: h, submittedBy: rc.from, committee: c.callbacks, agentRequests: c.requests });
     }
     entry.callbacks = callbacks;
     for (const x of stages) {
@@ -753,6 +849,9 @@ try {
     case "record":
       await recordDeploy();
       break;
+    case "swap-reviewer":
+      await swapReviewer(args[0]);
+      break;
     case "wire":
       await wire();
       break;
@@ -778,7 +877,7 @@ try {
       await guard();
       break;
     default:
-      throw new Error("steps: bridge <stt> | record | wire | fund <stt> | check | trade | base-url <url> | prompt | review [trader ...] | guard");
+      throw new Error("steps: bridge <stt> | record | swap-reviewer [stt] | wire | fund <stt> | check | trade | base-url <url> | prompt | review [trader ...] | guard");
   }
 } catch (e) {
   failed = true;

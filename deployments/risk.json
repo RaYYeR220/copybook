@@ -24,8 +24,8 @@
     "baseUrl": "https://copybook-eosin.vercel.app/api/risk/",
     "summarySelector": "rubric",
     "systemPrompt": "You review perpetual-futures traders for people who copy their positions automatically. Apply this rubric exactly to the 30-day stats (key=value; n/a means unknown, not safe). BLOCK if liquidations30d is 2 or more, or maxDrawdownPct30d is present and at least 50. Otherwise CAUTION if liquidations30d is 1, or trades30d is below 10, or history=none, or partial=1, or maxDrawdownPct30d is present and at least 25. Otherwise OK. Answer with exactly one word: OK, CAUTION or BLOCK.",
-    "balance": "5.6926863724",
-    "balanceAsOf": "2026-10-28T15:07:08Z",
+    "balance": "10",
+    "balanceAsOf": "2026-10-28T21:10:22.591Z",
     "explorer": "https://shannon-explorer.somnia.network/address/0xc999B6924179a0dc9649DA7eBa8F3aC8b7CF7c25",
     "verification": {
       "verifier": "blockscout",
@@ -58,8 +58,8 @@
       "result": "Pass - Verified",
       "readBack": "not possible: the explorer API answers 'Not available' / 'Not found'"
     },
-    "balance": "21.5",
-    "balanceAsOf": "2026-10-28T15:07:08Z"
+    "balance": "0",
+    "balanceAsOf": "2026-10-28T21:10:26.854Z"
   },
   "endpoint": {
     "status": "public",
@@ -3031,6 +3031,30 @@
       "from": "0xcCC32990233cB34008777b2eDB62236F8e432046",
       "to": "0xD7C2E95c62De3c0ad95b2C1cf08E4B85DF6b332D",
       "url": "https://explorer.testnet.somnia.network/tokyo/tx/0x6da631e04cba6c8a14b0b75a1438a3313f67bd8cd23fedcdc1263aa91d855343"
+    },
+    {
+      "chain": "hideki",
+      "step": "refill",
+      "label": "gate.withdraw(owner, 21.5)",
+      "hash": "0x92f70e1165e47705054adf428357f9f08c91e721f5ec2ed485a4d60f755b8b21",
+      "block": 35685955,
+      "gasUsed": 58463,
+      "status": "success",
+      "from": "0x5397812d66F3233E0972b7AEB5e195a945504632",
+      "to": "0xEe54c49E9e70a0e5C2218Eec1b1BDBd4e1Cb20f1",
+      "url": "https://explorer.testnet.somnia.network/tokyo/tx/0x92f70e1165e47705054adf428357f9f08c91e721f5ec2ed485a4d60f755b8b21"
+    },
+    {
+      "chain": "shannon",
+      "step": "refill",
+      "label": "top up reviewer by 4.3073136276 STT",
+      "hash": "0x85dca9b27b40e0867909b9e39fb37cdd0a0a1021bbf56824b34c275bfac4fc7d",
+      "block": 526475307,
+      "gasUsed": 21067,
+      "status": "success",
+      "from": "0x5397812d66F3233E0972b7AEB5e195a945504632",
+      "to": "0xc999B6924179a0dc9649DA7eBa8F3aC8b7CF7c25",
+      "url": "https://shannon-explorer.somnia.network/tx/0x85dca9b27b40e0867909b9e39fb37cdd0a0a1021bbf56824b34c275bfac4fc7d"
     }
   ],
   "checks": {
@@ -3061,12 +3085,12 @@
       "ok: domains 50312 <-> 50383",
       "ok: each side uses its own Mailbox",
       "ok: JSON-API and LLM agent ids",
-      "ok: reviewer holds >= 10 STT (12)",
-      "ok: owner keeps >= 40 STT on Hideki (84.677716066)",
+      "ok: reviewer holds >= 10 STT (10)",
+      "ok: owner keeps >= 40 STT on Hideki (84.600801802)",
       "ok: random trader / random follower: gate and hub agree on the source id",
-      "ok: random trader / random follower: allowIncrease = true with no verdict",
+      "ok: random trader / random follower: allowIncrease = true (verdict None)",
       "ok: leader / follower: gate and hub agree on the source id",
-      "ok: leader / follower: allowIncrease = true with no verdict",
+      "ok: leader / follower: allowIncrease = false (live Block from 2026-10-28T13:36:31.000Z, follower guarded)",
       "ok: the follower is guarded by default"
     ],
     "trade": [
@@ -3251,6 +3275,27 @@
       "ok: review 30: the reviewer replied (tier Block)",
       "ok: review 30 verdict delivered to the gate: delivered on hideki (found after ~3s of polling)",
       "ok: review 30: the gate settled it (VerdictReceived)"
+    ],
+    "refill": [
+      "ok: the gate's review fees (21.5 STT) are back with the owner",
+      "ok: reviewer holds >= 10 STT (10)",
+      "ok: owner keeps >= 2 STT on Shannon (4.1559931354)",
+      "ok: owner keeps >= 40 STT on Hideki (84.600801802)"
+    ],
+    "check (at deploy)": [
+      "ok: reviewer points at the gate",
+      "ok: gate points at the reviewer",
+      "ok: hub consults the gate",
+      "ok: domains 50312 <-> 50383",
+      "ok: each side uses its own Mailbox",
+      "ok: JSON-API and LLM agent ids",
+      "ok: reviewer holds >= 10 STT (12)",
+      "ok: owner keeps >= 40 STT on Hideki (84.677716066)",
+      "ok: random trader / random follower: gate and hub agree on the source id",
+      "ok: random trader / random follower: allowIncrease = true with no verdict",
+      "ok: leader / follower: gate and hub agree on the source id",
+      "ok: leader / follower: allowIncrease = true with no verdict",
+      "ok: the follower is guarded by default"
     ]
   },
   "measurements": {
@@ -3262,7 +3307,7 @@
     },
     "allowIncreaseEstimate": {
       "random trader / random follower": "1051690",
-      "leader / follower": "1051690"
+      "leader / follower": "1054792"
     },
     "gatedCopy": {
       "open": {
@@ -3309,6 +3354,31 @@
         "Copied(follower=0x7d736A88978e94E60494Ff91C49Ba838EDfb1932, sourceId=0x6744c2cdbcc5b0f6ad21719c8964204a5ffadf668d2b84479c9b14c029b0a40f, pool=0x4181dd08E73BbCdd1Ba3E615A18f6abD941b94C0, fromSize=50000, toSize=0, price=79926900000000000000000, capped=false)",
         "TankCharged(follower=0x7d736A88978e94E60494Ff91C49Ba838EDfb1932, amount=10877058000000000)"
       ]
+    },
+    "refills": [
+      {
+        "target": "10",
+        "feesWithdrawn": "21.5",
+        "bridged": "0",
+        "before": {
+          "at": "2026-10-28T21:09:36.676Z",
+          "gate": "21.5",
+          "reviewer": "5.6926863724",
+          "ownerHideki": "63.10115258",
+          "ownerShannon": "8.463433165"
+        },
+        "after": {
+          "at": "2026-10-28T21:09:44.705Z",
+          "gate": "0",
+          "reviewer": "10",
+          "ownerHideki": "84.600801802",
+          "ownerShannon": "4.1559931354"
+        }
+      }
+    ],
+    "allowIncreaseEstimateAtDeploy": {
+      "random trader / random follower": "1051690",
+      "leader / follower": "1051690"
     }
   },
   "reviews": [

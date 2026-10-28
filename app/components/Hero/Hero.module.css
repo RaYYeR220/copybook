@@ -4,7 +4,7 @@
   min-height: max(100svh, 760px);
   display: flex;
   flex-direction: column;
-  padding: 0 var(--gut);
+  padding: 80px var(--gut) 0; /* the banner sits over the top 80px */
   background: var(--dusk-1);
 }
 
@@ -179,13 +179,13 @@
   font: 400 11px/1.5 var(--mono);
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--ink-3);
+  color: var(--ink-2);
   font-variant-numeric: tabular-nums;
 }
 
 .foot b {
   font-weight: 400;
-  color: var(--ink-2);
+  color: var(--ink);
 }
 
 .frameNote {
@@ -214,6 +214,10 @@
 }
 
 @media (max-width: 760px) {
+  .hero {
+    padding-top: 64px;
+  }
+
   .col {
     padding-top: 206px;
   }

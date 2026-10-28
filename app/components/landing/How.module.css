@@ -90,7 +90,7 @@
 .num {
   font: italic 500 22px/1 var(--display);
   font-variation-settings: "opsz" 72, "SOFT" 100;
-  color: var(--ink-3);
+  color: var(--ink-2);
 }
 
 .vb {
@@ -117,7 +117,7 @@
   font: 400 11px/1.4 var(--mono);
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--ink-3);
+  color: var(--ink-2);
 }
 
 .perchLocal {

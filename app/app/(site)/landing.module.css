@@ -3,6 +3,25 @@
   overflow-x: clip;
 }
 
+/* the banner lies over the hero's top; only its links take the pointer, so the hero can be steered under it */
+.banner {
+  position: absolute;
+  z-index: 5;
+  top: 0;
+  left: 0;
+  right: 0;
+  padding: 0 var(--gut);
+  pointer-events: none;
+}
+
+.banner a {
+  pointer-events: auto;
+}
+
+.page main:focus {
+  outline: none;
+}
+
 .footWrap {
   position: relative;
   background: var(--night-0);

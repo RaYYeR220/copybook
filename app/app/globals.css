@@ -23,7 +23,7 @@
 
   /* the one accent: the last light at dusk, the meridian at night */
   --gold: #caa063;
-  --gold-deep: #835e22;
+  --gold-deep: #7a571f; /* 4.8:1 over the hero's apricot horizon, where the same-block mark sits (5.4:1 on dusk-1) */
   --gold-ink: #1a140c;
   --gold-wash: rgba(202, 160, 99, 0.08);
   --gold-line: rgba(202, 160, 99, 0.55);
@@ -83,7 +83,6 @@
 html {
   background: var(--night-0);
   -webkit-text-size-adjust: 100%;
-  color-scheme: dark;
 }
 
 body {
@@ -114,7 +113,7 @@ ol {
 }
 
 :focus-visible {
-  outline: 1px solid var(--gold);
+  outline: 1px solid var(--mark); /* gold at night, gold-deep at dusk (≥ 3:1 on both grounds) */
   outline-offset: 5px;
   border-radius: var(--r-pill);
 }
@@ -126,6 +125,24 @@ ol {
   overflow: hidden;
   clip: rect(0 0 0 0);
   white-space: nowrap;
+}
+
+.skip {
+  position: absolute;
+  z-index: 100;
+  top: 12px;
+  left: 12px;
+  padding: 10px 16px;
+  border-radius: var(--r-pill);
+  background: var(--ink);
+  color: var(--dusk-0);
+  font: 500 14px/1 var(--body);
+  transform: translateY(-200%);
+}
+
+.skip:focus-visible {
+  transform: none;
+  outline-color: var(--gold);
 }
 
 .mono {
@@ -144,6 +161,7 @@ ol {
   --mark: var(--gold-deep);
   --soft: 100;
   color: var(--ink);
+  color-scheme: light;
 }
 
 .night {
@@ -156,6 +174,7 @@ ol {
   --mark: var(--gold);
   --soft: 0;
   color: var(--bone);
+  color-scheme: dark;
 }
 
 /* ---------- texture floor: grain, pools, 64px grid ---------- */

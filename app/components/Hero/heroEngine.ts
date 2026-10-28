@@ -124,7 +124,7 @@ export function startHeroFlock(opt: HeroFlockOptions): () => void {
     tagW = tag.offsetWidth;
     tagH = tag.offsetHeight;
     // the guided sheet stays below the nav text
-    guard = [...hero.querySelectorAll("[data-flock-guard]")].map((el) => {
+    guard = [...document.querySelectorAll("[data-flock-guard]")].map((el) => {
       const q = el.getBoundingClientRect();
       return [q.left - r.left - 16, q.right - r.left + 16, q.bottom - r.top + 8] as Span;
     });

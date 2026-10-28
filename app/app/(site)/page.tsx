@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Footer } from "@/components/Footer";
+import { Nav, type NavLink } from "@/components/Nav";
 import { Hero } from "@/components/Hero/Hero";
 import { Closing } from "@/components/landing/Closing";
 import { Guard } from "@/components/landing/Guard";
@@ -9,7 +10,16 @@ import { Proof } from "@/components/landing/Proof";
 import { Refusals } from "@/components/landing/Refusals";
 import { Theses } from "@/components/landing/Theses";
 import { RevealObserver } from "@/components/RevealObserver";
+import { APP_PATH } from "@/content/site";
 import styles from "./landing.module.css";
+
+const NAV: NavLink[] = [
+  { href: "#how", label: "How it works" },
+  { href: "#proof", label: "Proof" },
+  { href: "#theses", label: "Theses" },
+  { href: "#guard", label: "AI guard" },
+  { href: APP_PATH, label: "Open app" },
+];
 
 export const metadata: Metadata = {
   title: { absolute: "Copybook — follow a trader or a thesis on dreamDEX perps" },
@@ -22,7 +32,13 @@ export const viewport: Viewport = {
 export default function Landing() {
   return (
     <div className={styles.page}>
-      <main>
+      <a className="skip" href="#main">
+        Skip to content
+      </a>
+      <div className={`${styles.banner} dusk`}>
+        <Nav links={NAV} className="rise" flockGuard />
+      </div>
+      <main id="main" tabIndex={-1}>
         <Hero />
         <How />
         <Proof />

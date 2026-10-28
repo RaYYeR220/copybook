@@ -81,9 +81,10 @@ export function Refusals() {
           <HorizonDiagram />
           <div className={`${styles.reading} reveal`} style={delay(0.08)}>
             <p className="kicker">Read off the chain</p>
-            <h3 className={`h3 ${styles.readingTitle}`} id="ref-h">
+            {/* the plate's heading: an h2 like the other plates, set at the reading's smaller size */}
+            <h2 className={`h3 ${styles.readingTitle}`} id="ref-h">
               A refusal is a record too.
-            </h3>
+            </h2>
             <Ledger
               className={styles.ledger}
               rows={[

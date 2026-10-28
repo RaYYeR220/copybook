@@ -15,10 +15,15 @@ export const USDSO = "0xed7993A74dAe1e6656B704A424DcD8711aAf4F72" as const;
 export const PLACE_ORDER_FOR = "0x80054449" as const;
 export const REACTIVITY = "0x0000000000000000000000000000000000000100" as const;
 
-/** Keys are read at runtime from the file named by COPYBOOK_ENV (KEY=VALUE lines); see .env.example. */
-function loadEnv(): Record<string, string> {
+/**
+ * Keys are read from the file named by COPYBOOK_ENV (KEY=VALUE lines; names in .env.example), on first use only,
+ * so tools that need no key (record-deploy, the RPC shim, typecheck) run without it.
+ */
+let loaded: Record<string, string> | undefined;
+function env(): Record<string, string> {
+  if (loaded) return loaded;
   const path = process.env.COPYBOOK_ENV;
-  if (!path) throw new Error("set COPYBOOK_ENV to the env file holding the wallet keys");
+  if (!path) throw new Error("set COPYBOOK_ENV to the env file holding the wallet keys (see .env.example)");
   const out: Record<string, string> = {};
   for (const line of readFileSync(path, "utf8").split(/\r?\n/)) {
     const t = line.trim();
@@ -26,17 +31,19 @@ function loadEnv(): Record<string, string> {
     const i = t.indexOf("=");
     out[t.slice(0, i).trim()] = t.slice(i + 1).trim();
   }
-  return out;
+  return (loaded = out);
 }
 
-export const env = loadEnv();
+export type Role = "HUB_OWNER" | "LEADER" | "FOLLOWER" | "FOLLOWER2";
 
-export type Role = "HUB_OWNER" | "LEADER" | "FOLLOWER" | "FOLLOWER2" | "FUNDER2";
+function key(role: Role): Hex {
+  const pk = env()[`${role}_PK`];
+  if (!pk) throw new Error(`missing ${role}_PK in COPYBOOK_ENV`);
+  return pk as Hex;
+}
 
 export function account(role: Role): PrivateKeyAccount {
-  const pk = env[`${role}_PK`];
-  if (!pk) throw new Error(`missing ${role}_PK`);
-  return privateKeyToAccount(pk as Hex);
+  return privateKeyToAccount(key(role));
 }
 
 const transport = () => http(RPC_URL, { retryCount: 6, retryDelay: 2_000, timeout: 60_000 });
@@ -52,6 +59,6 @@ export function markets(role?: Role): SomniaMarkets {
     chain,
     indexerUrl: INDEXER_URL,
     addresses: SOMNIA_HIDEKI_TESTNET_ADDRESSES,
-    ...(role ? { privateKey: env[`${role}_PK`] as Hex } : {}),
+    ...(role ? { privateKey: key(role) } : {}),
   } as never);
 }

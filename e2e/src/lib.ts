@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, existsSync, renameSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -104,9 +104,16 @@ type Proof = {
   sameBlock: SameBlock[];
   measurements: Record<string, unknown>;
 };
-export const proof: Proof = existsSync(PROOF)
-  ? JSON.parse(readFileSync(PROOF, "utf8"))
-  : { ...deployment, scenarios: {}, sameBlock: [], measurements: {} };
+/** The proof of this deployment; a proof left by another hub is kept beside it as proof-<hub>.json. */
+function loadProof(): Proof {
+  const fresh = { ...deployment, scenarios: {}, sameBlock: [], measurements: {} } as Proof;
+  if (!existsSync(PROOF)) return fresh;
+  const prev = JSON.parse(readFileSync(PROOF, "utf8")) as Proof;
+  if (getAddress(prev.hub) === HUB) return prev;
+  renameSync(PROOF, resolve(dirname(PROOF), `proof-${prev.hub}.json`));
+  return fresh;
+}
+export const proof: Proof = loadProof();
 
 const big = (_: string, v: unknown) => (typeof v === "bigint" ? v.toString() : v);
 export function saveProof() {

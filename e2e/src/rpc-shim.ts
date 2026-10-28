@@ -3,6 +3,8 @@
 // rejected outright. It also answers eth_getStorageAt for an empty slot with "0x". The shim reads state at
 // "latest" and pads empty storage words.
 // Usage: tsx src/rpc-shim.ts [port]  ->  forge script ... --rpc-url http://127.0.0.1:<port>
+// Warning: for broadcasting from this machine only. It listens on localhost and relays whatever it is sent; never
+// expose it beyond 127.0.0.1.
 import { createServer } from "node:http";
 
 const RPC_URL = process.env.HIDEKI_RPC ?? "https://api.hideki2.infra.testnet.somnia.network";

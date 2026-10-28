@@ -1,4 +1,4 @@
-import { getTraderStats, riskSummary, IndexerError } from "@copybook/stats";
+import { getTraderStats, riskRubric, riskSummary, IndexerError } from "@copybook/stats";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -20,8 +20,13 @@ export async function GET(_req: Request, ctx: { params: Promise<{ trader: string
   if (!ADDRESS_RE.test(trader)) return json({ error: "invalid trader address" }, 400);
   try {
     const stats = await getTraderStats(trader as `0x${string}`, { maxRows: ROW_CAP });
-    // asOf is the response time; the response may be served from cache for up to s-maxage.
-    return json({ trader: stats.trader, summary: riskSummary(stats), stats, asOf: new Date().toISOString() }, 200, CACHE);
+    // `rubric` holds only the keys the published rubric reads (the validators classify it); `summary` is the fuller
+    // line for people. asOf is the response time; the response may be served from cache for up to s-maxage.
+    return json(
+      { trader: stats.trader, rubric: riskRubric(stats), summary: riskSummary(stats), stats, asOf: new Date().toISOString() },
+      200,
+      CACHE,
+    );
   } catch (err) {
     if (err instanceof IndexerError) return json({ error: "risk summary unavailable" }, 502);
     console.error("risk route failed", err);

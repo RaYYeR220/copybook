@@ -10,9 +10,9 @@ import {Tier, RiskMessages} from "./RiskTypes.sol";
 
 /// @title RiskReviewer
 /// @notice Reviews a trader for the gate on Hideki using two Somnia validator committees on Shannon. A review
-/// request arrives over Hyperlane; stage 1 has the JSON API agent fetch the trader's risk summary from
-/// `baseUrl + <trader>` (field `summary`); stage 2 has the LLM agent classify that summary as OK, CAUTION or
-/// BLOCK. The reduced tier goes back to the gate over Hyperlane. Every accepted request ends in a reply: on any
+/// request arrives over Hyperlane; stage 1 has the JSON API agent fetch the trader's risk line from
+/// `baseUrl + <trader>` (field `summarySelector`, by default `rubric`: only the keys the published rubric reads);
+/// stage 2 has the LLM agent classify that line as OK, CAUTION or BLOCK, with the rubric as its system message. The reduced tier goes back to the gate over Hyperlane. Every accepted request ends in a reply: on any
 /// failure (unfunded, platform refusal, committee failure or timeout, no agreed summary, no majority tier) the
 /// reply carries `Tier.None`, which the gate treats as "no verdict".
 /// @dev Agent deposits are paid from this contract's balance; the owner funds it.
@@ -31,9 +31,11 @@ contract RiskReviewer is IMessageRecipient, Ownable2Step {
     uint256 public constant LLM_PER_AGENT_COST = 0.07 ether;
     /// @notice Longest summary or answer read from a validator; longer results are ignored.
     uint256 public constant MAX_TEXT_BYTES = 1024;
-    string public constant SUMMARY_FIELD = "summary";
+    /// @notice The endpoint's JSON field fetched in stage 1: the rubric's inputs only.
+    string public constant DEFAULT_SUMMARY_SELECTOR = "rubric";
+    /// @notice The published rubric (eval/rubric.ts), sent as the LLM's system message.
     string public constant DEFAULT_SYSTEM_PROMPT =
-        "You review perpetual-futures traders for people who copy their positions automatically. Read the 30-day stats (key=value). n/a means unknown, not safe. partial=1 means only the most recent activity was read. history=none means no trades. Answer with exactly one word: BLOCK if a follower copying this trader is likely to be wiped out (repeated liquidations or a drawdown near or above the margin), CAUTION if risk is elevated or the data is too thin to judge, OK otherwise.";
+        "You review perpetual-futures traders for people who copy their positions automatically. Apply this rubric exactly to the 30-day stats (key=value; n/a means unknown, not safe). BLOCK if liquidations30d is 2 or more, or maxDrawdownPct30d is present and at least 50. Otherwise CAUTION if liquidations30d is 1, or trades30d is below 10, or history=none, or partial=1, or maxDrawdownPct30d is present and at least 25. Otherwise OK. Answer with exactly one word: OK, CAUTION or BLOCK.";
 
     enum Failure {
         Unfunded,
@@ -64,6 +66,9 @@ contract RiskReviewer is IMessageRecipient, Ownable2Step {
     uint256 public llmAgentId;
     /// @notice Risk summary endpoint; the lowercase trader address is appended.
     string public baseUrl;
+    /// @notice JSON field of the endpoint's response that stage 1 fetches.
+    string public summarySelector;
+    /// @notice Stage 2's system message.
     string public systemPrompt;
     mapping(uint256 requestId => SummaryJob) public summaryJobs;
     mapping(uint256 requestId => VerdictJob) public verdictJobs;
@@ -96,6 +101,7 @@ contract RiskReviewer is IMessageRecipient, Ownable2Step {
     event ReplyFailed(address indexed trader, uint64 nonce, Tier tier);
     event BaseUrlSet(string baseUrl);
     event SystemPromptSet(string systemPrompt);
+    event SummarySelectorSet(string summarySelector);
     event GateSet(address gate);
     event AgentsSet(uint256 jsonAgentId, uint256 llmAgentId);
     event Withdrawn(address indexed to, uint256 amount);
@@ -135,6 +141,7 @@ contract RiskReviewer is IMessageRecipient, Ownable2Step {
         GATE_DOMAIN = gateDomain_;
         gate = gate_;
         baseUrl = baseUrl_;
+        summarySelector = DEFAULT_SUMMARY_SELECTOR;
         systemPrompt = DEFAULT_SYSTEM_PROMPT;
         jsonAgentId = DEFAULT_JSON_AGENT_ID;
         llmAgentId = DEFAULT_LLM_AGENT_ID;
@@ -163,7 +170,7 @@ contract RiskReviewer is IMessageRecipient, Ownable2Step {
         }
 
         bytes memory payload = abi.encodeWithSelector(
-            IJsonApiAgent.fetchString.selector, string.concat(baseUrl, trader.toHexString()), SUMMARY_FIELD
+            IJsonApiAgent.fetchString.selector, string.concat(baseUrl, trader.toHexString()), summarySelector
         );
         try PLATFORM.createAdvancedRequest{value: summaryDeposit}(
             jsonAgentId,
@@ -228,8 +235,9 @@ contract RiskReviewer is IMessageRecipient, Ownable2Step {
         allowed[0] = "OK";
         allowed[1] = "CAUTION";
         allowed[2] = "BLOCK";
-        bytes memory payload =
-            abi.encodeWithSelector(ILLMInferenceAgent.inferString.selector, promptFor(summary), "", false, allowed);
+        bytes memory payload = abi.encodeWithSelector(
+            ILLMInferenceAgent.inferString.selector, promptFor(summary), systemPrompt, false, allowed
+        );
         try PLATFORM.createAdvancedRequest{value: deposit}(
             llmAgentId,
             address(this),
@@ -303,9 +311,9 @@ contract RiskReviewer is IMessageRecipient, Ownable2Step {
         return (floor + JSON_PER_AGENT_COST * COMMITTEE_SIZE, floor + LLM_PER_AGENT_COST * COMMITTEE_SIZE);
     }
 
-    /// @notice The prompt stage 2 sends for `summary`.
-    function promptFor(string memory summary) public view returns (string memory) {
-        return string.concat(systemPrompt, "\nStats: ", summary);
+    /// @notice The user prompt stage 2 sends for `summary`; `systemPrompt` goes with it as the system message.
+    function promptFor(string memory summary) public pure returns (string memory) {
+        return string.concat("Stats: ", summary);
     }
 
     /// @notice Reads one validator's answer: the first run of ASCII letters (leading non-letters skipped),
@@ -338,6 +346,12 @@ contract RiskReviewer is IMessageRecipient, Ownable2Step {
         emit SystemPromptSet(systemPrompt_);
     }
 
+    function setSummarySelector(string calldata summarySelector_) external onlyOwner {
+        if (bytes(summarySelector_).length == 0) revert EmptyValue();
+        summarySelector = summarySelector_;
+        emit SummarySelectorSet(summarySelector_);
+    }
+
     function setGate(address gate_) external onlyOwner {
         if (gate_ == address(0)) revert ZeroAddress();
         gate = gate_;
@@ -360,7 +374,7 @@ contract RiskReviewer is IMessageRecipient, Ownable2Step {
         emit Withdrawn(to, amount);
     }
 
-    /// @notice Disabled: the endpoint, prompt, agents and funds must stay manageable.
+    /// @notice Disabled: the endpoint, field, prompt, agents and funds must stay manageable.
     function renounceOwnership() public pure override {
         revert RenounceDisabled();
     }

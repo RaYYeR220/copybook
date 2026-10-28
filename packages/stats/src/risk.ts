@@ -35,3 +35,18 @@ export function riskSummary(s: TraderStats): string {
   const tail = flags.length ? " " + flags.join(" ") : "";
   return parts.join(" ").slice(0, RISK_SUMMARY_MAX_LENGTH - tail.length) + tail;
 }
+
+const count = (x: number) => (Number.isFinite(x) ? String(x) : NA);
+
+/**
+ * The published rubric's inputs and nothing else: liquidations, trades, the drawdown percentage when it could be
+ * estimated (absent otherwise, exactly as in `riskSummary`), and the history and partial flags, always stated.
+ * This is the line the validators classify; `riskSummary` stays the fuller line for people.
+ */
+export function riskRubric(s: TraderStats): string {
+  const w = `${s.windowDays}d`;
+  const parts = [`liquidations${w}=${count(s.liquidations30d)}`, `trades${w}=${count(s.trades30d)}`];
+  if (s.maxDrawdownPct30d != null) parts.push(`maxDrawdownPct${w}=${s.maxDrawdownPct30d.toFixed(1)}`);
+  parts.push(`history=${s.hasHistory ? "yes" : "none"}`, `partial=${s.truncated ? 1 : 0}`);
+  return parts.join(" ");
+}

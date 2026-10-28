@@ -1,0 +1,2176 @@
+{
+  "run": "v3",
+  "scoredAt": "2026-10-28T14:45:28.359Z",
+  "answerKeyGeneratedAt": "2026-10-28T14:29:27.684Z",
+  "systemPrompt": "You review perpetual-futures traders for people who copy their positions automatically. Apply this rubric exactly to the 30-day stats (key=value; n/a means unknown, not safe). BLOCK if liquidations30d is 2 or more, or maxDrawdownPct30d is present and at least 50. Otherwise CAUTION if liquidations30d is 1, or trades30d is below 10, or history=none, or partial=1, or maxDrawdownPct30d is present and at least 25. Otherwise OK. Answer with exactly one word: OK, CAUTION or BLOCK.",
+  "summary": {
+    "traders": 20,
+    "reviewed": 20,
+    "failures": 0,
+    "summaryChanged": 0,
+    "agreementPreRegistered": 18,
+    "agreementOnSeenSummary": 18,
+    "falseBlocks": 0,
+    "missedBlocks": 0,
+    "gateDecisionsAgreeing": 20,
+    "blockRecall": {
+      "caught": 6,
+      "expected": 6
+    },
+    "falseBlockRate": {
+      "falseBlocks": 0,
+      "notBlockExpected": 14
+    },
+    "inferenceAsPublished": 20,
+    "validatorAnswers": 60,
+    "validatorAnswersAgreeing": 54,
+    "confusionPreRegistered": {
+      "OK": {
+        "OK": 5,
+        "CAUTION": 0,
+        "BLOCK": 0,
+        "None": 0
+      },
+      "CAUTION": {
+        "OK": 2,
+        "CAUTION": 7,
+        "BLOCK": 0,
+        "None": 0
+      },
+      "BLOCK": {
+        "OK": 0,
+        "CAUTION": 0,
+        "BLOCK": 6,
+        "None": 0
+      }
+    },
+    "confusionOnSeenSummary": {
+      "OK": {
+        "OK": 5,
+        "CAUTION": 0,
+        "BLOCK": 0,
+        "None": 0
+      },
+      "CAUTION": {
+        "OK": 2,
+        "CAUTION": 7,
+        "BLOCK": 0,
+        "None": 0
+      },
+      "BLOCK": {
+        "OK": 0,
+        "CAUTION": 0,
+        "BLOCK": 6,
+        "None": 0
+      }
+    }
+  },
+  "rows": [
+    {
+      "trader": "0xfc2Fb08CCCF87BFC472cded8E7eBEF588fCF7fd2",
+      "pickedAs": "clean",
+      "expected": "OK",
+      "reasons": [],
+      "preRegisteredLine": "liquidations30d=0 trades30d=113 history=yes partial=0",
+      "preRegisteredHash": "0x9c65fbc561cfd25b439622a0a7c45654497eeb82813077393b131ea78f8c3158",
+      "reviewed": true,
+      "requestedAt": "2026-10-28T14:30:02.456Z",
+      "nonce": 24,
+      "seenSummary": "liquidations30d=0 trades30d=113 history=yes partial=0",
+      "seenHash": "0x9c65fbc561cfd25b439622a0a7c45654497eeb82813077393b131ea78f8c3158",
+      "seenHashRecomputed": true,
+      "summaryMatch": true,
+      "reviewer": "0xc999B6924179a0dc9649DA7eBa8F3aC8b7CF7c25",
+      "fetched": {
+        "url": "https://copybook-eosin.vercel.app/api/risk/0xfc2fb08cccf87bfc472cded8e7ebef588fcf7fd2",
+        "field": "rubric"
+      },
+      "inference": {
+        "prompt": "Stats: liquidations30d=0 trades30d=113 history=yes partial=0",
+        "system": "You review perpetual-futures traders for people who copy their positions automatically. Apply this rubric exactly to the 30-day stats (key=value; n/a means unknown, not safe). BLOCK if liquidations30d is 2 or more, or maxDrawdownPct30d is present and at least 50. Otherwise CAUTION if liquidations30d is 1, or trades30d is below 10, or history=none, or partial=1, or maxDrawdownPct30d is present and at least 25. Otherwise OK. Answer with exactly one word: OK, CAUTION or BLOCK.",
+        "chainOfThought": false,
+        "allowed": [
+          "OK",
+          "CAUTION",
+          "BLOCK"
+        ]
+      },
+      "inferenceAsPublished": true,
+      "expectedOnSeen": "OK",
+      "expectedOnSeenReasons": [],
+      "committee": "OK",
+      "previousRun": "BLOCK",
+      "votes": {
+        "ok": 3,
+        "caution": 0,
+        "block": 0,
+        "responded": 3
+      },
+      "jsonStage": {
+        "requestId": "18076209",
+        "status": 2,
+        "identical": true,
+        "validators": [
+          {
+            "validator": "0x3E05e29029C60E000C8F01EB5AC9cEE6b242D7e0",
+            "status": 2,
+            "receipt": "0",
+            "executionCost": "300000000000000"
+          },
+          {
+            "validator": "0x55Acbe370872c7D90F504eF169217a00c29E2A33",
+            "status": 2,
+            "receipt": "0",
+            "executionCost": "300000000000000"
+          },
+          {
+            "validator": "0x1Cb38b3ee632B5dCc0347dB81766606d6Aad4926",
+            "status": 2,
+            "receipt": "0",
+            "executionCost": "300000000000000"
+          }
+        ]
+      },
+      "answers": [
+        {
+          "validator": "0x05f1fE2DDF9B65576D3165E37C6A60e6c5Ba93De",
+          "status": 2,
+          "receipt": "0",
+          "executionCost": "70000000000000000",
+          "answer": "OK"
+        },
+        {
+          "validator": "0x3E05e29029C60E000C8F01EB5AC9cEE6b242D7e0",
+          "status": 2,
+          "receipt": "0",
+          "executionCost": "70000000000000000",
+          "answer": "OK"
+        },
+        {
+          "validator": "0x55Acbe370872c7D90F504eF169217a00c29E2A33",
+          "status": 2,
+          "receipt": "0",
+          "executionCost": "70000000000000000",
+          "answer": "OK"
+        }
+      ],
+      "llmRequestId": "18076215",
+      "gate": {
+        "event": "BlockHeld",
+        "tier": "OK"
+      },
+      "storedOnGate": "Block",
+      "txs": {
+        "gateRequest": "https://explorer.testnet.somnia.network/tokyo/tx/0x403b9e76f17de05b704afd4e50dcb9ba8a8ecf9b574b2db0f4102971bde67da7",
+        "summaryRequest": "https://shannon-explorer.somnia.network/tx/0x9ff258aa58a15bdba7de3a6ef6050eb44289280b228460fe8bc109b7cab287d2",
+        "verdictRequest": "https://shannon-explorer.somnia.network/tx/0x411d8fe0cc30449680b5bfd09fc0d5098e593b13bba7fe8d578090ed113e18e4",
+        "verdict": "https://shannon-explorer.somnia.network/tx/0x9767f41bdef68987ccb2ce71c2dfb20921a6c697ffb969d16507a62d4e8057a4",
+        "gateDelivery": "https://explorer.testnet.somnia.network/tokyo/tx/0xdabd7cc9c0bd481d09df85aa8a6067b2c64be30a51d9b6641bac811276843eb7"
+      }
+    },
+    {
+      "trader": "0xA14d4561F2697859AB6c2d5eb62E1172a6cc3D14",
+      "pickedAs": "liquidated-2+",
+      "expected": "BLOCK",
+      "reasons": [
+        "liquidations30d=3 >= 2",
+        "maxDrawdownPct30d=92.2 >= 50"
+      ],
+      "preRegisteredLine": "liquidations30d=3 trades30d=115 maxDrawdownPct30d=92.2 history=yes partial=0",
+      "preRegisteredHash": "0x92adb41ef8ba91aa37096ea1afc3a6d4f49db97126f1aea575e1d29854cec5b8",
+      "reviewed": true,
+      "requestedAt": "2026-10-28T14:30:29.690Z",
+      "nonce": 25,
+      "seenSummary": "liquidations30d=3 trades30d=115 maxDrawdownPct30d=92.2 history=yes partial=0",
+      "seenHash": "0x92adb41ef8ba91aa37096ea1afc3a6d4f49db97126f1aea575e1d29854cec5b8",
+      "seenHashRecomputed": true,
+      "summaryMatch": true,
+      "reviewer": "0xc999B6924179a0dc9649DA7eBa8F3aC8b7CF7c25",
+      "fetched": {
+        "url": "https://copybook-eosin.vercel.app/api/risk/0xa14d4561f2697859ab6c2d5eb62e1172a6cc3d14",
+        "field": "rubric"
+      },
+      "inference": {
+        "prompt": "Stats: liquidations30d=3 trades30d=115 maxDrawdownPct30d=92.2 history=yes partial=0",
+        "system": "You review perpetual-futures traders for people who copy their positions automatically. Apply this rubric exactly to the 30-day stats (key=value; n/a means unknown, not safe). BLOCK if liquidations30d is 2 or more, or maxDrawdownPct30d is present and at least 50. Otherwise CAUTION if liquidations30d is 1, or trades30d is below 10, or history=none, or partial=1, or maxDrawdownPct30d is present and at least 25. Otherwise OK. Answer with exactly one word: OK, CAUTION or BLOCK.",
+        "chainOfThought": false,
+        "allowed": [
+          "OK",
+          "CAUTION",
+          "BLOCK"
+        ]
+      },
+      "inferenceAsPublished": true,
+      "expectedOnSeen": "BLOCK",
+      "expectedOnSeenReasons": [
+        "liquidations30d=3 >= 2",
+        "maxDrawdownPct30d=92.2 >= 50"
+      ],
+      "committee": "BLOCK",
+      "previousRun": "BLOCK",
+      "votes": {
+        "ok": 0,
+        "caution": 0,
+        "block": 3,
+        "responded": 3
+      },
+      "jsonStage": {
+        "requestId": "18076236",
+        "status": 2,
+        "identical": true,
+        "validators": [
+          {
+            "validator": "0x05f1fE2DDF9B65576D3165E37C6A60e6c5Ba93De",
+            "status": 2,
+            "receipt": "0",
+            "executionCost": "300000000000000"
+          },
+          {
+            "validator": "0x1Cb38b3ee632B5dCc0347dB81766606d6Aad4926",
+            "status": 2,
+            "receipt": "0",
+            "executionCost": "300000000000000"
+          },
+          {
+            "validator": "0x3E05e29029C60E000C8F01EB5AC9cEE6b242D7e0",
+            "status": 2,
+            "receipt": "0",
+            "executionCost": "300000000000000"
+          }
+        ]
+      },
+      "answers": [
+        {
+          "validator": "0x1Cb38b3ee632B5dCc0347dB81766606d6Aad4926",
+          "status": 2,
+          "receipt": "0",
+          "executionCost": "70000000000000000",
+          "answer": "BLOCK"
+        },
+        {
+          "validator": "0x05f1fE2DDF9B65576D3165E37C6A60e6c5Ba93De",
+          "status": 2,
+          "receipt": "0",
+          "executionCost": "70000000000000000",
+          "answer": "BLOCK"
+        },
+        {
+          "validator": "0x3E05e29029C60E000C8F01EB5AC9cEE6b242D7e0",
+          "status": 2,
+          "receipt": "0",
+          "executionCost": "70000000000000000",
+          "answer": "BLOCK"
+        }
+      ],
+      "llmRequestId": "18076239",
+      "gate": {
+        "event": "VerdictReceived",
+        "tier": "BLOCK"
+      },
+      "storedOnGate": "Block",
+      "txs": {
+        "gateRequest": "https://explorer.testnet.somnia.network/tokyo/tx/0x80fbb9030770c7f9cbc9dbe9b18f45ffb4fa0f1440d06d8dc17134e7ea33933a",
+        "summaryRequest": "https://shannon-explorer.somnia.network/tx/0xe92c74f04f0d1c512a4bfb37b2acd08d156a365d45c44e65caa0cfc444186a7c",
+        "verdictRequest": "https://shannon-explorer.somnia.network/tx/0x2fdfb5c02032f71e0b99b85cc228c4d7bddba0f533f7ebc29c70c973f1ce6e4d",
+        "verdict": "https://shannon-explorer.somnia.network/tx/0x2f031bd20b1b5c9ac7a18d0e52402432ae2f2e78f5772b260125daf96dac539f",
+        "gateDelivery": "https://explorer.testnet.somnia.network/tokyo/tx/0x34280d921bb1fc19f77ebcf467d74bcb302a9c77e3520e9c14a116bb12e2b862"
+      }
+    },
+    {
+      "trader": "0x220c695eFB9a6914a334Ac7b783012F43C0BAF00",
+      "pickedAs": "liquidated-2+",
+      "expected": "BLOCK",
+      "reasons": [
+        "liquidations30d=6 >= 2"
+      ],
+      "preRegisteredLine": "liquidations30d=6 trades30d=633 history=yes partial=0",
+      "preRegisteredHash": "0x9137680a6e5e941eae9ffac8e2bdf1f2540004c31668b51679e511f41aa0ae0c",
+      "reviewed": true,
+      "requestedAt": "2026-10-28T14:30:54.149Z",
+      "nonce": 26,
+      "seenSummary": "liquidations30d=6 trades30d=633 history=yes partial=0",
+      "seenHash": "0x9137680a6e5e941eae9ffac8e2bdf1f2540004c31668b51679e511f41aa0ae0c",
+      "seenHashRecomputed": true,
+      "summaryMatch": true,
+      "reviewer": "0xc999B6924179a0dc9649DA7eBa8F3aC8b7CF7c25",
+      "fetched": {
+        "url": "https://copybook-eosin.vercel.app/api/risk/0x220c695efb9a6914a334ac7b783012f43c0baf00",
+        "field": "rubric"
+      },
+      "inference": {
+        "prompt": "Stats: liquidations30d=6 trades30d=633 history=yes partial=0",
+        "system": "You review perpetual-futures traders for people who copy their positions automatically. Apply this rubric exactly to the 30-day stats (key=value; n/a means unknown, not safe). BLOCK if liquidations30d is 2 or more, or maxDrawdownPct30d is present and at least 50. Otherwise CAUTION if liquidations30d is 1, or trades30d is below 10, or history=none, or partial=1, or maxDrawdownPct30d is present and at least 25. Otherwise OK. Answer with exactly one word: OK, CAUTION or BLOCK.",
+        "chainOfThought": false,
+        "allowed": [
+          "OK",
+          "CAUTION",
+          "BLOCK"
+        ]
+      },
+      "inferenceAsPublished": true,
+      "expectedOnSeen": "BLOCK",
+      "expectedOnSeenReasons": [
+        "liquidations30d=6 >= 2"
+      ],
+      "committee": "BLOCK",
+      "previousRun": "BLOCK",
+      "votes": {
+        "ok": 0,
+        "caution": 0,
+        "block": 3,
+        "responded": 3
+      },
+      "jsonStage": {
+        "requestId": "18076262",
+        "status": 2,
+        "identical": true,
+        "validators": [
+          {
+            "validator": "0x05f1fE2DDF9B65576D3165E37C6A60e6c5Ba93De",
+            "status": 2,
+            "receipt": "0",
+            "executionCost": "300000000000000"
+          },
+          {
+            "validator": "0x55Acbe370872c7D90F504eF169217a00c29E2A33",
+            "status": 2,
+            "receipt": "0",
+            "executionCost": "300000000000000"
+          },
+          {
+            "validator": "0x1Cb38b3ee632B5dCc0347dB81766606d6Aad4926",
+            "status": 2,
+            "receipt": "0",
+            "executionCost": "300000000000000"
+          }
+        ]
+      },
+      "answers": [
+        {
+          "validator": "0x05f1fE2DDF9B65576D3165E37C6A60e6c5Ba93De",
+          "status": 2,
+          "receipt": "0",
+          "executionCost": "70000000000000000",
+          "answer": "BLOCK"
+        },
+        {
+          "validator": "0x55Acbe370872c7D90F504eF169217a00c29E2A33",
+          "status": 2,
+          "receipt": "0",
+          "executionCost": "70000000000000000",
+          "answer": "BLOCK"
+        },
+        {
+          "validator": "0x1Cb38b3ee632B5dCc0347dB81766606d6Aad4926",
+          "status": 2,
+          "receipt": "0",
+          "executionCost": "70000000000000000",
+          "answer": "BLOCK"
+        }
+      ],
+      "llmRequestId": "18076265",
+      "gate": {
+        "event": "VerdictReceived",
+        "tier": "BLOCK"
+      },
+      "storedOnGate": "Block",
+      "txs": {
+        "gateRequest": "https://explorer.testnet.somnia.network/tokyo/tx/0x1a8c96debe1752efbec9cc5083593ec99e719f73ad759707c3a6e2aab54e2198",
+        "summaryRequest": "https://shannon-explorer.somnia.network/tx/0x31d84e8cf5f86fb51e8de7f76978d09e6eacbc3a1480fe1d28cae4d4470f36cf",
+        "verdictRequest": "https://shannon-explorer.somnia.network/tx/0x0df7aee1fd71d33ecf73ccb56b01d1b0a136a15944b90a9a29de0e44749cc5b4",
+        "verdict": "https://shannon-explorer.somnia.network/tx/0x0f29936416e94c96610e5e27ad57cd03b06fce6e76329fd4429da65444f680a0",
+        "gateDelivery": "https://explorer.testnet.somnia.network/tokyo/tx/0x9a961ee66d6406f93c7a689b0c22798698cebc75c2f7e262b99138cb76869363"
+      }
+    },
+    {
+      "trader": "0x5521160E05bB130783E003F746F03d9D31ea1e69",
+      "pickedAs": "liquidated-2+",
+      "expected": "BLOCK",
+      "reasons": [
+        "liquidations30d=3 >= 2"
+      ],
+      "preRegisteredLine": "liquidations30d=3 trades30d=337 history=yes partial=0",
+      "preRegisteredHash": "0x2265c280c18530ccc7906a67533ac8ac7e82523917c2b6ff8536900ad63f0748",
+      "reviewed": true,
+      "requestedAt": "2026-10-28T14:31:18.951Z",
+      "nonce": 27,
+      "seenSummary": "liquidations30d=3 trades30d=337 history=yes partial=0",
+      "seenHash": "0x2265c280c18530ccc7906a67533ac8ac7e82523917c2b6ff8536900ad63f0748",
+      "seenHashRecomputed": true,
+      "summaryMatch": true,
+      "reviewer": "0xc999B6924179a0dc9649DA7eBa8F3aC8b7CF7c25",
+      "fetched": {
+        "url": "https://copybook-eosin.vercel.app/api/risk/0x5521160e05bb130783e003f746f03d9d31ea1e69",
+        "field": "rubric"
+      },
+      "inference": {
+        "prompt": "Stats: liquidations30d=3 trades30d=337 history=yes partial=0",
+        "system": "You review perpetual-futures traders for people who copy their positions automatically. Apply this rubric exactly to the 30-day stats (key=value; n/a means unknown, not safe). BLOCK if liquidations30d is 2 or more, or maxDrawdownPct30d is present and at least 50. Otherwise CAUTION if liquidations30d is 1, or trades30d is below 10, or history=none, or partial=1, or maxDrawdownPct30d is present and at least 25. Otherwise OK. Answer with exactly one word: OK, CAUTION or BLOCK.",
+        "chainOfThought": false,
+        "allowed": [
+          "OK",
+          "CAUTION",
+          "BLOCK"
+        ]
+      },
+      "inferenceAsPublished": true,
+      "expectedOnSeen": "BLOCK",
+      "expectedOnSeenReasons": [
+        "liquidations30d=3 >= 2"
+      ],
+      "committee": "BLOCK",
+      "previousRun": "BLOCK",
+      "votes": {
+        "ok": 0,
+        "caution": 0,
+        "block": 3,
+        "responded": 3
+      },
+      "jsonStage": {
+        "requestId": "18076289",
+        "status": 2,
+        "identical": true,
+        "validators": [
+          {
+            "validator": "0x55Acbe370872c7D90F504eF169217a00c29E2A33",
+            "status": 2,
+            "receipt": "0",
+            "executionCost": "300000000000000"
+          },
+          {
+            "validator": "0x05f1fE2DDF9B65576D3165E37C6A60e6c5Ba93De",
+            "status": 2,
+            "receipt": "0",
+            "executionCost": "300000000000000"
+          },
+          {
+            "validator": "0x3E05e29029C60E000C8F01EB5AC9cEE6b242D7e0",
+            "status": 2,
+            "receipt": "0",
+            "executionCost": "300000000000000"
+          }
+        ]
+      },
+      "answers": [
+        {
+          "validator": "0x05f1fE2DDF9B65576D3165E37C6A60e6c5Ba93De",
+          "status": 2,
+          "receipt": "0",
+          "executionCost": "70000000000000000",
+          "answer": "BLOCK"
+        },
+        {
+          "validator": "0x55Acbe370872c7D90F504eF169217a00c29E2A33",
+          "status": 2,
+          "receipt": "0",
+          "executionCost": "70000000000000000",
+          "answer": "BLOCK"
+        },
+        {
+          "validator": "0x1Cb38b3ee632B5dCc0347dB81766606d6Aad4926",
+          "status": 2,
+          "receipt": "0",
+          "executionCost": "70000000000000000",
+          "answer": "BLOCK"
+        }
+      ],
+      "llmRequestId": "18076293",
+      "gate": {
+        "event": "VerdictReceived",
+        "tier": "BLOCK"
+      },
+      "storedOnGate": "Block",
+      "txs": {
+        "gateRequest": "https://explorer.testnet.somnia.network/tokyo/tx/0x356f7547b6d37d15639325023d325a21fa7c928d3f1866f232f49024f88897f6",
+        "summaryRequest": "https://shannon-explorer.somnia.network/tx/0x17c8a1e1616afb8ee8473ab50a2fefc23aee14fa985c1c74b40c2e208b4165f8",
+        "verdictRequest": "https://shannon-explorer.somnia.network/tx/0xb5b553abbd404b502474bc00a5ee324cc70e805d71c4b36c60c7ebf21f1cffad",
+        "verdict": "https://shannon-explorer.somnia.network/tx/0xb3fec6a74d2c5f25ef5652c9b637b9c710638c26af77f41e466f2ca27eb96d01",
+        "gateDelivery": "https://explorer.testnet.somnia.network/tokyo/tx/0xf30edd694ab2a1b9a32519e757224c48c44105427db9f0e8b3ef5b5c3ab091e6"
+      }
+    },
+    {
+      "trader": "0x1fAeD318FCeD713cC5764BD7B4974b39DDF5BFc7",
+      "pickedAs": "liquidated-2+",
+      "expected": "BLOCK",
+      "reasons": [
+        "liquidations30d=3 >= 2"
+      ],
+      "preRegisteredLine": "liquidations30d=3 trades30d=38 history=yes partial=0",
+      "preRegisteredHash": "0x2663bb7aae4df6bef80d037ede68ceec76471a130b3a133972b0c538970dfe8e",
+      "reviewed": true,
+      "requestedAt": "2026-10-28T14:31:58.306Z",
+      "nonce": 28,
+      "seenSummary": "liquidations30d=3 trades30d=38 history=yes partial=0",
+      "seenHash": "0x2663bb7aae4df6bef80d037ede68ceec76471a130b3a133972b0c538970dfe8e",
+      "seenHashRecomputed": true,
+      "summaryMatch": true,
+      "reviewer": "0xc999B6924179a0dc9649DA7eBa8F3aC8b7CF7c25",
+      "fetched": {
+        "url": "https://copybook-eosin.vercel.app/api/risk/0x1faed318fced713cc5764bd7b4974b39ddf5bfc7",
+        "field": "rubric"
+      },
+      "inference": {
+        "prompt": "Stats: liquidations30d=3 trades30d=38 history=yes partial=0",
+        "system": "You review perpetual-futures traders for people who copy their positions automatically. Apply this rubric exactly to the 30-day stats (key=value; n/a means unknown, not safe). BLOCK if liquidations30d is 2 or more, or maxDrawdownPct30d is present and at least 50. Otherwise CAUTION if liquidations30d is 1, or trades30d is below 10, or history=none, or partial=1, or maxDrawdownPct30d is present and at least 25. Otherwise OK. Answer with exactly one word: OK, CAUTION or BLOCK.",
+        "chainOfThought": false,
+        "allowed": [
+          "OK",
+          "CAUTION",
+          "BLOCK"
+        ]
+      },
+      "inferenceAsPublished": true,
+      "expectedOnSeen": "BLOCK",
+      "expectedOnSeenReasons": [
+        "liquidations30d=3 >= 2"
+      ],
+      "committee": "BLOCK",
+      "previousRun": "BLOCK",
+      "votes": {
+        "ok": 0,
+        "caution": 0,
+        "block": 3,
+        "responded": 3
+      },
+      "jsonStage": {
+        "requestId": "18076328",
+        "status": 2,
+        "identical": true,
+        "validators": [
+          {
+            "validator": "0x3E05e29029C60E000C8F01EB5AC9cEE6b242D7e0",
+            "status": 2,
+            "receipt": "0",
+            "executionCost": "300000000000000"
+          },
+          {
+            "validator": "0x05f1fE2DDF9B65576D3165E37C6A60e6c5Ba93De",
+            "status": 2,
+            "receipt": "0",
+            "executionCost": "300000000000000"
+          },
+          {
+            "validator": "0x1Cb38b3ee632B5dCc0347dB81766606d6Aad4926",
+            "status": 2,
+            "receipt": "0",
+            "executionCost": "300000000000000"
+          }
+        ]
+      },
+      "answers": [
+        {
+          "validator": "0x05f1fE2DDF9B65576D3165E37C6A60e6c5Ba93De",
+          "status": 2,
+          "receipt": "0",
+          "executionCost": "70000000000000000",
+          "answer": "BLOCK"
+        },
+        {
+          "validator": "0x3E05e29029C60E000C8F01EB5AC9cEE6b242D7e0",
+          "status": 2,
+          "receipt": "0",
+          "executionCost": "70000000000000000",
+          "answer": "BLOCK"
+        },
+        {
+          "validator": "0x55Acbe370872c7D90F504eF169217a00c29E2A33",
+          "status": 2,
+          "receipt": "0",
+          "executionCost": "70000000000000000",
+          "answer": "BLOCK"
+        }
+      ],
+      "llmRequestId": "18076331",
+      "gate": {
+        "event": "VerdictReceived",
+        "tier": "BLOCK"
+      },
+      "storedOnGate": "Block",
+      "txs": {
+        "gateRequest": "https://explorer.testnet.somnia.network/tokyo/tx/0xde50de51859989f44dbd9b19f1e719d93b51a5af78159b580e1cc7ee871b1915",
+        "summaryRequest": "https://shannon-explorer.somnia.network/tx/0x722dbdb1722967dab7e58ee468b8bf0fb4b757cd44e679068889a8eeba319faa",
+        "verdictRequest": "https://shannon-explorer.somnia.network/tx/0xb0e84d7c57db24aeca0180cdd4f6c331870f4d19e65907753dfdbc7db0857bfc",
+        "verdict": "https://shannon-explorer.somnia.network/tx/0xb8e8eb1d4e19a4ab3751eb450dab07794a3e7ffdd23a32e14232ff0e22010801",
+        "gateDelivery": "https://explorer.testnet.somnia.network/tokyo/tx/0x4d2ce64987961989d8da8bb492e9b3b5484dd7f78a141086f838e7588cc0da66"
+      }
+    },
+    {
+      "trader": "0x7c30179b81212f592f7D24d37aCbEC408e905b96",
+      "pickedAs": "liquidated-2+",
+      "expected": "BLOCK",
+      "reasons": [
+        "liquidations30d=3 >= 2"
+      ],
+      "preRegisteredLine": "liquidations30d=3 trades30d=60 history=yes partial=0",
+      "preRegisteredHash": "0xb8288b105f88112adce724820a892b4b81457274f7438ea39a7027dff8ecd8fc",
+      "reviewed": true,
+      "requestedAt": "2026-10-28T14:32:20.066Z",
+      "nonce": 29,
+      "seenSummary": "liquidations30d=3 trades30d=60 history=yes partial=0",
+      "seenHash": "0xb8288b105f88112adce724820a892b4b81457274f7438ea39a7027dff8ecd8fc",
+      "seenHashRecomputed": true,
+      "summaryMatch": true,
+      "reviewer": "0xc999B6924179a0dc9649DA7eBa8F3aC8b7CF7c25",
+      "fetched": {
+        "url": "https://copybook-eosin.vercel.app/api/risk/0x7c30179b81212f592f7d24d37acbec408e905b96",
+        "field": "rubric"
+      },
+      "inference": {
+        "prompt": "Stats: liquidations30d=3 trades30d=60 history=yes partial=0",
+        "system": "You review perpetual-futures traders for people who copy their positions automatically. Apply this rubric exactly to the 30-day stats (key=value; n/a means unknown, not safe). BLOCK if liquidations30d is 2 or more, or maxDrawdownPct30d is present and at least 50. Otherwise CAUTION if liquidations30d is 1, or trades30d is below 10, or history=none, or partial=1, or maxDrawdownPct30d is present and at least 25. Otherwise OK. Answer with exactly one word: OK, CAUTION or BLOCK.",
+        "chainOfThought": false,
+        "allowed": [
+          "OK",
+          "CAUTION",
+          "BLOCK"
+        ]
+      },
+      "inferenceAsPublished": true,
+      "expectedOnSeen": "BLOCK",
+      "expectedOnSeenReasons": [
+        "liquidations30d=3 >= 2"
+      ],
+      "committee": "BLOCK",
+      "previousRun": "BLOCK",
+      "votes": {
+        "ok": 0,
+        "caution": 0,
+        "block": 3,
+        "responded": 3
+      },
+      "jsonStage": {
+        "requestId": "18076351",
+        "status": 2,
+        "identical": true,
+        "validators": [
+          {
+            "validator": "0x55Acbe370872c7D90F504eF169217a00c29E2A33",
+            "status": 2,
+            "receipt": "0",
+            "executionCost": "300000000000000"
+          },
+          {
+            "validator": "0x05f1fE2DDF9B65576D3165E37C6A60e6c5Ba93De",
+            "status": 2,
+            "receipt": "0",
+            "executionCost": "300000000000000"
+          },
+          {
+            "validator": "0x1Cb38b3ee632B5dCc0347dB81766606d6Aad4926",
+            "status": 2,
+            "receipt": "0",
+            "executionCost": "300000000000000"
+          }
+        ]
+      },
+      "answers": [
+        {
+          "validator": "0x05f1fE2DDF9B65576D3165E37C6A60e6c5Ba93De",
+          "status": 2,
+          "receipt": "0",
+          "executionCost": "70000000000000000",
+          "answer": "BLOCK"
+        },
+        {
+          "validator": "0x3E05e29029C60E000C8F01EB5AC9cEE6b242D7e0",
+          "status": 2,
+          "receipt": "0",
+          "executionCost": "70000000000000000",
+          "answer": "BLOCK"
+        },
+        {
+          "validator": "0x1Cb38b3ee632B5dCc0347dB81766606d6Aad4926",
+          "status": 2,
+          "receipt": "0",
+          "executionCost": "70000000000000000",
+          "answer": "BLOCK"
+        }
+      ],
+      "llmRequestId": "18076355",
+      "gate": {
+        "event": "VerdictReceived",
+        "tier": "BLOCK"
+      },
+      "storedOnGate": "Block",
+      "txs": {
+        "gateRequest": "https://explorer.testnet.somnia.network/tokyo/tx/0x95ee27fd495556683b8655eaf098638529cc69dff942aff056e589a361a946cd",
+        "summaryRequest": "https://shannon-explorer.somnia.network/tx/0x54b36df76b9b77a11b8607f02c359726d3e830968a829b8de8f035380c321694",
+        "verdictRequest": "https://shannon-explorer.somnia.network/tx/0xf9d7ebfb1b9d05a05a9eabc2e7c1f0c6535ac5d74925b43f2578f01199beaa4d",
+        "verdict": "https://shannon-explorer.somnia.network/tx/0x6dcf3e3265be533da4b2d6be28f06b98db4198b8e30b0c792120bb9844a0a93f",
+        "gateDelivery": "https://explorer.testnet.somnia.network/tokyo/tx/0xddaaae0431ece232945a0bc1835093fd73898381d19532e3f2a45157bbd42fbe"
+      }
+    },
+    {
+      "trader": "0x2E6c0CD1c011Ec7e7a2d22fB464d7c63d53842b7",
+      "pickedAs": "liquidated-2+",
+      "expected": "BLOCK",
+      "reasons": [
+        "liquidations30d=4 >= 2"
+      ],
+      "preRegisteredLine": "liquidations30d=4 trades30d=9 history=yes partial=0",
+      "preRegisteredHash": "0x9c962802155569dd510b95daa7337dc6a5041b206e2de5cd47e44363eb99e0bf",
+      "reviewed": true,
+      "requestedAt": "2026-10-28T14:32:41.192Z",
+      "nonce": 30,
+      "seenSummary": "liquidations30d=4 trades30d=9 history=yes partial=0",
+      "seenHash": "0x9c962802155569dd510b95daa7337dc6a5041b206e2de5cd47e44363eb99e0bf",
+      "seenHashRecomputed": true,
+      "summaryMatch": true,
+      "reviewer": "0xc999B6924179a0dc9649DA7eBa8F3aC8b7CF7c25",
+      "fetched": {
+        "url": "https://copybook-eosin.vercel.app/api/risk/0x2e6c0cd1c011ec7e7a2d22fb464d7c63d53842b7",
+        "field": "rubric"
+      },
+      "inference": {
+        "prompt": "Stats: liquidations30d=4 trades30d=9 history=yes partial=0",
+        "system": "You review perpetual-futures traders for people who copy their positions automatically. Apply this rubric exactly to the 30-day stats (key=value; n/a means unknown, not safe). BLOCK if liquidations30d is 2 or more, or maxDrawdownPct30d is present and at least 50. Otherwise CAUTION if liquidations30d is 1, or trades30d is below 10, or history=none, or partial=1, or maxDrawdownPct30d is present and at least 25. Otherwise OK. Answer with exactly one word: OK, CAUTION or BLOCK.",
+        "chainOfThought": false,
+        "allowed": [
+          "OK",
+          "CAUTION",
+          "BLOCK"
+        ]
+      },
+      "inferenceAsPublished": true,
+      "expectedOnSeen": "BLOCK",
+      "expectedOnSeenReasons": [
+        "liquidations30d=4 >= 2"
+      ],
+      "committee": "BLOCK",
+      "previousRun": "BLOCK",
+      "votes": {
+        "ok": 0,
+        "caution": 0,
+        "block": 3,
+        "responded": 3
+      },
+      "jsonStage": {
+        "requestId": "18076683",
+        "status": 2,
+        "identical": true,
+        "validators": [
+          {
+            "validator": "0x05f1fE2DDF9B65576D3165E37C6A60e6c5Ba93De",
+            "status": 2,
+            "receipt": "0",
+            "executionCost": "300000000000000"
+          },
+          {
+            "validator": "0x55Acbe370872c7D90F504eF169217a00c29E2A33",
+            "status": 2,
+            "receipt": "0",
+            "executionCost": "300000000000000"
+          },
+          {
+            "validator": "0x1Cb38b3ee632B5dCc0347dB81766606d6Aad4926",
+            "status": 2,
+            "receipt": "0",
+            "executionCost": "300000000000000"
+          }
+        ]
+      },
+      "answers": [
+        {
+          "validator": "0x05f1fE2DDF9B65576D3165E37C6A60e6c5Ba93De",
+          "status": 2,
+          "receipt": "0",
+          "executionCost": "70000000000000000",
+          "answer": "BLOCK"
+        },
+        {
+          "validator": "0x3E05e29029C60E000C8F01EB5AC9cEE6b242D7e0",
+          "status": 2,
+          "receipt": "0",
+          "executionCost": "70000000000000000",
+          "answer": "BLOCK"
+        },
+        {
+          "validator": "0x55Acbe370872c7D90F504eF169217a00c29E2A33",
+          "status": 2,
+          "receipt": "0",
+          "executionCost": "70000000000000000",
+          "answer": "BLOCK"
+        }
+      ],
+      "llmRequestId": "18076687",
+      "gate": {
+        "event": "VerdictReceived",
+        "tier": "BLOCK"
+      },
+      "storedOnGate": "Block",
+      "txs": {
+        "gateRequest": "https://explorer.testnet.somnia.network/tokyo/tx/0xe8a53858cb1c9d675905affa067def447945e322192de3022d021ce44cdf5774",
+        "summaryRequest": "https://shannon-explorer.somnia.network/tx/0x125d0413b50cf6c45892f3d872598827359ccac299ff596d549be27624c98be7",
+        "verdictRequest": "https://shannon-explorer.somnia.network/tx/0x23d644045994440cf3ae232a4e8756800ab3e4b17fb56687387b6b881e0d276a",
+        "verdict": "https://shannon-explorer.somnia.network/tx/0x74019ca3d5f1a6627552d50da2ae67f7a387b267abb8e05697122dabef66d591",
+        "gateDelivery": "https://explorer.testnet.somnia.network/tokyo/tx/0x6da631e04cba6c8a14b0b75a1438a3313f67bd8cd23fedcdc1263aa91d855343"
+      }
+    },
+    {
+      "trader": "0xb8700E8d07Bd029f7dD3CE6CC97Fe936D70c50a8",
+      "pickedAs": "liquidated-1",
+      "expected": "CAUTION",
+      "reasons": [
+        "liquidations30d=1"
+      ],
+      "preRegisteredLine": "liquidations30d=1 trades30d=695 history=yes partial=0",
+      "preRegisteredHash": "0xb3e920c0aaa0a4413a39c638c87ef54d3190cb59232a84be215786638e075016",
+      "reviewed": true,
+      "requestedAt": "2026-10-28T14:37:50.172Z",
+      "nonce": 31,
+      "seenSummary": "liquidations30d=1 trades30d=695 history=yes partial=0",
+      "seenHash": "0xb3e920c0aaa0a4413a39c638c87ef54d3190cb59232a84be215786638e075016",
+      "seenHashRecomputed": true,
+      "summaryMatch": true,
+      "reviewer": "0xc999B6924179a0dc9649DA7eBa8F3aC8b7CF7c25",
+      "fetched": {
+        "url": "https://copybook-eosin.vercel.app/api/risk/0xb8700e8d07bd029f7dd3ce6cc97fe936d70c50a8",
+        "field": "rubric"
+      },
+      "inference": {
+        "prompt": "Stats: liquidations30d=1 trades30d=695 history=yes partial=0",
+        "system": "You review perpetual-futures traders for people who copy their positions automatically. Apply this rubric exactly to the 30-day stats (key=value; n/a means unknown, not safe). BLOCK if liquidations30d is 2 or more, or maxDrawdownPct30d is present and at least 50. Otherwise CAUTION if liquidations30d is 1, or trades30d is below 10, or history=none, or partial=1, or maxDrawdownPct30d is present and at least 25. Otherwise OK. Answer with exactly one word: OK, CAUTION or BLOCK.",
+        "chainOfThought": false,
+        "allowed": [
+          "OK",
+          "CAUTION",
+          "BLOCK"
+        ]
+      },
+      "inferenceAsPublished": true,
+      "expectedOnSeen": "CAUTION",
+      "expectedOnSeenReasons": [
+        "liquidations30d=1"
+      ],
+      "committee": "CAUTION",
+      "previousRun": "CAUTION",
+      "votes": {
+        "ok": 0,
+        "caution": 3,
+        "block": 0,
+        "responded": 3
+      },
+      "jsonStage": {
+        "requestId": "18076685",
+        "status": 2,
+        "identical": true,
+        "validators": [
+          {
+            "validator": "0x55Acbe370872c7D90F504eF169217a00c29E2A33",
+            "status": 2,
+            "receipt": "0",
+            "executionCost": "300000000000000"
+          },
+          {
+            "validator": "0x05f1fE2DDF9B65576D3165E37C6A60e6c5Ba93De",
+            "status": 2,
+            "receipt": "0",
+            "executionCost": "300000000000000"
+          },
+          {
+            "validator": "0x1Cb38b3ee632B5dCc0347dB81766606d6Aad4926",
+            "status": 2,
+            "receipt": "0",
+            "executionCost": "300000000000000"
+          }
+        ]
+      },
+      "answers": [
+        {
+          "validator": "0x3E05e29029C60E000C8F01EB5AC9cEE6b242D7e0",
+          "status": 2,
+          "receipt": "0",
+          "executionCost": "70000000000000000",
+          "answer": "CAUTION"
+        },
+        {
+          "validator": "0x55Acbe370872c7D90F504eF169217a00c29E2A33",
+          "status": 2,
+          "receipt": "0",
+          "executionCost": "70000000000000000",
+          "answer": "CAUTION"
+        },
+        {
+          "validator": "0x05f1fE2DDF9B65576D3165E37C6A60e6c5Ba93De",
+          "status": 2,
+          "receipt": "0",
+          "executionCost": "70000000000000000",
+          "answer": "CAUTION"
+        }
+      ],
+      "llmRequestId": "18076689",
+      "gate": {
+        "event": "VerdictReceived",
+        "tier": "CAUTION"
+      },
+      "storedOnGate": "Caution",
+      "txs": {
+        "gateRequest": "https://explorer.testnet.somnia.network/tokyo/tx/0x5411d84cc31929d90676a7c4f47e09786bf0eed2e8805a26b21f3981be9f5f49",
+        "summaryRequest": "https://shannon-explorer.somnia.network/tx/0x5f820951fe56d1750c61733ff8f34c36adcf86536e827c68b8e3d6032041d04c",
+        "verdictRequest": "https://shannon-explorer.somnia.network/tx/0xd03ab0c6c6035a2bdf51348a85b4a74dea8b254f736ad526dd30169e693524cd",
+        "verdict": "https://shannon-explorer.somnia.network/tx/0xb932983a5e66d21db8deee561906d46ea13857f29e6b1cfc79e7d407e4bad501",
+        "gateDelivery": "https://explorer.testnet.somnia.network/tokyo/tx/0xbbd029a6446258771e621abda077f444ebdfae40611384f16a426d4ba2578013"
+      }
+    },
+    {
+      "trader": "0xCd509d80cDB707dD1871a8aD10b8A399696a2D7f",
+      "pickedAs": "liquidated-1",
+      "expected": "CAUTION",
+      "reasons": [
+        "liquidations30d=1",
+        "trades30d=5 < 10"
+      ],
+      "preRegisteredLine": "liquidations30d=1 trades30d=5 history=yes partial=0",
+      "preRegisteredHash": "0x55f79352d80517050737b7244d68cb173c51520e6df9b23c1b33d33220ee3335",
+      "reviewed": true,
+      "requestedAt": "2026-10-28T14:38:06.973Z",
+      "nonce": 32,
+      "seenSummary": "liquidations30d=1 trades30d=5 history=yes partial=0",
+      "seenHash": "0x55f79352d80517050737b7244d68cb173c51520e6df9b23c1b33d33220ee3335",
+      "seenHashRecomputed": true,
+      "summaryMatch": true,
+      "reviewer": "0xc999B6924179a0dc9649DA7eBa8F3aC8b7CF7c25",
+      "fetched": {
+        "url": "https://copybook-eosin.vercel.app/api/risk/0xcd509d80cdb707dd1871a8ad10b8a399696a2d7f",
+        "field": "rubric"
+      },
+      "inference": {
+        "prompt": "Stats: liquidations30d=1 trades30d=5 history=yes partial=0",
+        "system": "You review perpetual-futures traders for people who copy their positions automatically. Apply this rubric exactly to the 30-day stats (key=value; n/a means unknown, not safe). BLOCK if liquidations30d is 2 or more, or maxDrawdownPct30d is present and at least 50. Otherwise CAUTION if liquidations30d is 1, or trades30d is below 10, or history=none, or partial=1, or maxDrawdownPct30d is present and at least 25. Otherwise OK. Answer with exactly one word: OK, CAUTION or BLOCK.",
+        "chainOfThought": false,
+        "allowed": [
+          "OK",
+          "CAUTION",
+          "BLOCK"
+        ]
+      },
+      "inferenceAsPublished": true,
+      "expectedOnSeen": "CAUTION",
+      "expectedOnSeenReasons": [
+        "liquidations30d=1",
+        "trades30d=5 < 10"
+      ],
+      "committee": "CAUTION",
+      "previousRun": "CAUTION",
+      "votes": {
+        "ok": 0,
+        "caution": 3,
+        "block": 0,
+        "responded": 3
+      },
+      "jsonStage": {
+        "requestId": "18076707",
+        "status": 2,
+        "identical": true,
+        "validators": [
+          {
+            "validator": "0x3E05e29029C60E000C8F01EB5AC9cEE6b242D7e0",
+            "status": 2,
+            "receipt": "0",
+            "executionCost": "300000000000000"
+          },
+          {
+            "validator": "0x55Acbe370872c7D90F504eF169217a00c29E2A33",
+            "status": 2,
+            "receipt": "0",
+            "executionCost": "300000000000000"
+          },
+          {
+            "validator": "0x05f1fE2DDF9B65576D3165E37C6A60e6c5Ba93De",
+            "status": 2,
+            "receipt": "0",
+            "executionCost": "300000000000000"
+          }
+        ]
+      },
+      "answers": [
+        {
+          "validator": "0x3E05e29029C60E000C8F01EB5AC9cEE6b242D7e0",
+          "status": 2,
+          "receipt": "0",
+          "executionCost": "70000000000000000",
+          "answer": "CAUTION"
+        },
+        {
+          "validator": "0x05f1fE2DDF9B65576D3165E37C6A60e6c5Ba93De",
+          "status": 2,
+          "receipt": "0",
+          "executionCost": "70000000000000000",
+          "answer": "CAUTION"
+        },
+        {
+          "validator": "0x1Cb38b3ee632B5dCc0347dB81766606d6Aad4926",
+          "status": 2,
+          "receipt": "0",
+          "executionCost": "70000000000000000",
+          "answer": "CAUTION"
+        }
+      ],
+      "llmRequestId": "18076710",
+      "gate": {
+        "event": "VerdictReceived",
+        "tier": "CAUTION"
+      },
+      "storedOnGate": "Caution",
+      "txs": {
+        "gateRequest": "https://explorer.testnet.somnia.network/tokyo/tx/0x75c00cd5ce913779c6b399adca078544a5ccf80bd01723cc6facffd545e85043",
+        "summaryRequest": "https://shannon-explorer.somnia.network/tx/0xa74ae7c56cc2da81c9d5e159450395ce3897270be98e10fcffb46e537d20dbd1",
+        "verdictRequest": "https://shannon-explorer.somnia.network/tx/0xeeb459a07c74f41da7ce2c19e71373c01c701f25a4346f9f0ea35a863e45917e",
+        "verdict": "https://shannon-explorer.somnia.network/tx/0x2fef81e0a6b3494d628cd5763385acccc37c893736369234937a43513e4e68e6",
+        "gateDelivery": "https://explorer.testnet.somnia.network/tokyo/tx/0x08e46745c5266b61729c4cf9f7dcdd978b929d0e7e7bab1b00084b7b926cbb40"
+      }
+    },
+    {
+      "trader": "0x8B834Ce8F8D18D4247F600FBF91C74A8F0ABe1e4",
+      "pickedAs": "liquidated-1",
+      "expected": "CAUTION",
+      "reasons": [
+        "liquidations30d=1",
+        "trades30d=5 < 10"
+      ],
+      "preRegisteredLine": "liquidations30d=1 trades30d=5 history=yes partial=0",
+      "preRegisteredHash": "0x55f79352d80517050737b7244d68cb173c51520e6df9b23c1b33d33220ee3335",
+      "reviewed": true,
+      "requestedAt": "2026-10-28T14:38:25.833Z",
+      "nonce": 33,
+      "seenSummary": "liquidations30d=1 trades30d=5 history=yes partial=0",
+      "seenHash": "0x55f79352d80517050737b7244d68cb173c51520e6df9b23c1b33d33220ee3335",
+      "seenHashRecomputed": true,
+      "summaryMatch": true,
+      "reviewer": "0xc999B6924179a0dc9649DA7eBa8F3aC8b7CF7c25",
+      "fetched": {
+        "url": "https://copybook-eosin.vercel.app/api/risk/0x8b834ce8f8d18d4247f600fbf91c74a8f0abe1e4",
+        "field": "rubric"
+      },
+      "inference": {
+        "prompt": "Stats: liquidations30d=1 trades30d=5 history=yes partial=0",
+        "system": "You review perpetual-futures traders for people who copy their positions automatically. Apply this rubric exactly to the 30-day stats (key=value; n/a means unknown, not safe). BLOCK if liquidations30d is 2 or more, or maxDrawdownPct30d is present and at least 50. Otherwise CAUTION if liquidations30d is 1, or trades30d is below 10, or history=none, or partial=1, or maxDrawdownPct30d is present and at least 25. Otherwise OK. Answer with exactly one word: OK, CAUTION or BLOCK.",
+        "chainOfThought": false,
+        "allowed": [
+          "OK",
+          "CAUTION",
+          "BLOCK"
+        ]
+      },
+      "inferenceAsPublished": true,
+      "expectedOnSeen": "CAUTION",
+      "expectedOnSeenReasons": [
+        "liquidations30d=1",
+        "trades30d=5 < 10"
+      ],
+      "committee": "CAUTION",
+      "previousRun": "CAUTION",
+      "votes": {
+        "ok": 0,
+        "caution": 3,
+        "block": 0,
+        "responded": 3
+      },
+      "jsonStage": {
+        "requestId": "18076726",
+        "status": 2,
+        "identical": true,
+        "validators": [
+          {
+            "validator": "0x55Acbe370872c7D90F504eF169217a00c29E2A33",
+            "status": 2,
+            "receipt": "0",
+            "executionCost": "300000000000000"
+          },
+          {
+            "validator": "0x05f1fE2DDF9B65576D3165E37C6A60e6c5Ba93De",
+            "status": 2,
+            "receipt": "0",
+            "executionCost": "300000000000000"
+          },
+          {
+            "validator": "0x1Cb38b3ee632B5dCc0347dB81766606d6Aad4926",
+            "status": 2,
+            "receipt": "0",
+            "executionCost": "300000000000000"
+          }
+        ]
+      },
+      "answers": [
+        {
+          "validator": "0x05f1fE2DDF9B65576D3165E37C6A60e6c5Ba93De",
+          "status": 2,
+          "receipt": "0",
+          "executionCost": "70000000000000000",
+          "answer": "CAUTION"
+        },
+        {
+          "validator": "0x3E05e29029C60E000C8F01EB5AC9cEE6b242D7e0",
+          "status": 2,
+          "receipt": "0",
+          "executionCost": "70000000000000000",
+          "answer": "CAUTION"
+        },
+        {
+          "validator": "0x55Acbe370872c7D90F504eF169217a00c29E2A33",
+          "status": 2,
+          "receipt": "0",
+          "executionCost": "70000000000000000",
+          "answer": "CAUTION"
+        }
+      ],
+      "llmRequestId": "18076729",
+      "gate": {
+        "event": "VerdictReceived",
+        "tier": "CAUTION"
+      },
+      "storedOnGate": "Caution",
+      "txs": {
+        "gateRequest": "https://explorer.testnet.somnia.network/tokyo/tx/0x5670de9e5e41f439f2e2d2e18541d78e52dfc223efd4d7112c15b0f862b26e0e",
+        "summaryRequest": "https://shannon-explorer.somnia.network/tx/0x430c1c08bafc02cacd6df5e15898bcd04213e05b5593863689d7a371da09f629",
+        "verdictRequest": "https://shannon-explorer.somnia.network/tx/0x50b71b11465d72139e647194584f9323288638176a3777a4e1a5530885bce8d5",
+        "verdict": "https://shannon-explorer.somnia.network/tx/0xf5320de330699041233f43ed97f0b0de51391afa39079e3df9da7bf44735fc27",
+        "gateDelivery": "https://explorer.testnet.somnia.network/tokyo/tx/0xb14f98439d4e4f28b55e59762ed3446b002b79f63e9b110050e8350569eda5ad"
+      }
+    },
+    {
+      "trader": "0xF3ed3F5b90A13b39f30759E9800ec638711008F8",
+      "pickedAs": "liquidated-1",
+      "expected": "CAUTION",
+      "reasons": [
+        "liquidations30d=1"
+      ],
+      "preRegisteredLine": "liquidations30d=1 trades30d=555 history=yes partial=0",
+      "preRegisteredHash": "0xa261c68c4cffd2f93a529849e21b8f87503aab6d0c648b7c08cd98444e3d9c8e",
+      "reviewed": true,
+      "requestedAt": "2026-10-28T14:38:44.184Z",
+      "nonce": 34,
+      "seenSummary": "liquidations30d=1 trades30d=555 history=yes partial=0",
+      "seenHash": "0xa261c68c4cffd2f93a529849e21b8f87503aab6d0c648b7c08cd98444e3d9c8e",
+      "seenHashRecomputed": true,
+      "summaryMatch": true,
+      "reviewer": "0xc999B6924179a0dc9649DA7eBa8F3aC8b7CF7c25",
+      "fetched": {
+        "url": "https://copybook-eosin.vercel.app/api/risk/0xf3ed3f5b90a13b39f30759e9800ec638711008f8",
+        "field": "rubric"
+      },
+      "inference": {
+        "prompt": "Stats: liquidations30d=1 trades30d=555 history=yes partial=0",
+        "system": "You review perpetual-futures traders for people who copy their positions automatically. Apply this rubric exactly to the 30-day stats (key=value; n/a means unknown, not safe). BLOCK if liquidations30d is 2 or more, or maxDrawdownPct30d is present and at least 50. Otherwise CAUTION if liquidations30d is 1, or trades30d is below 10, or history=none, or partial=1, or maxDrawdownPct30d is present and at least 25. Otherwise OK. Answer with exactly one word: OK, CAUTION or BLOCK.",
+        "chainOfThought": false,
+        "allowed": [
+          "OK",
+          "CAUTION",
+          "BLOCK"
+        ]
+      },
+      "inferenceAsPublished": true,
+      "expectedOnSeen": "CAUTION",
+      "expectedOnSeenReasons": [
+        "liquidations30d=1"
+      ],
+      "committee": "CAUTION",
+      "previousRun": "CAUTION",
+      "votes": {
+        "ok": 0,
+        "caution": 3,
+        "block": 0,
+        "responded": 3
+      },
+      "jsonStage": {
+        "requestId": "18076749",
+        "status": 2,
+        "identical": true,
+        "validators": [
+          {
+            "validator": "0x05f1fE2DDF9B65576D3165E37C6A60e6c5Ba93De",
+            "status": 2,
+            "receipt": "0",
+            "executionCost": "300000000000000"
+          },
+          {
+            "validator": "0x55Acbe370872c7D90F504eF169217a00c29E2A33",
+            "status": 2,
+            "receipt": "0",
+            "executionCost": "300000000000000"
+          },
+          {
+            "validator": "0x3E05e29029C60E000C8F01EB5AC9cEE6b242D7e0",
+            "status": 2,
+            "receipt": "0",
+            "executionCost": "300000000000000"
+          }
+        ]
+      },
+      "answers": [
+        {
+          "validator": "0x3E05e29029C60E000C8F01EB5AC9cEE6b242D7e0",
+          "status": 2,
+          "receipt": "0",
+          "executionCost": "70000000000000000",
+          "answer": "CAUTION"
+        },
+        {
+          "validator": "0x05f1fE2DDF9B65576D3165E37C6A60e6c5Ba93De",
+          "status": 2,
+          "receipt": "0",
+          "executionCost": "70000000000000000",
+          "answer": "CAUTION"
+        },
+        {
+          "validator": "0x55Acbe370872c7D90F504eF169217a00c29E2A33",
+          "status": 2,
+          "receipt": "0",
+          "executionCost": "70000000000000000",
+          "answer": "CAUTION"
+        }
+      ],
+      "llmRequestId": "18076752",
+      "gate": {
+        "event": "VerdictReceived",
+        "tier": "CAUTION"
+      },
+      "storedOnGate": "Caution",
+      "txs": {
+        "gateRequest": "https://explorer.testnet.somnia.network/tokyo/tx/0x1876872e72131140aebab78920a5ff979521ade33b184648cfc3417cc55935eb",
+        "summaryRequest": "https://shannon-explorer.somnia.network/tx/0x1bbab7c05b97aadcffd7f5f3bf6bb16906ae6869b20a62f49e2a9ea653735bda",
+        "verdictRequest": "https://shannon-explorer.somnia.network/tx/0x976da6565da9980173c30a33c85f8ce50cf5c5a2123e429216444021bb93e56f",
+        "verdict": "https://shannon-explorer.somnia.network/tx/0x2ff2d1bb4c2c0ad5f0025e741154123151f4a185e24b042ac475fc104b5a25b4",
+        "gateDelivery": "https://explorer.testnet.somnia.network/tokyo/tx/0xc73cb9f44bf2dd43c7f033a8c3d347c319c41c2b8318972dca5ad27ae693d5aa"
+      }
+    },
+    {
+      "trader": "0x857387a56F7ceE3246860a8A470123C31bB0d02c",
+      "pickedAs": "clean",
+      "expected": "CAUTION",
+      "reasons": [
+        "partial=1"
+      ],
+      "preRegisteredLine": "liquidations30d=0 trades30d=2000 history=yes partial=1",
+      "preRegisteredHash": "0x95e132c57a0ae15a026a1016d1fb5d1625c7ec58aafb8dbde86238a9d0df89d1",
+      "reviewed": true,
+      "requestedAt": "2026-10-28T14:39:05.720Z",
+      "nonce": 35,
+      "seenSummary": "liquidations30d=0 trades30d=2000 history=yes partial=1",
+      "seenHash": "0x95e132c57a0ae15a026a1016d1fb5d1625c7ec58aafb8dbde86238a9d0df89d1",
+      "seenHashRecomputed": true,
+      "summaryMatch": true,
+      "reviewer": "0xc999B6924179a0dc9649DA7eBa8F3aC8b7CF7c25",
+      "fetched": {
+        "url": "https://copybook-eosin.vercel.app/api/risk/0x857387a56f7cee3246860a8a470123c31bb0d02c",
+        "field": "rubric"
+      },
+      "inference": {
+        "prompt": "Stats: liquidations30d=0 trades30d=2000 history=yes partial=1",
+        "system": "You review perpetual-futures traders for people who copy their positions automatically. Apply this rubric exactly to the 30-day stats (key=value; n/a means unknown, not safe). BLOCK if liquidations30d is 2 or more, or maxDrawdownPct30d is present and at least 50. Otherwise CAUTION if liquidations30d is 1, or trades30d is below 10, or history=none, or partial=1, or maxDrawdownPct30d is present and at least 25. Otherwise OK. Answer with exactly one word: OK, CAUTION or BLOCK.",
+        "chainOfThought": false,
+        "allowed": [
+          "OK",
+          "CAUTION",
+          "BLOCK"
+        ]
+      },
+      "inferenceAsPublished": true,
+      "expectedOnSeen": "CAUTION",
+      "expectedOnSeenReasons": [
+        "partial=1"
+      ],
+      "committee": "CAUTION",
+      "previousRun": "CAUTION",
+      "votes": {
+        "ok": 0,
+        "caution": 3,
+        "block": 0,
+        "responded": 3
+      },
+      "jsonStage": {
+        "requestId": "18076772",
+        "status": 2,
+        "identical": true,
+        "validators": [
+          {
+            "validator": "0x55Acbe370872c7D90F504eF169217a00c29E2A33",
+            "status": 2,
+            "receipt": "0",
+            "executionCost": "300000000000000"
+          },
+          {
+            "validator": "0x05f1fE2DDF9B65576D3165E37C6A60e6c5Ba93De",
+            "status": 2,
+            "receipt": "0",
+            "executionCost": "300000000000000"
+          },
+          {
+            "validator": "0x1Cb38b3ee632B5dCc0347dB81766606d6Aad4926",
+            "status": 2,
+            "receipt": "0",
+            "executionCost": "300000000000000"
+          }
+        ]
+      },
+      "answers": [
+        {
+          "validator": "0x3E05e29029C60E000C8F01EB5AC9cEE6b242D7e0",
+          "status": 2,
+          "receipt": "0",
+          "executionCost": "70000000000000000",
+          "answer": "CAUTION"
+        },
+        {
+          "validator": "0x55Acbe370872c7D90F504eF169217a00c29E2A33",
+          "status": 2,
+          "receipt": "0",
+          "executionCost": "70000000000000000",
+          "answer": "CAUTION"
+        },
+        {
+          "validator": "0x1Cb38b3ee632B5dCc0347dB81766606d6Aad4926",
+          "status": 2,
+          "receipt": "0",
+          "executionCost": "70000000000000000",
+          "answer": "CAUTION"
+        }
+      ],
+      "llmRequestId": "18076776",
+      "gate": {
+        "event": "VerdictReceived",
+        "tier": "CAUTION"
+      },
+      "storedOnGate": "Caution",
+      "txs": {
+        "gateRequest": "https://explorer.testnet.somnia.network/tokyo/tx/0xe7bcb9a5810fc0e2244f98905d61a5b42a5b7131f38cdd4ece97a52edc8bf399",
+        "summaryRequest": "https://shannon-explorer.somnia.network/tx/0xef3c6b3f05fee7221fd2e94541ca9a263ceba117260095d596562a07d2398f6b",
+        "verdictRequest": "https://shannon-explorer.somnia.network/tx/0xfecd29a5f811b5514d407619ecfcb9cf3503d925731ace74c4178cba754271fd",
+        "verdict": "https://shannon-explorer.somnia.network/tx/0x55c95c4e8a71c47cf4e3911288706b4b38bbf555658a46188553ff188d098057",
+        "gateDelivery": "https://explorer.testnet.somnia.network/tokyo/tx/0x3da886898a1a98bfbce9d779cf06a907a5a6b639431a5486bdda719f8afde0c4"
+      }
+    },
+    {
+      "trader": "0x0a72b2e45fB68a8Ff4B0945Ee8104cb5a97D8Ff4",
+      "pickedAs": "clean",
+      "expected": "CAUTION",
+      "reasons": [
+        "partial=1"
+      ],
+      "preRegisteredLine": "liquidations30d=0 trades30d=2000 history=yes partial=1",
+      "preRegisteredHash": "0x95e132c57a0ae15a026a1016d1fb5d1625c7ec58aafb8dbde86238a9d0df89d1",
+      "reviewed": true,
+      "requestedAt": "2026-10-28T14:39:28.927Z",
+      "nonce": 36,
+      "seenSummary": "liquidations30d=0 trades30d=2000 history=yes partial=1",
+      "seenHash": "0x95e132c57a0ae15a026a1016d1fb5d1625c7ec58aafb8dbde86238a9d0df89d1",
+      "seenHashRecomputed": true,
+      "summaryMatch": true,
+      "reviewer": "0xc999B6924179a0dc9649DA7eBa8F3aC8b7CF7c25",
+      "fetched": {
+        "url": "https://copybook-eosin.vercel.app/api/risk/0x0a72b2e45fb68a8ff4b0945ee8104cb5a97d8ff4",
+        "field": "rubric"
+      },
+      "inference": {
+        "prompt": "Stats: liquidations30d=0 trades30d=2000 history=yes partial=1",
+        "system": "You review perpetual-futures traders for people who copy their positions automatically. Apply this rubric exactly to the 30-day stats (key=value; n/a means unknown, not safe). BLOCK if liquidations30d is 2 or more, or maxDrawdownPct30d is present and at least 50. Otherwise CAUTION if liquidations30d is 1, or trades30d is below 10, or history=none, or partial=1, or maxDrawdownPct30d is present and at least 25. Otherwise OK. Answer with exactly one word: OK, CAUTION or BLOCK.",
+        "chainOfThought": false,
+        "allowed": [
+          "OK",
+          "CAUTION",
+          "BLOCK"
+        ]
+      },
+      "inferenceAsPublished": true,
+      "expectedOnSeen": "CAUTION",
+      "expectedOnSeenReasons": [
+        "partial=1"
+      ],
+      "committee": "CAUTION",
+      "previousRun": "BLOCK",
+      "votes": {
+        "ok": 0,
+        "caution": 3,
+        "block": 0,
+        "responded": 3
+      },
+      "jsonStage": {
+        "requestId": "18076794",
+        "status": 2,
+        "identical": true,
+        "validators": [
+          {
+            "validator": "0x3E05e29029C60E000C8F01EB5AC9cEE6b242D7e0",
+            "status": 2,
+            "receipt": "0",
+            "executionCost": "300000000000000"
+          },
+          {
+            "validator": "0x1Cb38b3ee632B5dCc0347dB81766606d6Aad4926",
+            "status": 2,
+            "receipt": "0",
+            "executionCost": "300000000000000"
+          },
+          {
+            "validator": "0x05f1fE2DDF9B65576D3165E37C6A60e6c5Ba93De",
+            "status": 2,
+            "receipt": "0",
+            "executionCost": "300000000000000"
+          }
+        ]
+      },
+      "answers": [
+        {
+          "validator": "0x3E05e29029C60E000C8F01EB5AC9cEE6b242D7e0",
+          "status": 2,
+          "receipt": "0",
+          "executionCost": "70000000000000000",
+          "answer": "CAUTION"
+        },
+        {
+          "validator": "0x05f1fE2DDF9B65576D3165E37C6A60e6c5Ba93De",
+          "status": 2,
+          "receipt": "0",
+          "executionCost": "70000000000000000",
+          "answer": "CAUTION"
+        },
+        {
+          "validator": "0x55Acbe370872c7D90F504eF169217a00c29E2A33",
+          "status": 2,
+          "receipt": "0",
+          "executionCost": "70000000000000000",
+          "answer": "CAUTION"
+        }
+      ],
+      "llmRequestId": "18076798",
+      "gate": {
+        "event": "BlockHeld",
+        "tier": "CAUTION"
+      },
+      "storedOnGate": "Block",
+      "txs": {
+        "gateRequest": "https://explorer.testnet.somnia.network/tokyo/tx/0x47fd55c36df01d8ecc1f7614b57ab3c27ea6ccffced80d495cbacafcd499e8a7",
+        "summaryRequest": "https://shannon-explorer.somnia.network/tx/0x2a33b4deca24b460844a7ff7739903bdf60af32c3061b18bde33969f9102c245",
+        "verdictRequest": "https://shannon-explorer.somnia.network/tx/0xe8442ff9fb7b8f3675883e71354d6e7d76d1ae4bf3975672064f4da5e6f2f398",
+        "verdict": "https://shannon-explorer.somnia.network/tx/0xb9a011e16fafdf0419ea313cd250fc3ef75fa070f1ca282e2040480733d7f1e4",
+        "gateDelivery": "https://explorer.testnet.somnia.network/tokyo/tx/0x240a69f17db716d43337b9c0fcfd312bb2dfbf730a8be21a4c6feaf3dab8bf04"
+      }
+    },
+    {
+      "trader": "0x20A0d517f1b60fd3041B49d7B97b529964c7bA88",
+      "pickedAs": "clean",
+      "expected": "OK",
+      "reasons": [],
+      "preRegisteredLine": "liquidations30d=0 trades30d=15 history=yes partial=0",
+      "preRegisteredHash": "0x3c0b3c284603526f90d19ebb511eedaf0882961dd13be7731d048bcbd0142d8c",
+      "reviewed": true,
+      "requestedAt": "2026-10-28T14:39:48.021Z",
+      "nonce": 37,
+      "seenSummary": "liquidations30d=0 trades30d=15 history=yes partial=0",
+      "seenHash": "0x3c0b3c284603526f90d19ebb511eedaf0882961dd13be7731d048bcbd0142d8c",
+      "seenHashRecomputed": true,
+      "summaryMatch": true,
+      "reviewer": "0xc999B6924179a0dc9649DA7eBa8F3aC8b7CF7c25",
+      "fetched": {
+        "url": "https://copybook-eosin.vercel.app/api/risk/0x20a0d517f1b60fd3041b49d7b97b529964c7ba88",
+        "field": "rubric"
+      },
+      "inference": {
+        "prompt": "Stats: liquidations30d=0 trades30d=15 history=yes partial=0",
+        "system": "You review perpetual-futures traders for people who copy their positions automatically. Apply this rubric exactly to the 30-day stats (key=value; n/a means unknown, not safe). BLOCK if liquidations30d is 2 or more, or maxDrawdownPct30d is present and at least 50. Otherwise CAUTION if liquidations30d is 1, or trades30d is below 10, or history=none, or partial=1, or maxDrawdownPct30d is present and at least 25. Otherwise OK. Answer with exactly one word: OK, CAUTION or BLOCK.",
+        "chainOfThought": false,
+        "allowed": [
+          "OK",
+          "CAUTION",
+          "BLOCK"
+        ]
+      },
+      "inferenceAsPublished": true,
+      "expectedOnSeen": "OK",
+      "expectedOnSeenReasons": [],
+      "committee": "OK",
+      "previousRun": "BLOCK",
+      "votes": {
+        "ok": 3,
+        "caution": 0,
+        "block": 0,
+        "responded": 3
+      },
+      "jsonStage": {
+        "requestId": "18076818",
+        "status": 2,
+        "identical": true,
+        "validators": [
+          {
+            "validator": "0x05f1fE2DDF9B65576D3165E37C6A60e6c5Ba93De",
+            "status": 2,
+            "receipt": "0",
+            "executionCost": "300000000000000"
+          },
+          {
+            "validator": "0x1Cb38b3ee632B5dCc0347dB81766606d6Aad4926",
+            "status": 2,
+            "receipt": "0",
+            "executionCost": "300000000000000"
+          },
+          {
+            "validator": "0x3E05e29029C60E000C8F01EB5AC9cEE6b242D7e0",
+            "status": 2,
+            "receipt": "0",
+            "executionCost": "300000000000000"
+          }
+        ]
+      },
+      "answers": [
+        {
+          "validator": "0x3E05e29029C60E000C8F01EB5AC9cEE6b242D7e0",
+          "status": 2,
+          "receipt": "0",
+          "executionCost": "70000000000000000",
+          "answer": "OK"
+        },
+        {
+          "validator": "0x05f1fE2DDF9B65576D3165E37C6A60e6c5Ba93De",
+          "status": 2,
+          "receipt": "0",
+          "executionCost": "70000000000000000",
+          "answer": "OK"
+        },
+        {
+          "validator": "0x1Cb38b3ee632B5dCc0347dB81766606d6Aad4926",
+          "status": 2,
+          "receipt": "0",
+          "executionCost": "70000000000000000",
+          "answer": "OK"
+        }
+      ],
+      "llmRequestId": "18076821",
+      "gate": {
+        "event": "BlockHeld",
+        "tier": "OK"
+      },
+      "storedOnGate": "Block",
+      "txs": {
+        "gateRequest": "https://explorer.testnet.somnia.network/tokyo/tx/0x07f6a9652498b0bad31ff8cc13c1a45cb73043523b22de54c3ab3a472fae43f8",
+        "summaryRequest": "https://shannon-explorer.somnia.network/tx/0xcefb23310ffa68065724b490c05c191ee6a9f5f1dfd1210a45444c0b1820b6a9",
+        "verdictRequest": "https://shannon-explorer.somnia.network/tx/0x4fc4b555266e5e7b54772f96c161470453a373b21f4ccc2610a2cf28bf5e0bf6",
+        "verdict": "https://shannon-explorer.somnia.network/tx/0x235a016c3a78c39f7d2a14f7bde82abcf7a823df76f364c22894ec2b0464f70e",
+        "gateDelivery": "https://explorer.testnet.somnia.network/tokyo/tx/0x0508c85cdac2d00809f77192477c016c7162447a8a6c8a1fae067695cff6a6ec"
+      }
+    },
+    {
+      "trader": "0xfed46fe76Ac5e98f1C969Bc10eFB96014Dc17749",
+      "pickedAs": "clean",
+      "expected": "OK",
+      "reasons": [],
+      "preRegisteredLine": "liquidations30d=0 trades30d=16 history=yes partial=0",
+      "preRegisteredHash": "0xb050212de104871b5d66fb0661d17e2ad762a8a963de207ca3b40e236c861377",
+      "reviewed": true,
+      "requestedAt": "2026-10-28T14:40:11.261Z",
+      "nonce": 38,
+      "seenSummary": "liquidations30d=0 trades30d=16 history=yes partial=0",
+      "seenHash": "0xb050212de104871b5d66fb0661d17e2ad762a8a963de207ca3b40e236c861377",
+      "seenHashRecomputed": true,
+      "summaryMatch": true,
+      "reviewer": "0xc999B6924179a0dc9649DA7eBa8F3aC8b7CF7c25",
+      "fetched": {
+        "url": "https://copybook-eosin.vercel.app/api/risk/0xfed46fe76ac5e98f1c969bc10efb96014dc17749",
+        "field": "rubric"
+      },
+      "inference": {
+        "prompt": "Stats: liquidations30d=0 trades30d=16 history=yes partial=0",
+        "system": "You review perpetual-futures traders for people who copy their positions automatically. Apply this rubric exactly to the 30-day stats (key=value; n/a means unknown, not safe). BLOCK if liquidations30d is 2 or more, or maxDrawdownPct30d is present and at least 50. Otherwise CAUTION if liquidations30d is 1, or trades30d is below 10, or history=none, or partial=1, or maxDrawdownPct30d is present and at least 25. Otherwise OK. Answer with exactly one word: OK, CAUTION or BLOCK.",
+        "chainOfThought": false,
+        "allowed": [
+          "OK",
+          "CAUTION",
+          "BLOCK"
+        ]
+      },
+      "inferenceAsPublished": true,
+      "expectedOnSeen": "OK",
+      "expectedOnSeenReasons": [],
+      "committee": "OK",
+      "previousRun": "OK",
+      "votes": {
+        "ok": 3,
+        "caution": 0,
+        "block": 0,
+        "responded": 3
+      },
+      "jsonStage": {
+        "requestId": "18076841",
+        "status": 2,
+        "identical": true,
+        "validators": [
+          {
+            "validator": "0x05f1fE2DDF9B65576D3165E37C6A60e6c5Ba93De",
+            "status": 2,
+            "receipt": "0",
+            "executionCost": "300000000000000"
+          },
+          {
+            "validator": "0x55Acbe370872c7D90F504eF169217a00c29E2A33",
+            "status": 2,
+            "receipt": "0",
+            "executionCost": "300000000000000"
+          },
+          {
+            "validator": "0x3E05e29029C60E000C8F01EB5AC9cEE6b242D7e0",
+            "status": 2,
+            "receipt": "0",
+            "executionCost": "300000000000000"
+          }
+        ]
+      },
+      "answers": [
+        {
+          "validator": "0x3E05e29029C60E000C8F01EB5AC9cEE6b242D7e0",
+          "status": 2,
+          "receipt": "0",
+          "executionCost": "70000000000000000",
+          "answer": "OK"
+        },
+        {
+          "validator": "0x05f1fE2DDF9B65576D3165E37C6A60e6c5Ba93De",
+          "status": 2,
+          "receipt": "0",
+          "executionCost": "70000000000000000",
+          "answer": "OK"
+        },
+        {
+          "validator": "0x1Cb38b3ee632B5dCc0347dB81766606d6Aad4926",
+          "status": 2,
+          "receipt": "0",
+          "executionCost": "70000000000000000",
+          "answer": "OK"
+        }
+      ],
+      "llmRequestId": "18076844",
+      "gate": {
+        "event": "VerdictReceived",
+        "tier": "OK"
+      },
+      "storedOnGate": "Ok",
+      "txs": {
+        "gateRequest": "https://explorer.testnet.somnia.network/tokyo/tx/0xbd0dcda26706f95cf55113503b384aa6a9472d65f80a5adfb9cb1d5481a875d9",
+        "summaryRequest": "https://shannon-explorer.somnia.network/tx/0xe7c885c3798aea0e0bfd49b12429b76898e076612c38fa76778805fb15150216",
+        "verdictRequest": "https://shannon-explorer.somnia.network/tx/0xb9f078a4f2630aa07f463507efef6d8ae51ab3a0e3d759324bee669ce2e49223",
+        "verdict": "https://shannon-explorer.somnia.network/tx/0x2f315323f2c401c8519d3d41c108447f195535a7d414e02826ee17284cab2fd5",
+        "gateDelivery": "https://explorer.testnet.somnia.network/tokyo/tx/0x3365ce1d6cd3e0cd48794bd77f940c0938b0098c58e36f4ed1b4471c7595ba1f"
+      }
+    },
+    {
+      "trader": "0xE46cd08B8921aFD922051Ee4D11701aEf68d9999",
+      "pickedAs": "clean",
+      "expected": "OK",
+      "reasons": [],
+      "preRegisteredLine": "liquidations30d=0 trades30d=127 history=yes partial=0",
+      "preRegisteredHash": "0x3e0e2b9b1b485617bd9cc54dc657bd155d8b5a4788c12e300e7526ec6eb16f61",
+      "reviewed": true,
+      "requestedAt": "2026-10-28T14:40:30.896Z",
+      "nonce": 39,
+      "seenSummary": "liquidations30d=0 trades30d=127 history=yes partial=0",
+      "seenHash": "0x3e0e2b9b1b485617bd9cc54dc657bd155d8b5a4788c12e300e7526ec6eb16f61",
+      "seenHashRecomputed": true,
+      "summaryMatch": true,
+      "reviewer": "0xc999B6924179a0dc9649DA7eBa8F3aC8b7CF7c25",
+      "fetched": {
+        "url": "https://copybook-eosin.vercel.app/api/risk/0xe46cd08b8921afd922051ee4d11701aef68d9999",
+        "field": "rubric"
+      },
+      "inference": {
+        "prompt": "Stats: liquidations30d=0 trades30d=127 history=yes partial=0",
+        "system": "You review perpetual-futures traders for people who copy their positions automatically. Apply this rubric exactly to the 30-day stats (key=value; n/a means unknown, not safe). BLOCK if liquidations30d is 2 or more, or maxDrawdownPct30d is present and at least 50. Otherwise CAUTION if liquidations30d is 1, or trades30d is below 10, or history=none, or partial=1, or maxDrawdownPct30d is present and at least 25. Otherwise OK. Answer with exactly one word: OK, CAUTION or BLOCK.",
+        "chainOfThought": false,
+        "allowed": [
+          "OK",
+          "CAUTION",
+          "BLOCK"
+        ]
+      },
+      "inferenceAsPublished": true,
+      "expectedOnSeen": "OK",
+      "expectedOnSeenReasons": [],
+      "committee": "OK",
+      "previousRun": "OK",
+      "votes": {
+        "ok": 3,
+        "caution": 0,
+        "block": 0,
+        "responded": 3
+      },
+      "jsonStage": {
+        "requestId": "18076865",
+        "status": 2,
+        "identical": true,
+        "validators": [
+          {
+            "validator": "0x1Cb38b3ee632B5dCc0347dB81766606d6Aad4926",
+            "status": 2,
+            "receipt": "0",
+            "executionCost": "300000000000000"
+          },
+          {
+            "validator": "0x3E05e29029C60E000C8F01EB5AC9cEE6b242D7e0",
+            "status": 2,
+            "receipt": "0",
+            "executionCost": "300000000000000"
+          },
+          {
+            "validator": "0x05f1fE2DDF9B65576D3165E37C6A60e6c5Ba93De",
+            "status": 2,
+            "receipt": "0",
+            "executionCost": "300000000000000"
+          }
+        ]
+      },
+      "answers": [
+        {
+          "validator": "0x05f1fE2DDF9B65576D3165E37C6A60e6c5Ba93De",
+          "status": 2,
+          "receipt": "0",
+          "executionCost": "70000000000000000",
+          "answer": "OK"
+        },
+        {
+          "validator": "0x3E05e29029C60E000C8F01EB5AC9cEE6b242D7e0",
+          "status": 2,
+          "receipt": "0",
+          "executionCost": "70000000000000000",
+          "answer": "OK"
+        },
+        {
+          "validator": "0x1Cb38b3ee632B5dCc0347dB81766606d6Aad4926",
+          "status": 2,
+          "receipt": "0",
+          "executionCost": "70000000000000000",
+          "answer": "OK"
+        }
+      ],
+      "llmRequestId": "18076868",
+      "gate": {
+        "event": "VerdictReceived",
+        "tier": "OK"
+      },
+      "storedOnGate": "Ok",
+      "txs": {
+        "gateRequest": "https://explorer.testnet.somnia.network/tokyo/tx/0x26b6ed8172d49c0b0ce578e4309fc1d233e03eeea843802755110fb0df9c1998",
+        "summaryRequest": "https://shannon-explorer.somnia.network/tx/0x3cf94872ab42a64b43b7ef9913a5e240786280b76d95cb64c1461ced14649c20",
+        "verdictRequest": "https://shannon-explorer.somnia.network/tx/0x054d13e5b4d98d7381e7486d421566c08e9b62a51fce8815fc1b215c2dee9179",
+        "verdict": "https://shannon-explorer.somnia.network/tx/0x28b6aedb3b4780ccb230ed06c4d31a9f4259f77205bac50c899b159bd6475c6d",
+        "gateDelivery": "https://explorer.testnet.somnia.network/tokyo/tx/0x434322c237105ed540c3e84a2b447a838f18ed1af3894885bbe9f3bf46a05f9d"
+      }
+    },
+    {
+      "trader": "0x2c12A7432362E335B7A0B2ACCA2F6Ae17a1f2fd8",
+      "pickedAs": "thin",
+      "expected": "CAUTION",
+      "reasons": [
+        "trades30d=3 < 10"
+      ],
+      "preRegisteredLine": "liquidations30d=0 trades30d=3 history=yes partial=0",
+      "preRegisteredHash": "0x65babbe9b676ac47fb86a98bf75bf195c00048bdbc70a9c71a43bc012e21c21a",
+      "reviewed": true,
+      "requestedAt": "2026-10-28T14:40:52.691Z",
+      "nonce": 40,
+      "seenSummary": "liquidations30d=0 trades30d=3 history=yes partial=0",
+      "seenHash": "0x65babbe9b676ac47fb86a98bf75bf195c00048bdbc70a9c71a43bc012e21c21a",
+      "seenHashRecomputed": true,
+      "summaryMatch": true,
+      "reviewer": "0xc999B6924179a0dc9649DA7eBa8F3aC8b7CF7c25",
+      "fetched": {
+        "url": "https://copybook-eosin.vercel.app/api/risk/0x2c12a7432362e335b7a0b2acca2f6ae17a1f2fd8",
+        "field": "rubric"
+      },
+      "inference": {
+        "prompt": "Stats: liquidations30d=0 trades30d=3 history=yes partial=0",
+        "system": "You review perpetual-futures traders for people who copy their positions automatically. Apply this rubric exactly to the 30-day stats (key=value; n/a means unknown, not safe). BLOCK if liquidations30d is 2 or more, or maxDrawdownPct30d is present and at least 50. Otherwise CAUTION if liquidations30d is 1, or trades30d is below 10, or history=none, or partial=1, or maxDrawdownPct30d is present and at least 25. Otherwise OK. Answer with exactly one word: OK, CAUTION or BLOCK.",
+        "chainOfThought": false,
+        "allowed": [
+          "OK",
+          "CAUTION",
+          "BLOCK"
+        ]
+      },
+      "inferenceAsPublished": true,
+      "expectedOnSeen": "CAUTION",
+      "expectedOnSeenReasons": [
+        "trades30d=3 < 10"
+      ],
+      "committee": "OK",
+      "previousRun": "OK",
+      "votes": {
+        "ok": 3,
+        "caution": 0,
+        "block": 0,
+        "responded": 3
+      },
+      "jsonStage": {
+        "requestId": "18076893",
+        "status": 2,
+        "identical": true,
+        "validators": [
+          {
+            "validator": "0x3E05e29029C60E000C8F01EB5AC9cEE6b242D7e0",
+            "status": 2,
+            "receipt": "0",
+            "executionCost": "300000000000000"
+          },
+          {
+            "validator": "0x05f1fE2DDF9B65576D3165E37C6A60e6c5Ba93De",
+            "status": 2,
+            "receipt": "0",
+            "executionCost": "300000000000000"
+          },
+          {
+            "validator": "0x55Acbe370872c7D90F504eF169217a00c29E2A33",
+            "status": 2,
+            "receipt": "0",
+            "executionCost": "300000000000000"
+          }
+        ]
+      },
+      "answers": [
+        {
+          "validator": "0x3E05e29029C60E000C8F01EB5AC9cEE6b242D7e0",
+          "status": 2,
+          "receipt": "0",
+          "executionCost": "70000000000000000",
+          "answer": "OK"
+        },
+        {
+          "validator": "0x1Cb38b3ee632B5dCc0347dB81766606d6Aad4926",
+          "status": 2,
+          "receipt": "0",
+          "executionCost": "70000000000000000",
+          "answer": "OK"
+        },
+        {
+          "validator": "0x55Acbe370872c7D90F504eF169217a00c29E2A33",
+          "status": 2,
+          "receipt": "0",
+          "executionCost": "70000000000000000",
+          "answer": "OK"
+        }
+      ],
+      "llmRequestId": "18076896",
+      "gate": {
+        "event": "VerdictReceived",
+        "tier": "OK"
+      },
+      "storedOnGate": "Ok",
+      "txs": {
+        "gateRequest": "https://explorer.testnet.somnia.network/tokyo/tx/0xd6b70821f95fe71845a37f587b8067764d2366751808715540791928fb45a9f7",
+        "summaryRequest": "https://shannon-explorer.somnia.network/tx/0xa81196585f56f47f290e6c2ce57c84192c3ebf8282b49fe4f21e8c5d2d0f8187",
+        "verdictRequest": "https://shannon-explorer.somnia.network/tx/0xf14ac07e803e856b90abc02f728dffea33797322c8b2b2be9ca933e931912d25",
+        "verdict": "https://shannon-explorer.somnia.network/tx/0x0fde9c04d6bcb217b6843c0bf0746ede3212e7860dc923b22a72f48f726ef558",
+        "gateDelivery": "https://explorer.testnet.somnia.network/tokyo/tx/0x1910739aaf06535c870c0978c13f2063014b43e22ede7b69628daf64b848b16a"
+      }
+    },
+    {
+      "trader": "0xb9c0424B350be6Bb438eE3fdda981212d42037F3",
+      "pickedAs": "thin",
+      "expected": "CAUTION",
+      "reasons": [
+        "trades30d=7 < 10"
+      ],
+      "preRegisteredLine": "liquidations30d=0 trades30d=7 history=yes partial=0",
+      "preRegisteredHash": "0x7e620790dc8637a05915f31f4d9869aa3e204c0cdaaacb59aa35d4e502d37a16",
+      "reviewed": true,
+      "requestedAt": "2026-10-28T14:41:18.435Z",
+      "nonce": 41,
+      "seenSummary": "liquidations30d=0 trades30d=7 history=yes partial=0",
+      "seenHash": "0x7e620790dc8637a05915f31f4d9869aa3e204c0cdaaacb59aa35d4e502d37a16",
+      "seenHashRecomputed": true,
+      "summaryMatch": true,
+      "reviewer": "0xc999B6924179a0dc9649DA7eBa8F3aC8b7CF7c25",
+      "fetched": {
+        "url": "https://copybook-eosin.vercel.app/api/risk/0xb9c0424b350be6bb438ee3fdda981212d42037f3",
+        "field": "rubric"
+      },
+      "inference": {
+        "prompt": "Stats: liquidations30d=0 trades30d=7 history=yes partial=0",
+        "system": "You review perpetual-futures traders for people who copy their positions automatically. Apply this rubric exactly to the 30-day stats (key=value; n/a means unknown, not safe). BLOCK if liquidations30d is 2 or more, or maxDrawdownPct30d is present and at least 50. Otherwise CAUTION if liquidations30d is 1, or trades30d is below 10, or history=none, or partial=1, or maxDrawdownPct30d is present and at least 25. Otherwise OK. Answer with exactly one word: OK, CAUTION or BLOCK.",
+        "chainOfThought": false,
+        "allowed": [
+          "OK",
+          "CAUTION",
+          "BLOCK"
+        ]
+      },
+      "inferenceAsPublished": true,
+      "expectedOnSeen": "CAUTION",
+      "expectedOnSeenReasons": [
+        "trades30d=7 < 10"
+      ],
+      "committee": "CAUTION",
+      "previousRun": "OK",
+      "votes": {
+        "ok": 0,
+        "caution": 3,
+        "block": 0,
+        "responded": 3
+      },
+      "jsonStage": {
+        "requestId": "18076917",
+        "status": 2,
+        "identical": true,
+        "validators": [
+          {
+            "validator": "0x1Cb38b3ee632B5dCc0347dB81766606d6Aad4926",
+            "status": 2,
+            "receipt": "0",
+            "executionCost": "300000000000000"
+          },
+          {
+            "validator": "0x3E05e29029C60E000C8F01EB5AC9cEE6b242D7e0",
+            "status": 2,
+            "receipt": "0",
+            "executionCost": "300000000000000"
+          },
+          {
+            "validator": "0x05f1fE2DDF9B65576D3165E37C6A60e6c5Ba93De",
+            "status": 2,
+            "receipt": "0",
+            "executionCost": "300000000000000"
+          }
+        ]
+      },
+      "answers": [
+        {
+          "validator": "0x3E05e29029C60E000C8F01EB5AC9cEE6b242D7e0",
+          "status": 2,
+          "receipt": "0",
+          "executionCost": "70000000000000000",
+          "answer": "CAUTION"
+        },
+        {
+          "validator": "0x1Cb38b3ee632B5dCc0347dB81766606d6Aad4926",
+          "status": 2,
+          "receipt": "0",
+          "executionCost": "70000000000000000",
+          "answer": "CAUTION"
+        },
+        {
+          "validator": "0x55Acbe370872c7D90F504eF169217a00c29E2A33",
+          "status": 2,
+          "receipt": "0",
+          "executionCost": "70000000000000000",
+          "answer": "CAUTION"
+        }
+      ],
+      "llmRequestId": "18076920",
+      "gate": {
+        "event": "VerdictReceived",
+        "tier": "CAUTION"
+      },
+      "storedOnGate": "Caution",
+      "txs": {
+        "gateRequest": "https://explorer.testnet.somnia.network/tokyo/tx/0x7746a7378cc5d3b2a093c7c884cb0d82c802e444dd8e4202afe3f5c3aa872cc9",
+        "summaryRequest": "https://shannon-explorer.somnia.network/tx/0x4cc0da46b3068594235d5ca8c04be1bc240182b21381e9ef1f04d03750ccc318",
+        "verdictRequest": "https://shannon-explorer.somnia.network/tx/0x241939ff615533fd4c46d948210b272513bf7561ba4adc98956fe4f26c35dd75",
+        "verdict": "https://shannon-explorer.somnia.network/tx/0x8a260f5c6be9f0182c51462b40401abbcf161a3dde69f40b87068bf47820c7de",
+        "gateDelivery": "https://explorer.testnet.somnia.network/tokyo/tx/0x7e446e907b8907bb04ef2c1fd166d1984e7a2126c837d2a81634fcbd07bbe804"
+      }
+    },
+    {
+      "trader": "0x10eae18964db8EE7981B51fd93b3B163e8dF2E90",
+      "pickedAs": "thin",
+      "expected": "CAUTION",
+      "reasons": [
+        "trades30d=5 < 10"
+      ],
+      "preRegisteredLine": "liquidations30d=0 trades30d=5 history=yes partial=0",
+      "preRegisteredHash": "0x6849fb889c85c3f11c7964d0cc74d7f2f4129cece56126765cad5e1e703fd23f",
+      "reviewed": true,
+      "requestedAt": "2026-10-28T14:41:40.526Z",
+      "nonce": 42,
+      "seenSummary": "liquidations30d=0 trades30d=5 history=yes partial=0",
+      "seenHash": "0x6849fb889c85c3f11c7964d0cc74d7f2f4129cece56126765cad5e1e703fd23f",
+      "seenHashRecomputed": true,
+      "summaryMatch": true,
+      "reviewer": "0xc999B6924179a0dc9649DA7eBa8F3aC8b7CF7c25",
+      "fetched": {
+        "url": "https://copybook-eosin.vercel.app/api/risk/0x10eae18964db8ee7981b51fd93b3b163e8df2e90",
+        "field": "rubric"
+      },
+      "inference": {
+        "prompt": "Stats: liquidations30d=0 trades30d=5 history=yes partial=0",
+        "system": "You review perpetual-futures traders for people who copy their positions automatically. Apply this rubric exactly to the 30-day stats (key=value; n/a means unknown, not safe). BLOCK if liquidations30d is 2 or more, or maxDrawdownPct30d is present and at least 50. Otherwise CAUTION if liquidations30d is 1, or trades30d is below 10, or history=none, or partial=1, or maxDrawdownPct30d is present and at least 25. Otherwise OK. Answer with exactly one word: OK, CAUTION or BLOCK.",
+        "chainOfThought": false,
+        "allowed": [
+          "OK",
+          "CAUTION",
+          "BLOCK"
+        ]
+      },
+      "inferenceAsPublished": true,
+      "expectedOnSeen": "CAUTION",
+      "expectedOnSeenReasons": [
+        "trades30d=5 < 10"
+      ],
+      "committee": "OK",
+      "previousRun": "OK",
+      "votes": {
+        "ok": 3,
+        "caution": 0,
+        "block": 0,
+        "responded": 3
+      },
+      "jsonStage": {
+        "requestId": "18076945",
+        "status": 2,
+        "identical": true,
+        "validators": [
+          {
+            "validator": "0x1Cb38b3ee632B5dCc0347dB81766606d6Aad4926",
+            "status": 2,
+            "receipt": "0",
+            "executionCost": "300000000000000"
+          },
+          {
+            "validator": "0x3E05e29029C60E000C8F01EB5AC9cEE6b242D7e0",
+            "status": 2,
+            "receipt": "0",
+            "executionCost": "300000000000000"
+          },
+          {
+            "validator": "0x05f1fE2DDF9B65576D3165E37C6A60e6c5Ba93De",
+            "status": 2,
+            "receipt": "0",
+            "executionCost": "300000000000000"
+          }
+        ]
+      },
+      "answers": [
+        {
+          "validator": "0x3E05e29029C60E000C8F01EB5AC9cEE6b242D7e0",
+          "status": 2,
+          "receipt": "0",
+          "executionCost": "70000000000000000",
+          "answer": "OK"
+        },
+        {
+          "validator": "0x05f1fE2DDF9B65576D3165E37C6A60e6c5Ba93De",
+          "status": 2,
+          "receipt": "0",
+          "executionCost": "70000000000000000",
+          "answer": "OK"
+        },
+        {
+          "validator": "0x55Acbe370872c7D90F504eF169217a00c29E2A33",
+          "status": 2,
+          "receipt": "0",
+          "executionCost": "70000000000000000",
+          "answer": "OK"
+        }
+      ],
+      "llmRequestId": "18076948",
+      "gate": {
+        "event": "VerdictReceived",
+        "tier": "OK"
+      },
+      "storedOnGate": "Ok",
+      "txs": {
+        "gateRequest": "https://explorer.testnet.somnia.network/tokyo/tx/0x56a19d94918ea5527cbf4962eb6a56a2a0f64de40c3b5cda24f60d187357a414",
+        "summaryRequest": "https://shannon-explorer.somnia.network/tx/0x34f0f09d93c5edf215daa4dcfee8206d94df7c30ec71b962e8a780a4fc1989b8",
+        "verdictRequest": "https://shannon-explorer.somnia.network/tx/0x6dcc6129ee10184e8689d12a111e6ab7602d26323099babffc69bad722f4b660",
+        "verdict": "https://shannon-explorer.somnia.network/tx/0xbadee804b8193e2d735039aa289f4412d3dd84bddc52ddd00c7eadb0c3e225ba",
+        "gateDelivery": "https://explorer.testnet.somnia.network/tokyo/tx/0xe4000df4d7440e8fb2ccde67cfb013a70a3779061211ea4f8af31c9b107b4e8f"
+      }
+    },
+    {
+      "trader": "0xA1d0CB85c869e534Fe1e0c22af3b238301157b5d",
+      "pickedAs": "leader",
+      "expected": "OK",
+      "reasons": [],
+      "preRegisteredLine": "liquidations30d=0 trades30d=45 history=yes partial=0",
+      "preRegisteredHash": "0x9d6308df58dcc0ab8ebb38eaa1567400e2912872bb6c63888dd67ed316aeee97",
+      "reviewed": true,
+      "requestedAt": "2026-10-28T14:42:19.233Z",
+      "nonce": 43,
+      "seenSummary": "liquidations30d=0 trades30d=45 history=yes partial=0",
+      "seenHash": "0x9d6308df58dcc0ab8ebb38eaa1567400e2912872bb6c63888dd67ed316aeee97",
+      "seenHashRecomputed": true,
+      "summaryMatch": true,
+      "reviewer": "0xc999B6924179a0dc9649DA7eBa8F3aC8b7CF7c25",
+      "fetched": {
+        "url": "https://copybook-eosin.vercel.app/api/risk/0xa1d0cb85c869e534fe1e0c22af3b238301157b5d",
+        "field": "rubric"
+      },
+      "inference": {
+        "prompt": "Stats: liquidations30d=0 trades30d=45 history=yes partial=0",
+        "system": "You review perpetual-futures traders for people who copy their positions automatically. Apply this rubric exactly to the 30-day stats (key=value; n/a means unknown, not safe). BLOCK if liquidations30d is 2 or more, or maxDrawdownPct30d is present and at least 50. Otherwise CAUTION if liquidations30d is 1, or trades30d is below 10, or history=none, or partial=1, or maxDrawdownPct30d is present and at least 25. Otherwise OK. Answer with exactly one word: OK, CAUTION or BLOCK.",
+        "chainOfThought": false,
+        "allowed": [
+          "OK",
+          "CAUTION",
+          "BLOCK"
+        ]
+      },
+      "inferenceAsPublished": true,
+      "expectedOnSeen": "OK",
+      "expectedOnSeenReasons": [],
+      "committee": "OK",
+      "previousRun": "OK",
+      "votes": {
+        "ok": 3,
+        "caution": 0,
+        "block": 0,
+        "responded": 3
+      },
+      "jsonStage": {
+        "requestId": "18076983",
+        "status": 2,
+        "identical": true,
+        "validators": [
+          {
+            "validator": "0x1Cb38b3ee632B5dCc0347dB81766606d6Aad4926",
+            "status": 2,
+            "receipt": "0",
+            "executionCost": "300000000000000"
+          },
+          {
+            "validator": "0x3E05e29029C60E000C8F01EB5AC9cEE6b242D7e0",
+            "status": 2,
+            "receipt": "0",
+            "executionCost": "300000000000000"
+          },
+          {
+            "validator": "0x55Acbe370872c7D90F504eF169217a00c29E2A33",
+            "status": 2,
+            "receipt": "0",
+            "executionCost": "300000000000000"
+          }
+        ]
+      },
+      "answers": [
+        {
+          "validator": "0x3E05e29029C60E000C8F01EB5AC9cEE6b242D7e0",
+          "status": 2,
+          "receipt": "0",
+          "executionCost": "70000000000000000",
+          "answer": "OK"
+        },
+        {
+          "validator": "0x05f1fE2DDF9B65576D3165E37C6A60e6c5Ba93De",
+          "status": 2,
+          "receipt": "0",
+          "executionCost": "70000000000000000",
+          "answer": "OK"
+        },
+        {
+          "validator": "0x55Acbe370872c7D90F504eF169217a00c29E2A33",
+          "status": 2,
+          "receipt": "0",
+          "executionCost": "70000000000000000",
+          "answer": "OK"
+        }
+      ],
+      "llmRequestId": "18076986",
+      "gate": {
+        "event": "BlockHeld",
+        "tier": "OK"
+      },
+      "storedOnGate": "Block",
+      "txs": {
+        "gateRequest": "https://explorer.testnet.somnia.network/tokyo/tx/0xae7bd79212d9d2541c372ef348e0ac63e61998f35b36e3ae19eaa963cf2d79cb",
+        "summaryRequest": "https://shannon-explorer.somnia.network/tx/0xd0fb5831837fdd82efa69872ba0e672ff988625eaa62b4f626cc9dc68515b797",
+        "verdictRequest": "https://shannon-explorer.somnia.network/tx/0x63478464150fbe3d921c68606f174dee00a5eb56c50c86876d3ff82f96c7edb2",
+        "verdict": "https://shannon-explorer.somnia.network/tx/0x39933fa48b30060e2f19a3d502a282914bbca7f3fd5a21041fb5095415e767ff",
+        "gateDelivery": "https://explorer.testnet.somnia.network/tokyo/tx/0x1525f30c37a7dc72a33897ef0071bd149ef326f6ae0b0832ae7279d87e5906c3"
+      }
+    }
+  ]
+}

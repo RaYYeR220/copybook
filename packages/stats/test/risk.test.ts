@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { riskSummary, type TraderStats } from "../src/index.ts";
+import { riskRubric, riskSummary, type TraderStats } from "../src/index.ts";
 
 const base: TraderStats = {
   trader: "0x0000000000000000000000000000000000000001",
@@ -91,5 +91,38 @@ describe("riskSummary", () => {
 
   it("uses the window length in the key suffix", () => {
     expect(riskSummary({ ...base, windowDays: 7 })).toContain("trades7d=412 activeDays7d=14");
+  });
+});
+
+describe("riskRubric", () => {
+  it("carries only the rubric's inputs, in a fixed order", () => {
+    expect(riskRubric(base)).toBe("liquidations30d=3 trades30d=412 maxDrawdownPct30d=31.2 history=yes partial=0");
+  });
+
+  it("leaves out the drawdown percentage when it is unknown, as the summary does", () => {
+    expect(riskRubric({ ...base, maxDrawdownPct30d: null })).toBe("liquidations30d=3 trades30d=412 history=yes partial=0");
+  });
+
+  it("drops every key the rubric does not read", () => {
+    const line = riskRubric({ ...base, realizedPnl30d: -979.66, avgLeverage: null, lastActiveAt: null });
+    for (const key of ["realizedPnl", "maxDrawdown30d", "avgLeverage", "lastActive", "activeDays", "markets"]) {
+      expect(line).not.toContain(key);
+    }
+  });
+
+  it("states history=none and partial=1", () => {
+    expect(
+      riskRubric({ ...base, trades30d: 0, liquidations30d: 0, maxDrawdownPct30d: null, hasHistory: false, truncated: true }),
+    ).toBe("liquidations30d=0 trades30d=0 history=none partial=1");
+  });
+
+  it("writes n/a for a count that is not a number", () => {
+    expect(riskRubric({ ...base, liquidations30d: Number.NaN, trades30d: Number.POSITIVE_INFINITY })).toBe(
+      "liquidations30d=n/a trades30d=n/a maxDrawdownPct30d=31.2 history=yes partial=0",
+    );
+  });
+
+  it("uses the window length in the key suffix", () => {
+    expect(riskRubric({ ...base, windowDays: 7 })).toBe("liquidations7d=3 trades7d=412 maxDrawdownPct7d=31.2 history=yes partial=0");
   });
 });

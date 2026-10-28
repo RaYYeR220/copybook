@@ -1,14 +1,23 @@
 // Pre-registered evaluation of the validator risk review. The rubric and the reviewer's prompt are in eval/rubric.ts.
+// Run v2 (eval/answer-key.json, eval/results.json): the rubric in the user prompt, the full summary as the stats.
+// Run v3 (eval/v3/): the rubric as the system message, and only the keys it reads (the endpoint's `rubric` field).
 // COPYBOOK_ENV=<env file> tsx src/eval.ts select
 //   picks 20 Hideki traders from the indexer (quotas below), fetches each one's summary from the public endpoint and
 //   writes eval/answer-key.json with the rubric's expected tier. The env file is read only to exclude our own wallets.
-// tsx src/eval.ts score
+// tsx src/eval.ts key v3
+//   the same 20 traders, in the same order: each one's rubric line from the public endpoint, the rubric's tier for it,
+//   into eval/v3/answer-key.json. Commit it before requesting any review of the run.
+// COPYBOOK_ENV=<env file> tsx src/eval.ts anchor v3 <commit>
+//   writes the commit hash and the keccak256 of the committed key on Hideki (a zero-value self-transfer from the hub
+//   owner), after checking the committed key is byte-identical to the file; the transaction goes to eval/v3/anchor.json.
+// tsx src/eval.ts score [v3]
 //   reads the reviews recorded in deployments/risk.json (npm run risk review <trader>) for the traders in the key and
-//   writes eval/results.json: the committee's tier against the expected one, per trader and as a confusion matrix.
-import { readFileSync, writeFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+//   writes the run's results.json: the committee's tier against the expected one, per trader and as a confusion matrix.
+import { execFileSync } from "node:child_process";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { getAddress, keccak256, toBytes, type Address, type Hex } from "viem";
+import { concat, getAddress, keccak256, toBytes, type Address, type Hex } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { Indexer, getTraderStats, riskSummary, type TraderStats } from "@copybook/stats";
 import { RUBRIC, SYSTEM_PROMPT, TIERS, rubricTier, type Tier } from "../../eval/rubric.ts";
@@ -17,6 +26,17 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const KEY_FILE = resolve(ROOT, "eval/answer-key.json");
 const RESULTS_FILE = resolve(ROOT, "eval/results.json");
 const RISK_FILE = resolve(ROOT, "deployments/risk.json");
+/** Each run's files: v2 sits at the top of eval/ (its key is anchored there), later runs in their own folder. */
+const RUNS = {
+  v2: { key: KEY_FILE, results: RESULTS_FILE, anchor: undefined },
+  v3: { key: resolve(ROOT, "eval/v3/answer-key.json"), results: resolve(ROOT, "eval/v3/results.json"), anchor: resolve(ROOT, "eval/v3/anchor.json") },
+} as const;
+type Run = keyof typeof RUNS;
+const runOf = (name: string | undefined): Run => {
+  const r = (name ?? "v2") as Run;
+  if (!(r in RUNS)) throw new Error(`unknown run ${name}: ${Object.keys(RUNS).join(" | ")}`);
+  return r;
+};
 const ENDPOINT = "https://copybook-eosin.vercel.app/api/risk/";
 /** The endpoint's row cap per trader and table; screening uses the same so it sees what the endpoint sees. */
 const ROW_CAP = 2000;
@@ -107,7 +127,7 @@ async function pools(ix: Indexer, since: number): Promise<Pool[]> {
   ];
 }
 
-type Fetched = { url: string; fetchedAt: string; status: number; summary: string; asOf: string; cache: string | null; age: string | null };
+type Fetched = { url: string; fetchedAt: string; status: number; summary: string; rubric?: string; asOf: string; cache: string | null; age: string | null };
 
 /** The trader's summary from the public endpoint, at the URL the reviewer's validators fetch (lowercase address). */
 async function fetchSummary(trader: Address): Promise<Fetched> {
@@ -120,9 +140,9 @@ async function fetchSummary(trader: Address): Promise<Fetched> {
       const res = await fetch(url, { signal: AbortSignal.timeout(60_000) });
       const body = await res.text();
       if (res.status === 200) {
-        const j = JSON.parse(body) as { summary: string; asOf: string };
+        const j = JSON.parse(body) as { summary: string; rubric?: string; asOf: string };
         if (typeof j.summary !== "string" || !j.summary) throw new Error("no summary in the response");
-        return { url, fetchedAt, status: res.status, summary: j.summary, asOf: j.asOf, cache: res.headers.get("x-vercel-cache"), age: res.headers.get("age") };
+        return { url, fetchedAt, status: res.status, summary: j.summary, rubric: j.rubric, asOf: j.asOf, cache: res.headers.get("x-vercel-cache"), age: res.headers.get("age") };
       }
       last = `HTTP ${res.status} ${body.slice(0, 120)}`;
     } catch (e) {
@@ -212,10 +232,89 @@ async function select() {
   console.log(`  wrote ${KEY_FILE}: ${traders.length} traders, expected ${JSON.stringify(count(traders.map((t) => t.expectedTier)))}`);
 }
 
+// ---------------------------------------------------------------- later runs: same sample, new answer key
+
+const count = <K extends string>(keys: K[]) => keys.reduce((m, k) => ((m[k] = (m[k] ?? 0) + 1), m), {} as Record<K, number>);
+
+/** Run v3's answer key: run v2's traders in run v2's order, each with the rubric line the endpoint serves now. */
+async function keyV3() {
+  const v2 = JSON.parse(readFileSync(KEY_FILE, "utf8")) as { generatedAt: string; traders: { trader: Address; pickedAs: Category; pool: string }[] };
+  const risk = JSON.parse(readFileSync(RISK_FILE, "utf8")) as { shannon: { reviewer: string; summarySelector?: string; systemPrompt?: string } };
+  if (risk.shannon.summarySelector !== "rubric" || risk.shannon.systemPrompt !== SYSTEM_PROMPT) {
+    throw new Error("the reviewer in deployments/risk.json does not read the rubric field with the rubric as its system message");
+  }
+  const traders = [];
+  for (const t of v2.traders) {
+    const f = await fetchSummary(t.trader);
+    if (typeof f.rubric !== "string" || !f.rubric) throw new Error(`no rubric line for ${t.trader}`);
+    const r = rubricTier(f.rubric);
+    const onSummary = rubricTier(f.summary).tier;
+    if (onSummary !== r.tier) throw new Error(`${t.trader}: the rubric line says ${r.tier}, the summary ${onSummary}`);
+    traders.push({
+      trader: t.trader,
+      pickedAs: t.pickedAs,
+      pool: t.pool,
+      rubric: f.rubric,
+      rubricHash: keccak256(toBytes(f.rubric)),
+      expectedTier: r.tier,
+      reasons: r.reasons,
+      summary: f.summary,
+      fetchedAt: f.fetchedAt,
+      endpoint: { url: f.url, asOf: f.asOf, cache: f.cache, age: f.age },
+    });
+    console.log(`  ${r.tier.padEnd(7)} ${t.trader}  ${f.rubric}`);
+    await sleep(1_000);
+  }
+  mkdirSync(dirname(RUNS.v3.key), { recursive: true });
+  write(RUNS.v3.key, {
+    about:
+      "Pre-registered answer key, run v3: run v2's 20 traders in the same order, each with the rubric line the public endpoint serves now (the only text the LLM committee classifies) and the rubric's tier for it, committed before any review of this run was requested.",
+    run: "v3",
+    generatedAt: new Date().toISOString(),
+    endpoint: ENDPOINT,
+    field: "rubric",
+    windowDays: WINDOW_DAYS,
+    rubric: RUBRIC,
+    systemPrompt: SYSTEM_PROMPT,
+    inference: 'inferString(prompt = "Stats: " + rubric line, system = systemPrompt, chainOfThought = false, allowedValues = ["OK", "CAUTION", "BLOCK"])',
+    reviewer: risk.shannon.reviewer,
+    rubricHash: "keccak256 of the rubric line's UTF-8 bytes, as RiskReviewer hashes the line the JSON committee agreed on",
+    sample: { from: "eval/answer-key.json (run v2, pre-registered in commit 6b1b07437b29c95c8d41916858cabdc73a7d6e07)", v2GeneratedAt: v2.generatedAt, rule: "the same traders in the same order" },
+    counts: { pickedAs: count(traders.map((t) => t.pickedAs)), expectedTier: count(traders.map((t) => t.expectedTier)) },
+    traders,
+  });
+  console.log(`  wrote ${RUNS.v3.key}: ${traders.length} traders, expected ${JSON.stringify(count(traders.map((t) => t.expectedTier)))}`);
+}
+
+/** Commit hash + keccak256 of the committed key, written on Hideki by the hub owner in a zero-value self-transfer. */
+async function anchor(run: Run, commit: string) {
+  const file = RUNS[run].anchor;
+  if (!file) throw new Error(`run ${run} has no anchor file`);
+  if (!/^[0-9a-f]{40}$/.test(commit)) throw new Error("a full commit sha1 expected");
+  const path = relative(ROOT, RUNS[run].key).split("\\").join("/");
+  const committed = execFileSync("git", ["show", `${commit}:${path}`], { cwd: ROOT });
+  const onDisk = readFileSync(RUNS[run].key);
+  if (!committed.equals(onDisk)) throw new Error(`${path} differs from its copy in ${commit}`);
+  const keyHash = keccak256(committed);
+  const data = concat([`0x${commit}`, keyHash]);
+  const { pub, wallet, chain, EXPLORER_TX } = await import("./env.ts");
+  const w = wallet("HUB_OWNER");
+  const est = await pub.estimateGas({ account: w.account, to: w.account.address, data, value: 0n });
+  const hash = await w.sendTransaction({ to: w.account.address, data, value: 0n, gas: (est * 3n) / 2n, chain, account: w.account } as never);
+  const r = await pub.waitForTransactionReceipt({ hash, timeout: 240_000 });
+  const b = await pub.getBlock({ blockNumber: r.blockNumber });
+  const out = { run, commit, key: path, keyKeccak: keyHash, data, tx: hash, url: EXPLORER_TX + hash, block: Number(r.blockNumber), timestamp: new Date(Number(b.timestamp) * 1000).toISOString(), from: w.account.address, status: r.status, gasUsed: Number(r.gasUsed) };
+  write(file, out);
+  console.log(JSON.stringify(out, null, 2));
+  if (r.status !== "success") throw new Error("the anchor transaction failed");
+}
+
 // ---------------------------------------------------------------- score
 
-type KeyRow = { trader: Address; pickedAs: Category; summary: string; summaryHash: Hex; expectedTier: Tier; reasons: string[]; fetchedAt: string };
-type Key = { generatedAt: string; traders: KeyRow[] };
+/** A key row holds the line the committee was to classify: the full summary in run v2, the rubric line later. */
+type KeyRow = { trader: Address; pickedAs: Category; summary: string; summaryHash?: Hex; rubric?: string; rubricHash?: Hex; expectedTier: Tier; reasons: string[]; fetchedAt: string };
+type Key = { generatedAt: string; systemPrompt: string; traders: KeyRow[] };
+type AgentRequest = { agentId: string; call: string; args: unknown[] };
 type Ev = { event: string; tx: Hex; block: number; args: Record<string, unknown> };
 type Resp = { validator: Address; status: number; receipt: string; executionCost: string; result: string };
 type Review = {
@@ -226,7 +325,9 @@ type Review = {
   deliveryToShannon?: Hex;
   deliveryToHideki?: Hex;
   shannonEvents?: Ev[];
-  callbacks?: { tx: Hex; submittedBy: string; committee: { callback: string; requestId: string; status: number; responses: Resp[] }[] }[];
+  reviewer?: string;
+  summaryRequest?: AgentRequest[];
+  callbacks?: { tx: Hex; submittedBy: string; committee: { callback: string; requestId: string; status: number; responses: Resp[] }[]; agentRequests?: AgentRequest[] }[];
   gateEvents?: { event: string; args: Record<string, unknown> }[];
   verdict?: { tier: string };
   failure?: string;
@@ -237,11 +338,15 @@ type Outcome = Tier | "None";
 const HIDEKI_TX = "https://explorer.testnet.somnia.network/tokyo/tx/";
 const SHANNON_TX = "https://shannon-explorer.somnia.network/tx/";
 
-function score() {
-  const key = JSON.parse(readFileSync(KEY_FILE, "utf8")) as Key;
+function score(run: Run) {
+  const key = JSON.parse(readFileSync(RUNS[run].key, "utf8")) as Key;
   const risk = JSON.parse(readFileSync(RISK_FILE, "utf8")) as { reviews: Review[]; shannon: Record<string, unknown> };
   const after = Date.parse(key.generatedAt);
+  // the previous run's committee tier per trader, for the side-by-side column
+  const previous = run === "v2" ? undefined : (JSON.parse(readFileSync(RESULTS_FILE, "utf8")) as { rows: { trader: string; committee: Outcome }[] }).rows;
   const rows = key.traders.map((k) => {
+    const line = k.rubric ?? k.summary;
+    const lineHash = k.rubricHash ?? k.summaryHash;
     // the first review of this trader requested after the key was written
     const r = risk.reviews.find((x) => getAddress(x.trader) === getAddress(k.trader) && Date.parse(x.at) > after);
     const ev = (name: string) => r?.shannonEvents?.find((e) => e.event === name);
@@ -255,23 +360,32 @@ function score() {
     const llm = stage("handleVerdict");
     const gate = r?.gateEvents?.find((g) => ["VerdictReceived", "BlockHeld", "ReviewFailed", "StaleVerdict"].includes(g.event));
     const expectedOnSeen = seen !== undefined ? rubricTier(seen).tier : undefined;
+    // exactly what the agents were asked (decoded from the reviewer's platform calls; recorded from run v3 on)
+    const fetch = r?.summaryRequest?.find((q) => q.call === "fetchString");
+    const infer = r?.callbacks?.flatMap((c) => c.agentRequests ?? []).find((q) => q.call === "inferString");
+    const inference = infer && { prompt: infer.args[0] as string, system: infer.args[1] as string, chainOfThought: infer.args[2] as boolean, allowed: infer.args[3] as string[] };
     return {
       trader: k.trader,
       pickedAs: k.pickedAs,
       expected: k.expectedTier,
       reasons: k.reasons,
-      preRegisteredSummary: k.summary,
-      preRegisteredHash: k.summaryHash,
+      preRegisteredLine: line,
+      preRegisteredHash: lineHash,
       reviewed: !!r,
       requestedAt: r?.at,
       nonce: r?.nonce,
       seenSummary: seen,
       seenHash,
       seenHashRecomputed: seen !== undefined ? keccak256(toBytes(seen)) === seenHash : undefined,
-      summaryMatch: seenHash !== undefined ? seenHash === k.summaryHash : undefined,
+      summaryMatch: seenHash !== undefined ? seenHash === lineHash : undefined,
+      reviewer: r?.reviewer,
+      fetched: fetch && { url: fetch.args[0] as string, field: fetch.args[1] as string },
+      inference,
+      inferenceAsPublished: inference && seen !== undefined ? inference.system === key.systemPrompt && inference.prompt === `Stats: ${seen}` : undefined,
       expectedOnSeen,
       expectedOnSeenReasons: seen !== undefined ? rubricTier(seen).reasons : undefined,
       committee,
+      previousRun: previous?.find((p) => getAddress(p.trader) === getAddress(k.trader))?.committee,
       votes: tallied ? { ok: Number(tallied.args.ok), caution: Number(tallied.args.caution), block: Number(tallied.args.blocked), responded: Number(tallied.args.responded) } : undefined,
       jsonStage: json && {
         requestId: json.requestId,
@@ -315,12 +429,17 @@ function score() {
     agreementOnSeenSummary: agree((x) => x.expectedOnSeen),
     falseBlocks: reviewed.filter((x) => x.committee === "BLOCK" && x.expectedOnSeen !== "BLOCK").length,
     missedBlocks: reviewed.filter((x) => x.expectedOnSeen === "BLOCK" && x.committee !== "BLOCK").length,
+    // the gate acts on BLOCK only: refuse (BLOCK) or allow (anything else, a failed review included)
+    gateDecisionsAgreeing: reviewed.filter((x) => (x.committee === "BLOCK") === (x.expectedOnSeen === "BLOCK")).length,
+    blockRecall: { caught: reviewed.filter((x) => x.expectedOnSeen === "BLOCK" && x.committee === "BLOCK").length, expected: reviewed.filter((x) => x.expectedOnSeen === "BLOCK").length },
+    falseBlockRate: { falseBlocks: reviewed.filter((x) => x.committee === "BLOCK" && x.expectedOnSeen !== "BLOCK").length, notBlockExpected: reviewed.filter((x) => x.expectedOnSeen !== undefined && x.expectedOnSeen !== "BLOCK").length },
+    inferenceAsPublished: run === "v2" ? undefined : reviewed.filter((x) => x.inferenceAsPublished === true).length,
     validatorAnswers: answers.length,
     validatorAnswersAgreeing: answers.filter((a) => a.answer === a.expected).length,
     confusionPreRegistered: matrix((x) => x.expected),
     confusionOnSeenSummary: matrix((x) => x.expectedOnSeen),
   };
-  write(RESULTS_FILE, { scoredAt: new Date().toISOString(), answerKeyGeneratedAt: key.generatedAt, systemPrompt: risk.shannon.systemPrompt, summary, rows });
+  write(RUNS[run].results, { run, scoredAt: new Date().toISOString(), answerKeyGeneratedAt: key.generatedAt, systemPrompt: key.systemPrompt, summary, rows });
 
   // markdown for the scorecard
   const md: string[] = [];
@@ -329,7 +448,7 @@ function score() {
     for (const t of TIERS) md.push(`| **${t}** | ${outcomes.map((o) => (o === t ? `**${m[t][o]}**` : String(m[t][o]))).join(" | ")} |`);
   };
   md.push(
-    `agreement with the pre-registered key: ${summary.agreementPreRegistered}/${summary.reviewed}; with the rubric on the summary the validators saw: ${summary.agreementOnSeenSummary}/${summary.reviewed}; no verdict: ${summary.failures}; summaries changed after pre-registration: ${summary.summaryChanged}; false BLOCKs: ${summary.falseBlocks}; missed BLOCKs: ${summary.missedBlocks}; validator answers matching the rubric: ${summary.validatorAnswersAgreeing}/${summary.validatorAnswers}`,
+    `agreement with the pre-registered key: ${summary.agreementPreRegistered}/${summary.reviewed}; with the rubric on the line the validators saw: ${summary.agreementOnSeenSummary}/${summary.reviewed}; gate decisions: ${summary.gateDecisionsAgreeing}/${summary.reviewed}; BLOCK recall ${summary.blockRecall.caught}/${summary.blockRecall.expected}; false BLOCKs ${summary.falseBlockRate.falseBlocks}/${summary.falseBlockRate.notBlockExpected}; no verdict: ${summary.failures}; lines changed after pre-registration: ${summary.summaryChanged}; missed BLOCKs: ${summary.missedBlocks}; validator answers matching the rubric: ${summary.validatorAnswersAgreeing}/${summary.validatorAnswers}${summary.inferenceAsPublished === undefined ? "" : `; inference calls as published: ${summary.inferenceAsPublished}/${summary.reviewed}`}`,
     "",
   );
   cm(summary.confusionPreRegistered);
@@ -349,13 +468,15 @@ function score() {
   };
   const tick = "`";
   const addr = (a: string) => `[${tick}${a.slice(0, 6)}…${a.slice(-4)}${tick}](https://explorer.testnet.somnia.network/tokyo/address/${a})`;
-  md.push("", "| # | trader | picked as | rule inputs seen | seen = key | expected | committee (OK/CAU/BLK) | gate |", "|---|---|---|---|---|---|---|---|");
+  const prevCol = previous ? " previous run |" : "";
+  md.push("", `| # | trader | picked as | rule inputs seen | seen = key | expected |${prevCol} committee (OK/CAU/BLK) | gate |`, `|---|---|---|---|---|---|${previous ? "---|" : ""}---|---|`);
   rows.forEach((x, i) => {
     const v = x.votes ? `${x.votes.ok}/${x.votes.caution}/${x.votes.block}` : "–";
     const tier = x.committee === x.expectedOnSeen ? x.committee : `**${x.committee}**`;
     const gate = x.gate ? `${x.gate.event}${x.gate.tier ? ` ${x.gate.tier}` : ""}` : "–";
     const seen = x.summaryMatch === undefined ? "–" : x.summaryMatch ? "yes" : "no";
-    md.push(`| ${i + 1} | ${addr(x.trader)} | ${x.pickedAs} | ${inputs(x.seenSummary)} | ${seen} | ${x.expected} | ${tier} (${v}) | ${gate} |`);
+    const prev = previous ? ` ${x.previousRun ?? "–"} |` : "";
+    md.push(`| ${i + 1} | ${addr(x.trader)} | ${x.pickedAs} | ${inputs(x.seenSummary)} | ${seen} | ${x.expected} |${prev} ${tier} (${v}) | ${gate} |`);
   });
   const link = (h?: string) => (h ? `[${h.split("/").pop()!.slice(0, 10)}…](${h})` : "–");
   md.push("", "| # | Hideki: requestReview | Shannon: summary request | Shannon: verdict request | Shannon: verdict | Hideki: verdict delivered |", "|---|---|---|---|---|---|");
@@ -373,10 +494,12 @@ function score() {
   md.push("", "| validator | summary fetches | LLM answers | answers matching the rubric |", "|---|---|---|---|");
   for (const [v, e] of [...vals].sort((a, b) => b[1].llm - a[1].llm)) md.push(`| ${tick}${v}${tick} | ${e.json} | ${e.llm} | ${e.agree} |`);
   console.log(md.join("\n"));
-  console.log(`\n  wrote ${RESULTS_FILE}`);
+  console.log(`\n  wrote ${RUNS[run].results}`);
 }
 
-const [cmd] = process.argv.slice(2);
+const [cmd, ...args] = process.argv.slice(2);
 if (cmd === "select") await select();
-else if (cmd === "score") score();
-else throw new Error("steps: select | score");
+else if (cmd === "key" && args[0] === "v3") await keyV3();
+else if (cmd === "anchor") await anchor(runOf(args[0]), args[1]);
+else if (cmd === "score") score(runOf(args[0]));
+else throw new Error("steps: select | key v3 | anchor <run> <commit> | score [run]");

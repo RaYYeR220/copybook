@@ -43,8 +43,11 @@ without it.
 
 ```sh
 cd contracts && npm ci && forge build    # e2e reads the ABIs from contracts/out
-cd ../e2e && npm ci
+cd ../e2e && npm ci                      # links packages/stats as @copybook/stats; no install at the repo root needed
 ```
+
+`npm run typecheck` and the eval (`npm run eval:test`, `npm run eval score`) need only these two installs; the
+`risk` and `live` steps also read the ABIs from `contracts/out`.
 
 ## 2. Deploy
 
@@ -170,17 +173,44 @@ forge verify-contract <gate> src/risk/RiskGate.sol:RiskGate --verifier blockscou
 |---|---|
 | `bridge <stt>` | bridges STT from Hideki to the owner on Shannon (the SDK's Hyperlane STT route) and waits for the delivery |
 | `record` | writes both deploy broadcasts into `deployments/risk.json` |
+| `swap-reviewer [stt]` | moves the live gate to the reviewer in the latest Shannon broadcast (deploy it with `GATE=<gate>`): the old reviewer's balance goes back to the owner, the new one is funded (default: what the old one held), `gate.setReviewer`, and the field, prompt and base URL are checked |
 | `wire` | `reviewer.setGate(gate)` on Shannon, then the hub's `setRiskGate(gate)` on Hideki, each only when not yet set |
 | `fund <stt>` | sends STT to the reviewer; each review holds two committee deposits (0.36 STT at today's platform floor) |
-| `check` | both sides' settings; `allowIncrease` answers true without a verdict |
+| `refill [stt]` | the refill loop below: the gate's review fees back to the owner, a bridge only when needed, the reviewer topped up to `stt` (default 10) |
+| `check` | both sides' settings, the reviewer's balance (≥ 10 STT), and `allowIncrease` against what the stored verdict and the follower's guard call for |
 | `trade` | the leader opens and closes 0.0005 BTC; the increase passes the gate (one staticcall, traced) and the exit never asks it |
 | `base-url <url>` | points the reviewer at the public risk endpoint |
 | `prompt` | sets the reviewer's system prompt to the published rubric in `eval/rubric.ts` |
-| `review [trader ...]` | pays for reviews and follows each one: the Hyperlane delivery to Shannon, both committee stages with every validator's answer and receipt, the reply, and the gate's verdict on Hideki |
+| `review [trader ...]` | pays for reviews and follows each one: the Hyperlane delivery to Shannon, both agent requests as sent (URL and field; user prompt, system message and allowed answers), both committee stages with every validator's answer, the reply, and the gate's verdict on Hideki |
+| `follow <nonce> [shannon block]` | picks up a recorded review whose Hyperlane delivery outlasted the wait and follows it from chain to the gate's answer |
 | `guard` | with a live `Block` on the leader: an unguarded increase copies, a guarded one is refused `RiskGate`, the exit copies; without one, only the guard switch |
 
-Every transaction lands in `deployments/risk.json` with its explorer link.
+Every transaction lands in `deployments/risk.json` with its explorer link (a deployment with its contract address);
+balances carry the time they were read, and the first three live reviews are summarized under `runV1`. The gate-call
+checks of `trade` and `guard` need `debug_traceTransaction`: without a trace they report UNVERIFIED, and the step ends
+UNVERIFIED (exit code 2), never PASS.
+
+**Held BLOCKs and the e2e follower.** A BLOCK on a trader refuses new size to every guarded follower of that trader;
+exits still copy. The gate keeps a BLOCK against a milder verdict for `BLOCK_HOLD` (24 h) after it landed, and a BLOCK
+that is not replaced stops blocking after `VERDICT_TTL` (7 d). While the leader holds a BLOCK, the guarded test
+follower's increases are refused, so before `npm run live` scenarios that expect increases to copy, either opt the
+follower out (`setGuard(false)` from the follower, as the `guard` step does) or re-review the leader once its hold has
+passed (`npm run risk review <leader>`).
+
+**The asymmetry of the hold.** A new BLOCK may replace a stored BLOCK at any time, while a milder verdict must wait out
+the 24 h hold. Re-rolling a trader into BLOCK is therefore cheaper than getting out of one. What limits this is that
+reviews cost a fee (0.5 STT) and a 10-minute cooldown, and that on the rubric line the committees answered unanimously
+in every review of the scorecard's runs, so asking again for the same line returns the same answer.
+
+**Refilling the reviewer.** Agent deposits are paid on Shannon from the reviewer's balance: 0.36 STT is held per review
+up front (0.12 + 0.24 at today's platform floor) and about 0.215 STT is spent once the platform returns the unused part.
+The review fees (0.5 STT each) accrue in the gate on Hideki. `npm run risk refill [stt]` closes the loop:
+`gate.withdraw` to the owner on Hideki, a bridge Hideki → Shannon (as in `bridge`) only when topping up would leave the
+owner under 2 STT on Shannon, and a transfer that brings the reviewer to `stt`. A reviewer holding less than one
+review's deposits answers every review with no verdict (`Unfunded`), which changes no stored verdict.
 
 **Evaluate** the committee against the rubric (results in [`eval/SCORECARD.md`](../eval/SCORECARD.md)):
 `npm run eval:test` runs the rubric's tests, `npm run eval select` picks the sample and writes the answer key
 (commit it before any review), `npm run risk review <trader>` runs each review, and `npm run eval score` scores them.
+A later run re-registers the same sample: `npm run eval key v3` writes `eval/v3/answer-key.json`, commit it,
+`npm run eval anchor v3 <commit>` writes the commit and key hash on Hideki, then the reviews, then `npm run eval score v3`.

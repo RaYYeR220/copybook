@@ -3,14 +3,22 @@
 // COPYBOOK_ENV=<env file> tsx src/risk.ts <step> [args]
 //   bridge <stt>        bridges STT from Hideki to Shannon for the hub owner and waits for the delivery
 //   record              writes the two DeployRisk broadcasts into deployments/risk.json
+//   swap-reviewer [stt] moves the gate to the reviewer in the latest Shannon DeployRisk broadcast: the old reviewer's
+//                       balance goes back to the owner, the new one is funded (default: what the old one held)
 //   wire                reviewer.setGate(gate) on Shannon, then the hub's setRiskGate(gate) on Hideki (each only if unset)
 //   fund <stt>          sends STT from the hub owner to the reviewer for agent deposits
+//   refill [stt]        the refill loop: the gate's review fees back to the owner on Hideki, a bridge to Shannon only
+//                       when the owner would keep < 2 STT there, and the reviewer topped up to <stt> (default 10)
 //   check               both sides' settings; allowIncrease answers true without a verdict; the gate call's gas
 //   trade               the leader opens and closes 0.0005 BTC; the follower's copies pass the gate
 //   base-url <url>      reviewer.setBaseUrl(url)
 //   prompt              reviewer.setSystemPrompt(the published rubric in eval/rubric.ts)
 //   review [trader ...] the hub owner pays for reviews (default: the steady and liquidated fixture traders and the
 //                       leader) and each is followed across both chains to the verdict
+//   follow <nonce> [shannon block]
+//                       picks up a recorded review whose Hyperlane delivery outlasted the wait, from its Shannon
+//                       delivery (searched from the given block, default the one recorded with the request) to the
+//                       gate's answer
 //   guard               the follower's guard against the leader's verdict
 // Every transaction goes to deployments/risk.json with its explorer link.
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
@@ -94,6 +102,8 @@ type TxEntry = {
   status: string;
   from: string;
   to: string | null;
+  /** The deployed contract, for a creation. */
+  contractAddress?: string;
   url: string;
 };
 type Rec = {
@@ -103,6 +113,10 @@ type Rec = {
   checks: Record<string, string[]>;
   measurements: Record<string, unknown>;
   reviews: Record<string, unknown>[];
+  /** Reviewers the gate used before the current one, with their last recorded settings. */
+  previousReviewers?: Record<string, unknown>[];
+  /** The first three live reviews (run v1, the launch prompt), kept as recorded then. */
+  runV1?: Record<string, unknown>;
 };
 
 const rec: Rec = existsSync(RISK_FILE)
@@ -115,6 +129,14 @@ function save() {
 
 let step = "";
 let failed = false;
+let unverified = 0;
+/** A check that could not be made (e.g. no trace on the node): reported as such, never as a pass. */
+function cannotVerify(what: string, why: string) {
+  const line = `UNVERIFIED: ${what} (${why})`;
+  (rec.checks[step] ??= []).push(line);
+  console.log(`  ${line}`);
+  unverified += 1;
+}
 function check(ok: boolean, what: string) {
   const line = `${ok ? "ok" : "FAILED"}: ${what}`;
   (rec.checks[step] ??= []).push(line);
@@ -137,6 +159,7 @@ function track(side: Side, label: string, r: TransactionReceipt): TxEntry {
     status: r.status,
     from: getAddress(r.from),
     to: r.to ? getAddress(r.to) : null,
+    ...(r.contractAddress ? { contractAddress: getAddress(r.contractAddress) } : {}),
     url: sides[side].explorer + r.transactionHash,
   };
   rec.txs = rec.txs.filter((t) => t.hash !== e.hash);
@@ -319,6 +342,67 @@ async function recordDeploy() {
   await settings();
 }
 
+/** Moves the gate to the reviewer in the latest Shannon broadcast. The old reviewer's record is kept under
+ * `previousReviewers`, its whole balance goes back to the owner, and a fresh reviewer is funded with `amountStt`
+ * (default: what the old one held). Every part is skipped when already done, so the step can be re-run. */
+async function swapReviewer(amountStt?: string) {
+  const s = broadcast(50312);
+  const tx = s.transactions.find((t) => t.contractName === "RiskReviewer" && t.transactionType === "CREATE");
+  if (!tx) throw new Error("RiskReviewer not in the Shannon broadcast");
+  const next = getAddress(tx.contractAddress);
+  if (next !== reviewerAddr()) {
+    rec.previousReviewers = [...(rec.previousReviewers ?? []), { ...rec.shannon, replacedAt: new Date().toISOString() }];
+    const [, , , , gateArg, baseUrl] = tx.arguments ?? [];
+    rec.shannon = { reviewer: next, constructorGate: gateArg, constructorBaseUrl: baseUrl };
+    const r = await shannonPub.getTransactionReceipt({ hash: tx.hash });
+    track("shannon", "deploy RiskReviewer", r);
+    check(r.status === "success", "deploy RiskReviewer succeeded");
+  }
+  const old = getAddress(rec.previousReviewers!.at(-1)!.reviewer as string);
+  note("old reviewer", old);
+  note("new reviewer", next);
+
+  // the old reviewer's balance back to the owner
+  const oldBalance = await shannonPub.getBalance({ address: old });
+  let drained = 0n;
+  if (oldBalance > 0n) {
+    await sendOn("shannon", "HUB_OWNER", `old reviewer.withdraw(owner, ${formatEther(oldBalance)})`, { address: old, abi: reviewerAbi, functionName: "withdraw", args: [OWNER, oldBalance] });
+    drained = oldBalance;
+  }
+  check((await shannonPub.getBalance({ address: old })) === 0n, `old reviewer ${old} holds 0 STT`);
+  if (drained) rec.previousReviewers!.at(-1)!.withdrawn = formatEther(drained);
+
+  // a fresh reviewer is funded once
+  if ((await shannonPub.getBalance({ address: next })) === 0n) {
+    const amount = amountStt ?? formatEther(drained);
+    if (parseEther(amount) === 0n) throw new Error("nothing to fund the new reviewer with: pass an amount");
+    await sendValueOn("shannon", "HUB_OWNER", `fund reviewer ${amount} STT`, next, parseEther(amount));
+  }
+
+  // wiring: the reviewer answers the live gate, the gate asks the new reviewer
+  if (getAddress(await readReviewer<Address>("gate")) !== gateAddr()) {
+    await sendOn("shannon", "HUB_OWNER", "reviewer.setGate(gate)", { address: next, abi: reviewerAbi, functionName: "setGate", args: [gateAddr()] });
+  }
+  if (getAddress(await readGate<Address>("reviewer")) !== next) {
+    await sendOn("hideki", "HUB_OWNER", "gate.setReviewer(reviewer)", { address: gateAddr(), abi: gateAbi, functionName: "setReviewer", args: [next] });
+  }
+  const url = (rec as unknown as { endpoint?: { baseUrl?: string } }).endpoint?.baseUrl;
+  if (url && (await readReviewer<string>("baseUrl")) !== url) {
+    await sendOn("shannon", "HUB_OWNER", `reviewer.setBaseUrl(${url})`, { address: next, abi: reviewerAbi, functionName: "setBaseUrl", args: [url] });
+  }
+
+  check(getAddress(await readReviewer<Address>("gate")) === gateAddr(), `reviewer.gate() = ${gateAddr()}`);
+  check(getAddress(await readGate<Address>("reviewer")) === next, `gate.reviewer() = ${next}`);
+  check(!url || (await readReviewer<string>("baseUrl")) === url, `reviewer.baseUrl() = ${url}`);
+  check((await readReviewer<string>("summarySelector")) === "rubric", "reviewer.summarySelector() = rubric");
+  check((await readReviewer<string>("systemPrompt")) === SYSTEM_PROMPT, "the reviewer's system prompt is the published rubric");
+  check(getAddress(await readHub<Address>("riskGate")) === gateAddr(), "the hub still consults the same gate");
+  const ownerHideki = await pub.getBalance({ address: OWNER });
+  check(ownerHideki >= OWNER_HIDEKI_FLOOR, `owner keeps >= 40 STT on Hideki (${formatEther(ownerHideki)})`);
+  await settings();
+  note("reviewer balance", rec.shannon.balance);
+}
+
 /** Both sides' configuration, read back from chain into the record. */
 async function settings() {
   const reviewer = reviewerAddr();
@@ -341,8 +425,11 @@ async function settings() {
     },
     depositsPerReview: { summary: formatEther(quoteSummary), verdict: formatEther(quoteVerdict), total: formatEther(quoteSummary + quoteVerdict) },
     baseUrl: await readReviewer("baseUrl"),
+    summarySelector: await readReviewer("summarySelector"),
     systemPrompt: await readReviewer("systemPrompt"),
+    // a snapshot: the balance moves with every review, so it carries the time it was read
     balance: formatEther(await shannonPub.getBalance({ address: reviewer })),
+    balanceAsOf: new Date().toISOString(),
     explorer: `https://shannon-explorer.somnia.network/address/${reviewer}`,
   });
   Object.assign(rec.hideki, {
@@ -360,6 +447,9 @@ async function settings() {
     hub: HUB,
     hubRiskGate: await readHub("riskGate"),
     riskGateGas: Number((await readHub<readonly bigint[]>("gasParams"))[6]),
+    // review fees held by the gate (owner-withdrawable), read at balanceAsOf
+    balance: formatEther(await pub.getBalance({ address: gate })),
+    balanceAsOf: new Date().toISOString(),
     explorer: `https://explorer.testnet.somnia.network/tokyo/address/${gate}`,
   });
   save();
@@ -399,6 +489,63 @@ async function fund(amountStt: string) {
   await settings();
 }
 
+const OWNER_SHANNON_FLOOR = parseEther("2");
+
+/** The refill loop. Review fees accrue in the gate on Hideki while agent deposits are paid from the reviewer on
+ * Shannon (0.36 STT held per review, about 0.215 STT spent once the platform returns the rest). The owner withdraws
+ * the fees, bridges to Shannon only when sending the top-up would leave it under 2 STT there, and tops the reviewer up
+ * to `targetStt`. */
+async function refill(targetStt: string) {
+  const gate = gateAddr();
+  const reviewer = reviewerAddr();
+  const target = parseEther(targetStt);
+  const at = () => new Date().toISOString();
+  const before = {
+    at: at(),
+    gate: formatEther(await pub.getBalance({ address: gate })),
+    reviewer: formatEther(await shannonPub.getBalance({ address: reviewer })),
+    ownerHideki: formatEther(await pub.getBalance({ address: OWNER })),
+    ownerShannon: formatEther(await shannonPub.getBalance({ address: OWNER })),
+  };
+  note("before", before);
+
+  const fees = await pub.getBalance({ address: gate });
+  if (fees > 0n) {
+    await sendOn("hideki", "HUB_OWNER", `gate.withdraw(owner, ${formatEther(fees)})`, { address: gate, abi: gateAbi, functionName: "withdraw", args: [OWNER, fees] });
+  }
+  check((await pub.getBalance({ address: gate })) === 0n, `the gate's review fees (${formatEther(fees)} STT) are back with the owner`);
+
+  const have = await shannonPub.getBalance({ address: reviewer });
+  let bridged = "0";
+  if (have < target) {
+    const need = target - have;
+    const ownerShannon = await shannonPub.getBalance({ address: OWNER });
+    if (ownerShannon < need + OWNER_SHANNON_FLOOR) {
+      const short = need + OWNER_SHANNON_FLOOR - ownerShannon;
+      const whole = (short + parseEther("1") - 1n) / parseEther("1");
+      bridged = String(whole < 10n ? 10n : whole);
+      await bridge(bridged);
+    }
+    await sendValueOn("shannon", "HUB_OWNER", `top up reviewer by ${formatEther(need)} STT`, reviewer, need);
+  } else {
+    note("reviewer", `already holds ${formatEther(have)} STT`);
+  }
+  const after = {
+    at: at(),
+    gate: formatEther(await pub.getBalance({ address: gate })),
+    reviewer: formatEther(await shannonPub.getBalance({ address: reviewer })),
+    ownerHideki: formatEther(await pub.getBalance({ address: OWNER })),
+    ownerShannon: formatEther(await shannonPub.getBalance({ address: OWNER })),
+  };
+  note("after", after);
+  check(parseEther(after.reviewer) >= target, `reviewer holds >= ${targetStt} STT (${after.reviewer})`);
+  check(parseEther(after.ownerShannon) >= OWNER_SHANNON_FLOOR, `owner keeps >= 2 STT on Shannon (${after.ownerShannon})`);
+  check(parseEther(after.ownerHideki) >= OWNER_HIDEKI_FLOOR, `owner keeps >= 40 STT on Hideki (${after.ownerHideki})`);
+  const log = ((rec.measurements.refills ??= []) as Record<string, unknown>[]);
+  log.push({ target: targetStt, feesWithdrawn: formatEther(fees), bridged, before, after });
+  await settings();
+}
+
 const sourceIdOf = (trader: Address) => keccak256(encodeAbiParameters([{ type: "uint8" }, { type: "uint256" }], [0, BigInt(trader)]));
 
 async function checks() {
@@ -415,7 +562,7 @@ async function checks() {
   check(ownerHideki >= OWNER_HIDEKI_FLOOR, `owner keeps >= 40 STT on Hideki (${formatEther(ownerHideki)})`);
   note("owner on Shannon", formatEther(await shannonPub.getBalance({ address: OWNER })));
 
-  // no verdict anywhere yet: every increase is allowed
+  // a random trader has no verdict, so every increase is allowed; the leader's answer follows its stored verdict
   const randomTrader = getAddress(keccak256(`0x${Date.now().toString(16).padStart(16, "0")}`).slice(0, 42));
   const randomFollower = getAddress(keccak256(randomTrader).slice(0, 42));
   for (const [what, trader, follower] of [
@@ -426,7 +573,13 @@ async function checks() {
     const hubSid = await readHub<Hex>("sourceIdOf", [0, BigInt(trader)]);
     check(sid === hubSid && sid === (await readGate<Hex>("sourceIdOf", [trader])), `${what}: gate and hub agree on the source id`);
     const allowed = await readGate<boolean>("allowIncrease", [sid, follower]);
-    check(allowed, `${what}: allowIncrease = true with no verdict`);
+    const v = await readGate<{ tier: number; reviewedAt: bigint }>("verdictOf", [trader]);
+    const now = BigInt(Math.floor(Date.now() / 1000));
+    const liveBlock = Number(v.tier) === 3 && now <= v.reviewedAt + BigInt(rec.hideki.verdictTtlSeconds as number);
+    const guarded = await readGate<boolean>("guardOf", [follower]);
+    const expected = !(liveBlock && guarded);
+    const why = liveBlock ? `live Block from ${new Date(Number(v.reviewedAt) * 1000).toISOString()}, follower ${guarded ? "guarded" : "opted out"}` : `verdict ${TIERS[Number(v.tier)]}`;
+    check(allowed === expected, `${what}: allowIncrease = ${allowed} (${why})`);
     // the hub's call: a staticcall from the hub with its riskGateGas budget
     const data = encodeFunctionData({ abi: gateAbi, functionName: "allowIncrease", args: [sid, follower] });
     const est = await pub.estimateGas({ account: HUB, to: gate, data });
@@ -460,10 +613,12 @@ function frames(f: CallFrame | undefined, pred: (c: CallFrame) => boolean, out: 
   return out;
 }
 
-/** The hub's staticcalls to the gate inside a handler run: gas offered, gas used, answer. */
+/** The hub's staticcalls to the gate inside a handler run: gas offered, gas used, answer. Undefined when the node
+ * gives no trace: then nothing is known about the calls, which is not the same as "no calls". */
 async function gateCalls(hash: Hex) {
   const gate = gateAddr().toLowerCase();
   const t = await trace("hideki", hash);
+  if (!t) return undefined;
   return frames(t, (c) => c.to?.toLowerCase() === gate).map((c) => ({
     type: c.type,
     from: c.from,
@@ -522,12 +677,14 @@ async function trade() {
   if (o) {
     check(!riskRefusal(o.events), "no Refused(RiskGate)");
     check(copiedTo(50_000n)(o.events), "Copied 0 -> 50000");
-    check(o.calls.length === 1 && o.calls[0].type === "STATICCALL", "the hub asked the gate once, by staticcall");
+    if (o.calls) check(o.calls.length === 1 && o.calls[0].type === "STATICCALL", "the hub asked the gate once, by staticcall");
+    else cannotVerify("the hub asked the gate once, by staticcall", "no trace");
   }
   check((await size(FOLLOWER, pool)) === 50_000n, "follower long 0.0005 BTC");
   const close = await leaderTrade("leader sells 0.0005 BTC (exit)", false, 50_000n);
   const c = await followerRun("close (exit, never gated)", close, copiedTo(0n));
-  if (c) check(c.calls.length === 0, "the exit did not ask the gate");
+  if (c?.calls) check(c.calls.length === 0, "the exit did not ask the gate");
+  else if (c) cannotVerify("the exit did not ask the gate", "no trace");
   check((await size(FOLLOWER, pool)) === 0n, "follower flat");
   rec.measurements.gatedCopy = {
     open: o && { handler: o.tx.hash, handlerGas: Number(o.receipt.gasUsed), gateCalls: o.calls, logs: o.logs },
@@ -559,10 +716,40 @@ async function setBaseUrl(url: string) {
   await settings();
 }
 
-/** Validator answers carried by the platform's callback into the reviewer, read from the callback's trace. */
+const platformAbi = parseAbi([
+  "function createAdvancedRequest(uint256 agentId, address callbackAddress, bytes4 callbackSelector, bytes payload, uint256 subcommitteeSize, uint256 threshold, uint8 consensusType, uint256 timeout) payable returns (uint256)",
+]);
+const agentAbi = parseAbi([
+  "function fetchString(string url, string selector)",
+  "function inferString(string prompt, string system, bool chainOfThought, string[] allowedValues)",
+]);
+
+/** The agent requests the reviewer made inside a traced transaction, with each payload decoded: what the JSON agent
+ * was asked to fetch, or exactly what the LLM agent was given (user prompt, system message, allowed answers). */
+function agentRequests(t: CallFrame | undefined) {
+  const reviewer = reviewerAddr().toLowerCase();
+  const out: Record<string, unknown>[] = [];
+  // The platform is a proxy: Shannon's tracer reports its inner DELEGATECALL with the reviewer as `from` too, so only
+  // the reviewer's own calls are read, or every request would be counted twice.
+  for (const f of frames(t, (c) => c.from?.toLowerCase() === reviewer && c.type !== "DELEGATECALL" && c.input.length > 10)) {
+    try {
+      const d = decodeFunctionData({ abi: platformAbi, data: f.input as Hex });
+      const [agentId, , , payload, size, threshold] = d.args;
+      const call = decodeFunctionData({ abi: agentAbi, data: payload as Hex });
+      out.push({ agentId: agentId.toString(), committee: Number(size), threshold: Number(threshold), call: call.functionName, args: call.args });
+    } catch {
+      /* not an agent request */
+    }
+  }
+  return out;
+}
+
+/** Validator answers carried by the platform's callback into the reviewer, read from the callback's trace, and the
+ * agent requests the callback made (the stage-2 request rides in the stage-1 callback). */
 async function committee(hash: Hex) {
   const reviewer = reviewerAddr().toLowerCase();
   const t = await trace("shannon", hash);
+  const requests = agentRequests(t);
   const out: Record<string, unknown>[] = [];
   for (const f of frames(t, (c) => c.to?.toLowerCase() === reviewer)) {
     try {
@@ -585,7 +772,7 @@ async function committee(hash: Hex) {
       /* not a callback */
     }
   }
-  return out;
+  return { callbacks: out, requests };
 }
 /** An agent result as text when it is an ABI string, else the raw bytes. */
 function text(result: Hex): string {
@@ -600,86 +787,104 @@ async function review(traders: Address[]) {
   const fee = await readGate<bigint>("reviewFee");
   for (const trader of traders) {
     console.log(`\n  -- review of ${trader}`);
-    const entry: Record<string, unknown> = { trader, at: new Date().toISOString(), fee: formatEther(fee) };
+    const entry: Record<string, unknown> = { trader, at: new Date().toISOString(), fee: formatEther(fee), reviewer: reviewerAddr() };
     rec.reviews.push(entry);
     const shannonFrom = await shannonPub.getBlockNumber();
     const r = await sendOn("hideki", "HUB_OWNER", `requestReview(${trader})`, { address: gateAddr(), abi: gateAbi, functionName: "requestReview", args: [trader], value: fee });
     const requested = r.logs.map((l) => decode(gateAbi, l as never)).find((d) => d?.eventName === "ReviewRequested");
     const nonce = requested?.args.nonce as bigint;
     const [toShannon] = dispatchedIds(r, "hideki");
-    Object.assign(entry, { nonce: Number(nonce), requestTx: r.transactionHash, messageToShannon: toShannon });
+    Object.assign(entry, { nonce: Number(nonce), requestTx: r.transactionHash, requestBlock: Number(r.blockNumber), messageToShannon: toShannon, shannonFrom: Number(shannonFrom) });
     save();
-    const inbound = toShannon ? await delivery("shannon", toShannon, shannonFrom, `review ${Number(nonce)} delivered to the reviewer`) : undefined;
-    if (!inbound) continue;
-    entry.deliveryToShannon = inbound.transactionHash;
-
-    // follow the reviewer's events for this review until it replies (two committee stages, up to 300 s each)
-    const mine = (d: { args: Record<string, unknown> } | undefined) =>
-      !!d && typeof d.args.trader === "string" && getAddress(d.args.trader) === trader && d.args.nonce === nonce;
-    const seen = new Set<string>();
-    const stages: Record<string, unknown>[] = [];
-    let sent: { tier: number; messageId: Hex; tx: Hex; block: bigint } | undefined;
-    let replyFailed = false;
-    await findLogs(
-      "shannon",
-      reviewerAddr(),
-      inbound.blockNumber,
-      (logs) => {
-        for (const l of logs) {
-          const key = `${l.transactionHash}:${l.logIndex}`;
-          if (seen.has(key)) continue;
-          seen.add(key);
-          const d = decode(reviewerAbi, l);
-          if (!mine(d)) continue;
-          const ev = { event: d!.eventName, tx: l.transactionHash, block: Number(l.blockNumber), args: d!.args };
-          stages.push(ev);
-          console.log(`    ${d!.eventName} ${JSON.stringify(d!.args, big)} (${l.transactionHash})`);
-          if (d!.eventName === "VerdictSent") {
-            sent = { tier: Number(d!.args.tier), messageId: d!.args.messageId as Hex, tx: l.transactionHash, block: l.blockNumber };
-            return true;
-          }
-          if (d!.eventName === "ReplyFailed") {
-            replyFailed = true;
-            return true;
-          }
-        }
-        return undefined;
-      },
-      15 * 60_000,
-    );
-    entry.shannonEvents = stages;
-    // the committee callbacks (validator transactions into the platform) with each validator's answer and receipt
-    const callbackTxs = [...new Set(stages.filter((x) => ["SummaryReceived", "VerdictTallied"].includes(x.event as string) || (x.event === "ReviewFailed" && x.tx !== inbound.transactionHash)).map((x) => x.tx as Hex))];
-    const callbacks: Record<string, unknown>[] = [];
-    for (const h of callbackTxs) {
-      const rc = await shannonPub.getTransactionReceipt({ hash: h });
-      track("shannon", `review ${Number(nonce)} committee callback`, rc);
-      callbacks.push({ tx: h, submittedBy: rc.from, committee: await committee(h) });
-    }
-    entry.callbacks = callbacks;
-    for (const x of stages) {
-      const hash = x.tx as Hex;
-      if (hash === inbound.transactionHash || callbackTxs.includes(hash) || rec.txs.some((t) => t.hash === hash)) continue;
-      track("shannon", `review ${Number(nonce)} ${x.event}`, await shannonPub.getTransactionReceipt({ hash }));
-    }
-    save();
-    if (!check(!!sent && !replyFailed, `review ${Number(nonce)}: the reviewer replied (tier ${sent ? TIERS[sent.tier] : "-"})`)) continue;
-    const hidekiFrom = (await pub.getBlockNumber()) - 900n;
-    const back = await delivery("hideki", sent!.messageId, hidekiFrom, `review ${Number(nonce)} verdict delivered to the gate`);
-    if (!back) continue;
-    const gateEvents = back.logs.map((l) => decode(gateAbi, l as never)).filter((d) => !!d) as { eventName: string; args: Record<string, unknown> }[];
-    entry.deliveryToHideki = back.transactionHash;
-    entry.gateEvents = gateEvents.map((g) => ({ event: g.eventName, args: g.args }));
-    for (const g of gateEvents) console.log(`    gate ${g.eventName} ${JSON.stringify(g.args, big)}`);
-    const v = await readGate<{ tier: number; reviewedAt: bigint; shannonRequestId: bigint; summaryHash: Hex }>("verdictOf", [trader]);
-    entry.verdict = { tier: TIERS[Number(v.tier)], reviewedAt: Number(v.reviewedAt), shannonRequestId: v.shannonRequestId.toString(), summaryHash: v.summaryHash };
-    const failure = stages.find((x) => x.event === "ReviewFailed");
-    if (failure) entry.failure = FAILURES[Number((failure.args as Record<string, unknown>).reason)];
-    const summary = stages.find((x) => x.event === "SummaryReceived");
-    if (summary) entry.summary = (summary.args as Record<string, unknown>).summary;
-    check(gateEvents.some((g) => ["VerdictReceived", "ReviewFailed", "BlockHeld"].includes(g.eventName)), `review ${Number(nonce)}: the gate settled it (${gateEvents.map((g) => g.eventName).join(", ")})`);
-    save();
+    if (toShannon) await followReview(entry, trader, nonce, toShannon, shannonFrom, r.blockNumber);
   }
+}
+
+/** A recorded review whose delivery to Shannon outlasted the wait: followed again from its Shannon delivery. */
+async function followRecorded(nonceArg: string, shannonFromArg?: string) {
+  const entry = rec.reviews.find((x) => Number(x.nonce) === Number(nonceArg));
+  if (!entry) throw new Error(`no recorded review with nonce ${nonceArg}`);
+  if (entry.deliveryToHideki) throw new Error(`review ${nonceArg} is already followed to the gate`);
+  const fromArg = shannonFromArg ?? (entry.shannonFrom as number | undefined);
+  if (fromArg === undefined) throw new Error("give the Shannon block to search from");
+  const request = await pub.getTransactionReceipt({ hash: entry.requestTx as Hex });
+  entry.followedLater = { at: new Date().toISOString(), shannonFrom: Number(fromArg) };
+  await followReview(entry, getAddress(entry.trader as string), BigInt(entry.nonce as number), entry.messageToShannon as Hex, BigInt(fromArg), request.blockNumber);
+}
+
+/** Follows one review from its Hyperlane delivery on Shannon to the gate's answer on Hideki, into `entry`. */
+async function followReview(entry: Record<string, unknown>, trader: Address, nonce: bigint, toShannon: Hex, shannonFrom: bigint, requestBlock: bigint) {
+  const inbound = await delivery("shannon", toShannon, shannonFrom, `review ${Number(nonce)} delivered to the reviewer`);
+  if (!inbound) return;
+  entry.deliveryToShannon = inbound.transactionHash;
+  entry.summaryRequest = agentRequests(await trace("shannon", inbound.transactionHash));
+
+  // follow the reviewer's events for this review until it replies (two committee stages, up to 300 s each)
+  const mine = (d: { args: Record<string, unknown> } | undefined) =>
+    !!d && typeof d.args.trader === "string" && getAddress(d.args.trader) === trader && d.args.nonce === nonce;
+  const seen = new Set<string>();
+  const stages: Record<string, unknown>[] = [];
+  let sent: { tier: number; messageId: Hex; tx: Hex; block: bigint } | undefined;
+  let replyFailed = false;
+  await findLogs(
+    "shannon",
+    reviewerAddr(),
+    inbound.blockNumber,
+    (logs) => {
+      for (const l of logs) {
+        const key = `${l.transactionHash}:${l.logIndex}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        const d = decode(reviewerAbi, l);
+        if (!mine(d)) continue;
+        const ev = { event: d!.eventName, tx: l.transactionHash, block: Number(l.blockNumber), args: d!.args };
+        stages.push(ev);
+        console.log(`    ${d!.eventName} ${JSON.stringify(d!.args, big)} (${l.transactionHash})`);
+        if (d!.eventName === "VerdictSent") {
+          sent = { tier: Number(d!.args.tier), messageId: d!.args.messageId as Hex, tx: l.transactionHash, block: l.blockNumber };
+          return true;
+        }
+        if (d!.eventName === "ReplyFailed") {
+          replyFailed = true;
+          return true;
+        }
+      }
+      return undefined;
+    },
+    15 * 60_000,
+  );
+  entry.shannonEvents = stages;
+  // the committee callbacks (validator transactions into the platform) with each validator's answer and receipt
+  const callbackTxs = [...new Set(stages.filter((x) => ["SummaryReceived", "VerdictTallied"].includes(x.event as string) || (x.event === "ReviewFailed" && x.tx !== inbound.transactionHash)).map((x) => x.tx as Hex))];
+  const callbacks: Record<string, unknown>[] = [];
+  for (const h of callbackTxs) {
+    const rc = await shannonPub.getTransactionReceipt({ hash: h });
+    track("shannon", `review ${Number(nonce)} committee callback`, rc);
+    const c = await committee(h);
+    callbacks.push({ tx: h, submittedBy: rc.from, committee: c.callbacks, agentRequests: c.requests });
+  }
+  entry.callbacks = callbacks;
+  for (const x of stages) {
+    const hash = x.tx as Hex;
+    if (hash === inbound.transactionHash || callbackTxs.includes(hash) || rec.txs.some((t) => t.hash === hash)) continue;
+    track("shannon", `review ${Number(nonce)} ${x.event}`, await shannonPub.getTransactionReceipt({ hash }));
+  }
+  save();
+  if (!check(!!sent && !replyFailed, `review ${Number(nonce)}: the reviewer replied (tier ${sent ? TIERS[sent.tier] : "-"})`)) return;
+  const back = await delivery("hideki", sent!.messageId, requestBlock, `review ${Number(nonce)} verdict delivered to the gate`);
+  if (!back) return;
+  const gateEvents = back.logs.map((l) => decode(gateAbi, l as never)).filter((d) => !!d) as { eventName: string; args: Record<string, unknown> }[];
+  entry.deliveryToHideki = back.transactionHash;
+  entry.gateEvents = gateEvents.map((g) => ({ event: g.eventName, args: g.args }));
+  for (const g of gateEvents) console.log(`    gate ${g.eventName} ${JSON.stringify(g.args, big)}`);
+  const v = await readGate<{ tier: number; reviewedAt: bigint; shannonRequestId: bigint; summaryHash: Hex }>("verdictOf", [trader]);
+  entry.verdict = { tier: TIERS[Number(v.tier)], reviewedAt: Number(v.reviewedAt), shannonRequestId: v.shannonRequestId.toString(), summaryHash: v.summaryHash };
+  const failure = stages.find((x) => x.event === "ReviewFailed");
+  if (failure) entry.failure = FAILURES[Number((failure.args as Record<string, unknown>).reason)];
+  const summary = stages.find((x) => x.event === "SummaryReceived");
+  if (summary) entry.summary = (summary.args as Record<string, unknown>).summary;
+  check(gateEvents.some((g) => ["VerdictReceived", "ReviewFailed", "BlockHeld"].includes(g.eventName)), `review ${Number(nonce)}: the gate settled it (${gateEvents.map((g) => g.eventName).join(", ")})`);
+  save();
 }
 
 /** With a live Block on the leader: an increase is refused for the guarded follower and copied once it opts out,
@@ -732,7 +937,9 @@ async function guard() {
   check((await size(FOLLOWER, pool)) === 50_000n, "follower still holds 50000");
   const t3 = await leaderTrade("leader sells 0.0008 BTC (exit)", false, 80_000n);
   const r3 = await followerRun("exit while blocked", t3, copiedTo(0n));
-  check(!!r3 && r3.calls.length === 0, "the exit copied without asking the gate");
+  if (r3?.calls) check(r3.calls.length === 0, "the exit copied without asking the gate");
+  else if (r3) cannotVerify("the exit copied without asking the gate", "no trace");
+  else check(false, "the exit copied without asking the gate");
   check((await size(FOLLOWER, pool)) === 0n, "follower flat");
   rec.measurements.guard = { ...(rec.measurements.guard as object), unguarded: r1?.logs, guarded: r2?.logs, exit: r3?.logs };
   save();
@@ -753,8 +960,14 @@ try {
     case "record":
       await recordDeploy();
       break;
+    case "swap-reviewer":
+      await swapReviewer(args[0]);
+      break;
     case "wire":
       await wire();
+      break;
+    case "refill":
+      await refill(args[0] ?? "10");
       break;
     case "fund":
       await fund(args[0] ?? "12");
@@ -774,16 +987,20 @@ try {
     case "review":
       await review(args.length ? args.map((a) => getAddress(a)) : [STEADY, LIQUIDATED, LEADER]);
       break;
+    case "follow":
+      await followRecorded(args[0], args[1]);
+      break;
     case "guard":
       await guard();
       break;
     default:
-      throw new Error("steps: bridge <stt> | record | wire | fund <stt> | check | trade | base-url <url> | prompt | review [trader ...] | guard");
+      throw new Error("steps: bridge <stt> | record | swap-reviewer [stt] | wire | fund <stt> | refill [stt] | check | trade | base-url <url> | prompt | review [trader ...] | follow <nonce> [shannon block] | guard");
   }
 } catch (e) {
   failed = true;
   check(false, `error: ${errMsg(e)}`);
 }
 save();
-console.log(`=== ${step}: ${failed ? "FAIL" : "PASS"}`);
-process.exit(failed ? 1 : 0);
+// a step with checks that could not be made is not reported as a pass
+console.log(`=== ${step}: ${failed ? "FAIL" : unverified ? `UNVERIFIED (${unverified} check(s) could not be made)` : "PASS"}`);
+process.exit(failed ? 1 : unverified ? 2 : 0);

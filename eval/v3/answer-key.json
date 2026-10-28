@@ -1,0 +1,412 @@
+{
+  "about": "Pre-registered answer key, run v3: run v2's 20 traders in the same order, each with the rubric line the public endpoint serves now (the only text the LLM committee classifies) and the rubric's tier for it, committed before any review of this run was requested.",
+  "run": "v3",
+  "generatedAt": "2026-10-28T14:29:27.684Z",
+  "endpoint": "https://copybook-eosin.vercel.app/api/risk/",
+  "field": "rubric",
+  "windowDays": 30,
+  "rubric": [
+    "BLOCK if liquidations30d >= 2, or maxDrawdownPct30d is present and >= 50.",
+    "CAUTION if (not BLOCK and) any of: liquidations30d == 1; trades30d < 10; history=none; partial=1; maxDrawdownPct30d present and >= 25.",
+    "OK otherwise.",
+    "Inputs are the summary keys; n/a means unknown, not safe."
+  ],
+  "systemPrompt": "You review perpetual-futures traders for people who copy their positions automatically. Apply this rubric exactly to the 30-day stats (key=value; n/a means unknown, not safe). BLOCK if liquidations30d is 2 or more, or maxDrawdownPct30d is present and at least 50. Otherwise CAUTION if liquidations30d is 1, or trades30d is below 10, or history=none, or partial=1, or maxDrawdownPct30d is present and at least 25. Otherwise OK. Answer with exactly one word: OK, CAUTION or BLOCK.",
+  "inference": "inferString(prompt = \"Stats: \" + rubric line, system = systemPrompt, chainOfThought = false, allowedValues = [\"OK\", \"CAUTION\", \"BLOCK\"])",
+  "reviewer": "0xc999B6924179a0dc9649DA7eBa8F3aC8b7CF7c25",
+  "rubricHash": "keccak256 of the rubric line's UTF-8 bytes, as RiskReviewer hashes the line the JSON committee agreed on",
+  "sample": {
+    "from": "eval/answer-key.json (run v2, pre-registered in commit 6b1b07437b29c95c8d41916858cabdc73a7d6e07)",
+    "v2GeneratedAt": "2026-10-28T13:55:11.853Z",
+    "rule": "the same traders in the same order"
+  },
+  "counts": {
+    "pickedAs": {
+      "clean": 6,
+      "liquidated-2+": 6,
+      "liquidated-1": 4,
+      "thin": 3,
+      "leader": 1
+    },
+    "expectedTier": {
+      "OK": 5,
+      "BLOCK": 6,
+      "CAUTION": 9
+    }
+  },
+  "traders": [
+    {
+      "trader": "0xfc2Fb08CCCF87BFC472cded8E7eBEF588fCF7fd2",
+      "pickedAs": "clean",
+      "pool": "first live run",
+      "rubric": "liquidations30d=0 trades30d=113 history=yes partial=0",
+      "rubricHash": "0x9c65fbc561cfd25b439622a0a7c45654497eeb82813077393b131ea78f8c3158",
+      "expectedTier": "OK",
+      "reasons": [],
+      "summary": "trades30d=113 activeDays30d=7 markets=3 realizedPnl30d=+3773.3 liquidations30d=0 maxDrawdown30d=679.3 avgLeverage=n/a lastActive=2026-10-22",
+      "fetchedAt": "2026-10-28T14:28:36.577Z",
+      "endpoint": {
+        "url": "https://copybook-eosin.vercel.app/api/risk/0xfc2fb08cccf87bfc472cded8e7ebef588fcf7fd2",
+        "asOf": "2026-10-28T14:28:38.517Z",
+        "cache": "MISS",
+        "age": "0"
+      }
+    },
+    {
+      "trader": "0xA14d4561F2697859AB6c2d5eb62E1172a6cc3D14",
+      "pickedAs": "liquidated-2+",
+      "pool": "first live run",
+      "rubric": "liquidations30d=3 trades30d=115 maxDrawdownPct30d=92.2 history=yes partial=0",
+      "rubricHash": "0x92adb41ef8ba91aa37096ea1afc3a6d4f49db97126f1aea575e1d29854cec5b8",
+      "expectedTier": "BLOCK",
+      "reasons": [
+        "liquidations30d=3 >= 2",
+        "maxDrawdownPct30d=92.2 >= 50"
+      ],
+      "summary": "trades30d=115 activeDays30d=6 markets=3 realizedPnl30d=-979.7 liquidations30d=3 maxDrawdown30d=2609.9 maxDrawdownPct30d=92.2 avgLeverage=17.0 lastActive=2026-10-26",
+      "fetchedAt": "2026-10-28T14:28:39.611Z",
+      "endpoint": {
+        "url": "https://copybook-eosin.vercel.app/api/risk/0xa14d4561f2697859ab6c2d5eb62e1172a6cc3d14",
+        "asOf": "2026-10-28T14:26:35.215Z",
+        "cache": "HIT",
+        "age": "124"
+      }
+    },
+    {
+      "trader": "0x220c695eFB9a6914a334Ac7b783012F43C0BAF00",
+      "pickedAs": "liquidated-2+",
+      "pool": "2+ liquidations in the latest 1000 liquidation rows",
+      "rubric": "liquidations30d=6 trades30d=633 history=yes partial=0",
+      "rubricHash": "0x9137680a6e5e941eae9ffac8e2bdf1f2540004c31668b51679e511f41aa0ae0c",
+      "expectedTier": "BLOCK",
+      "reasons": [
+        "liquidations30d=6 >= 2"
+      ],
+      "summary": "trades30d=633 activeDays30d=12 markets=10 realizedPnl30d=+3086.5 liquidations30d=6 maxDrawdown30d=10649.7 avgLeverage=n/a lastActive=2026-10-26",
+      "fetchedAt": "2026-10-28T14:28:40.664Z",
+      "endpoint": {
+        "url": "https://copybook-eosin.vercel.app/api/risk/0x220c695efb9a6914a334ac7b783012f43c0baf00",
+        "asOf": "2026-10-28T14:28:42.368Z",
+        "cache": "MISS",
+        "age": "0"
+      }
+    },
+    {
+      "trader": "0x5521160E05bB130783E003F746F03d9D31ea1e69",
+      "pickedAs": "liquidated-2+",
+      "pool": "2+ liquidations in the latest 1000 liquidation rows",
+      "rubric": "liquidations30d=3 trades30d=337 history=yes partial=0",
+      "rubricHash": "0x2265c280c18530ccc7906a67533ac8ac7e82523917c2b6ff8536900ad63f0748",
+      "expectedTier": "BLOCK",
+      "reasons": [
+        "liquidations30d=3 >= 2"
+      ],
+      "summary": "trades30d=337 activeDays30d=11 markets=5 realizedPnl30d=-2094.1 liquidations30d=3 maxDrawdown30d=2960.6 avgLeverage=n/a lastActive=2026-10-28",
+      "fetchedAt": "2026-10-28T14:28:43.449Z",
+      "endpoint": {
+        "url": "https://copybook-eosin.vercel.app/api/risk/0x5521160e05bb130783e003f746f03d9d31ea1e69",
+        "asOf": "2026-10-28T14:28:44.746Z",
+        "cache": "MISS",
+        "age": "0"
+      }
+    },
+    {
+      "trader": "0x1fAeD318FCeD713cC5764BD7B4974b39DDF5BFc7",
+      "pickedAs": "liquidated-2+",
+      "pool": "2+ liquidations in the latest 1000 liquidation rows",
+      "rubric": "liquidations30d=3 trades30d=38 history=yes partial=0",
+      "rubricHash": "0x2663bb7aae4df6bef80d037ede68ceec76471a130b3a133972b0c538970dfe8e",
+      "expectedTier": "BLOCK",
+      "reasons": [
+        "liquidations30d=3 >= 2"
+      ],
+      "summary": "trades30d=38 activeDays30d=6 markets=3 realizedPnl30d=-1653.6 liquidations30d=3 maxDrawdown30d=2437.7 avgLeverage=n/a lastActive=2026-10-27",
+      "fetchedAt": "2026-10-28T14:28:45.820Z",
+      "endpoint": {
+        "url": "https://copybook-eosin.vercel.app/api/risk/0x1faed318fced713cc5764bd7b4974b39ddf5bfc7",
+        "asOf": "2026-10-28T14:28:47.092Z",
+        "cache": "MISS",
+        "age": "0"
+      }
+    },
+    {
+      "trader": "0x7c30179b81212f592f7D24d37aCbEC408e905b96",
+      "pickedAs": "liquidated-2+",
+      "pool": "2+ liquidations in the latest 1000 liquidation rows",
+      "rubric": "liquidations30d=3 trades30d=60 history=yes partial=0",
+      "rubricHash": "0xb8288b105f88112adce724820a892b4b81457274f7438ea39a7027dff8ecd8fc",
+      "expectedTier": "BLOCK",
+      "reasons": [
+        "liquidations30d=3 >= 2"
+      ],
+      "summary": "trades30d=60 activeDays30d=5 markets=9 realizedPnl30d=-1758.5 liquidations30d=3 maxDrawdown30d=4942.4 avgLeverage=n/a lastActive=2026-10-27",
+      "fetchedAt": "2026-10-28T14:28:48.169Z",
+      "endpoint": {
+        "url": "https://copybook-eosin.vercel.app/api/risk/0x7c30179b81212f592f7d24d37acbec408e905b96",
+        "asOf": "2026-10-28T14:28:49.485Z",
+        "cache": "MISS",
+        "age": "0"
+      }
+    },
+    {
+      "trader": "0x2E6c0CD1c011Ec7e7a2d22fB464d7c63d53842b7",
+      "pickedAs": "liquidated-2+",
+      "pool": "2+ liquidations in the latest 1000 liquidation rows",
+      "rubric": "liquidations30d=4 trades30d=9 history=yes partial=0",
+      "rubricHash": "0x9c962802155569dd510b95daa7337dc6a5041b206e2de5cd47e44363eb99e0bf",
+      "expectedTier": "BLOCK",
+      "reasons": [
+        "liquidations30d=4 >= 2"
+      ],
+      "summary": "trades30d=9 activeDays30d=2 markets=1 realizedPnl30d=-1350.9 liquidations30d=4 maxDrawdown30d=1350.9 avgLeverage=n/a lastActive=2026-10-26",
+      "fetchedAt": "2026-10-28T14:28:50.559Z",
+      "endpoint": {
+        "url": "https://copybook-eosin.vercel.app/api/risk/0x2e6c0cd1c011ec7e7a2d22fb464d7c63d53842b7",
+        "asOf": "2026-10-28T14:28:51.872Z",
+        "cache": "MISS",
+        "age": "0"
+      }
+    },
+    {
+      "trader": "0xb8700E8d07Bd029f7dD3CE6CC97Fe936D70c50a8",
+      "pickedAs": "liquidated-1",
+      "pool": "1 liquidation in the latest 1000 liquidation rows",
+      "rubric": "liquidations30d=1 trades30d=695 history=yes partial=0",
+      "rubricHash": "0xb3e920c0aaa0a4413a39c638c87ef54d3190cb59232a84be215786638e075016",
+      "expectedTier": "CAUTION",
+      "reasons": [
+        "liquidations30d=1"
+      ],
+      "summary": "trades30d=695 activeDays30d=1 markets=14 realizedPnl30d=-43.1 liquidations30d=1 maxDrawdown30d=43.1 avgLeverage=n/a lastActive=2026-10-28",
+      "fetchedAt": "2026-10-28T14:28:52.949Z",
+      "endpoint": {
+        "url": "https://copybook-eosin.vercel.app/api/risk/0xb8700e8d07bd029f7dd3ce6cc97fe936d70c50a8",
+        "asOf": "2026-10-28T14:28:54.517Z",
+        "cache": "MISS",
+        "age": "0"
+      }
+    },
+    {
+      "trader": "0xCd509d80cDB707dD1871a8aD10b8A399696a2D7f",
+      "pickedAs": "liquidated-1",
+      "pool": "1 liquidation in the latest 1000 liquidation rows",
+      "rubric": "liquidations30d=1 trades30d=5 history=yes partial=0",
+      "rubricHash": "0x55f79352d80517050737b7244d68cb173c51520e6df9b23c1b33d33220ee3335",
+      "expectedTier": "CAUTION",
+      "reasons": [
+        "liquidations30d=1",
+        "trades30d=5 < 10"
+      ],
+      "summary": "trades30d=5 activeDays30d=1 markets=1 realizedPnl30d=-578.0 liquidations30d=1 maxDrawdown30d=578.0 avgLeverage=n/a lastActive=2026-10-28",
+      "fetchedAt": "2026-10-28T14:28:55.592Z",
+      "endpoint": {
+        "url": "https://copybook-eosin.vercel.app/api/risk/0xcd509d80cdb707dd1871a8ad10b8a399696a2d7f",
+        "asOf": "2026-10-28T14:28:56.876Z",
+        "cache": "MISS",
+        "age": "0"
+      }
+    },
+    {
+      "trader": "0x8B834Ce8F8D18D4247F600FBF91C74A8F0ABe1e4",
+      "pickedAs": "liquidated-1",
+      "pool": "1 liquidation in the latest 1000 liquidation rows",
+      "rubric": "liquidations30d=1 trades30d=5 history=yes partial=0",
+      "rubricHash": "0x55f79352d80517050737b7244d68cb173c51520e6df9b23c1b33d33220ee3335",
+      "expectedTier": "CAUTION",
+      "reasons": [
+        "liquidations30d=1",
+        "trades30d=5 < 10"
+      ],
+      "summary": "trades30d=5 activeDays30d=1 markets=1 realizedPnl30d=-516.7 liquidations30d=1 maxDrawdown30d=516.7 avgLeverage=n/a lastActive=2026-10-28",
+      "fetchedAt": "2026-10-28T14:28:57.954Z",
+      "endpoint": {
+        "url": "https://copybook-eosin.vercel.app/api/risk/0x8b834ce8f8d18d4247f600fbf91c74a8f0abe1e4",
+        "asOf": "2026-10-28T14:28:59.237Z",
+        "cache": "MISS",
+        "age": "0"
+      }
+    },
+    {
+      "trader": "0xF3ed3F5b90A13b39f30759E9800ec638711008F8",
+      "pickedAs": "liquidated-1",
+      "pool": "1 liquidation in the latest 1000 liquidation rows",
+      "rubric": "liquidations30d=1 trades30d=555 history=yes partial=0",
+      "rubricHash": "0xa261c68c4cffd2f93a529849e21b8f87503aab6d0c648b7c08cd98444e3d9c8e",
+      "expectedTier": "CAUTION",
+      "reasons": [
+        "liquidations30d=1"
+      ],
+      "summary": "trades30d=555 activeDays30d=16 markets=5 realizedPnl30d=+1156.3 liquidations30d=1 maxDrawdown30d=4916.4 avgLeverage=n/a lastActive=2026-10-28",
+      "fetchedAt": "2026-10-28T14:29:00.310Z",
+      "endpoint": {
+        "url": "https://copybook-eosin.vercel.app/api/risk/0xf3ed3f5b90a13b39f30759e9800ec638711008f8",
+        "asOf": "2026-10-28T14:29:02.030Z",
+        "cache": "MISS",
+        "age": "0"
+      }
+    },
+    {
+      "trader": "0x857387a56F7ceE3246860a8A470123C31bB0d02c",
+      "pickedAs": "clean",
+      "pool": "fewest rows in the latest 1000 position changes",
+      "rubric": "liquidations30d=0 trades30d=2000 history=yes partial=1",
+      "rubricHash": "0x95e132c57a0ae15a026a1016d1fb5d1625c7ec58aafb8dbde86238a9d0df89d1",
+      "expectedTier": "CAUTION",
+      "reasons": [
+        "partial=1"
+      ],
+      "summary": "trades30d=2000 activeDays30d=1 markets=1 realizedPnl30d=+202.7 liquidations30d=0 maxDrawdown30d=0.0 avgLeverage=n/a lastActive=2026-10-28 partial=1",
+      "fetchedAt": "2026-10-28T14:29:03.105Z",
+      "endpoint": {
+        "url": "https://copybook-eosin.vercel.app/api/risk/0x857387a56f7cee3246860a8a470123c31bb0d02c",
+        "asOf": "2026-10-28T14:29:08.115Z",
+        "cache": "MISS",
+        "age": "0"
+      }
+    },
+    {
+      "trader": "0x0a72b2e45fB68a8Ff4B0945Ee8104cb5a97D8Ff4",
+      "pickedAs": "clean",
+      "pool": "fewest rows in the latest 1000 position changes",
+      "rubric": "liquidations30d=0 trades30d=2000 history=yes partial=1",
+      "rubricHash": "0x95e132c57a0ae15a026a1016d1fb5d1625c7ec58aafb8dbde86238a9d0df89d1",
+      "expectedTier": "CAUTION",
+      "reasons": [
+        "partial=1"
+      ],
+      "summary": "trades30d=2000 activeDays30d=1 markets=1 realizedPnl30d=+6.8 liquidations30d=0 maxDrawdown30d=6.6 avgLeverage=n/a lastActive=2026-10-28 partial=1",
+      "fetchedAt": "2026-10-28T14:29:09.196Z",
+      "endpoint": {
+        "url": "https://copybook-eosin.vercel.app/api/risk/0x0a72b2e45fb68a8ff4b0945ee8104cb5a97d8ff4",
+        "asOf": "2026-10-28T14:29:11.437Z",
+        "cache": "MISS",
+        "age": "0"
+      }
+    },
+    {
+      "trader": "0x20A0d517f1b60fd3041B49d7B97b529964c7bA88",
+      "pickedAs": "clean",
+      "pool": "fewest rows in the latest 1000 position changes",
+      "rubric": "liquidations30d=0 trades30d=15 history=yes partial=0",
+      "rubricHash": "0x3c0b3c284603526f90d19ebb511eedaf0882961dd13be7731d048bcbd0142d8c",
+      "expectedTier": "OK",
+      "reasons": [],
+      "summary": "trades30d=15 activeDays30d=2 markets=2 realizedPnl30d=-464.9 liquidations30d=0 maxDrawdown30d=572.7 avgLeverage=n/a lastActive=2026-10-28",
+      "fetchedAt": "2026-10-28T14:29:12.526Z",
+      "endpoint": {
+        "url": "https://copybook-eosin.vercel.app/api/risk/0x20a0d517f1b60fd3041b49d7b97b529964c7ba88",
+        "asOf": "2026-10-28T14:29:13.822Z",
+        "cache": "MISS",
+        "age": "0"
+      }
+    },
+    {
+      "trader": "0xfed46fe76Ac5e98f1C969Bc10eFB96014Dc17749",
+      "pickedAs": "clean",
+      "pool": "fewest rows in the latest 1000 position changes",
+      "rubric": "liquidations30d=0 trades30d=16 history=yes partial=0",
+      "rubricHash": "0xb050212de104871b5d66fb0661d17e2ad762a8a963de207ca3b40e236c861377",
+      "expectedTier": "OK",
+      "reasons": [],
+      "summary": "trades30d=16 activeDays30d=2 markets=2 realizedPnl30d=-73.3 liquidations30d=0 maxDrawdown30d=208.0 avgLeverage=n/a lastActive=2026-10-28",
+      "fetchedAt": "2026-10-28T14:29:14.904Z",
+      "endpoint": {
+        "url": "https://copybook-eosin.vercel.app/api/risk/0xfed46fe76ac5e98f1c969bc10efb96014dc17749",
+        "asOf": "2026-10-28T14:29:16.170Z",
+        "cache": "MISS",
+        "age": "0"
+      }
+    },
+    {
+      "trader": "0xE46cd08B8921aFD922051Ee4D11701aEf68d9999",
+      "pickedAs": "clean",
+      "pool": "fewest rows in the latest 1000 position changes",
+      "rubric": "liquidations30d=0 trades30d=127 history=yes partial=0",
+      "rubricHash": "0x3e0e2b9b1b485617bd9cc54dc657bd155d8b5a4788c12e300e7526ec6eb16f61",
+      "expectedTier": "OK",
+      "reasons": [],
+      "summary": "trades30d=127 activeDays30d=7 markets=4 realizedPnl30d=-1018.8 liquidations30d=0 maxDrawdown30d=1908.7 avgLeverage=n/a lastActive=2026-10-28",
+      "fetchedAt": "2026-10-28T14:29:17.251Z",
+      "endpoint": {
+        "url": "https://copybook-eosin.vercel.app/api/risk/0xe46cd08b8921afd922051ee4d11701aef68d9999",
+        "asOf": "2026-10-28T14:29:18.515Z",
+        "cache": "MISS",
+        "age": "0"
+      }
+    },
+    {
+      "trader": "0x2c12A7432362E335B7A0B2ACCA2F6Ae17a1f2fd8",
+      "pickedAs": "thin",
+      "pool": "fewest rows in the latest 1000 position changes",
+      "rubric": "liquidations30d=0 trades30d=3 history=yes partial=0",
+      "rubricHash": "0x65babbe9b676ac47fb86a98bf75bf195c00048bdbc70a9c71a43bc012e21c21a",
+      "expectedTier": "CAUTION",
+      "reasons": [
+        "trades30d=3 < 10"
+      ],
+      "summary": "trades30d=3 activeDays30d=1 markets=1 realizedPnl30d=-0.2 liquidations30d=0 maxDrawdown30d=0.2 avgLeverage=n/a lastActive=2026-10-28",
+      "fetchedAt": "2026-10-28T14:29:19.587Z",
+      "endpoint": {
+        "url": "https://copybook-eosin.vercel.app/api/risk/0x2c12a7432362e335b7a0b2acca2f6ae17a1f2fd8",
+        "asOf": "2026-10-28T14:29:20.876Z",
+        "cache": "MISS",
+        "age": "0"
+      }
+    },
+    {
+      "trader": "0xb9c0424B350be6Bb438eE3fdda981212d42037F3",
+      "pickedAs": "thin",
+      "pool": "fewest rows in the latest 1000 position changes",
+      "rubric": "liquidations30d=0 trades30d=7 history=yes partial=0",
+      "rubricHash": "0x7e620790dc8637a05915f31f4d9869aa3e204c0cdaaacb59aa35d4e502d37a16",
+      "expectedTier": "CAUTION",
+      "reasons": [
+        "trades30d=7 < 10"
+      ],
+      "summary": "trades30d=7 activeDays30d=2 markets=2 realizedPnl30d=+273.6 liquidations30d=0 maxDrawdown30d=0.0 avgLeverage=n/a lastActive=2026-10-28",
+      "fetchedAt": "2026-10-28T14:29:21.957Z",
+      "endpoint": {
+        "url": "https://copybook-eosin.vercel.app/api/risk/0xb9c0424b350be6bb438ee3fdda981212d42037f3",
+        "asOf": "2026-10-28T14:29:23.216Z",
+        "cache": "MISS",
+        "age": "0"
+      }
+    },
+    {
+      "trader": "0x10eae18964db8EE7981B51fd93b3B163e8dF2E90",
+      "pickedAs": "thin",
+      "pool": "fewest rows in the latest 1000 position changes",
+      "rubric": "liquidations30d=0 trades30d=5 history=yes partial=0",
+      "rubricHash": "0x6849fb889c85c3f11c7964d0cc74d7f2f4129cece56126765cad5e1e703fd23f",
+      "expectedTier": "CAUTION",
+      "reasons": [
+        "trades30d=5 < 10"
+      ],
+      "summary": "trades30d=5 activeDays30d=1 markets=1 realizedPnl30d=-0.2 liquidations30d=0 maxDrawdown30d=0.2 avgLeverage=n/a lastActive=2026-10-28",
+      "fetchedAt": "2026-10-28T14:29:24.297Z",
+      "endpoint": {
+        "url": "https://copybook-eosin.vercel.app/api/risk/0x10eae18964db8ee7981b51fd93b3b163e8df2e90",
+        "asOf": "2026-10-28T14:29:25.558Z",
+        "cache": "MISS",
+        "age": "0"
+      }
+    },
+    {
+      "trader": "0xA1d0CB85c869e534Fe1e0c22af3b238301157b5d",
+      "pickedAs": "leader",
+      "pool": "our e2e leader",
+      "rubric": "liquidations30d=0 trades30d=45 history=yes partial=0",
+      "rubricHash": "0x9d6308df58dcc0ab8ebb38eaa1567400e2912872bb6c63888dd67ed316aeee97",
+      "expectedTier": "OK",
+      "reasons": [],
+      "summary": "trades30d=45 activeDays30d=2 markets=2 realizedPnl30d=-0.3 liquidations30d=0 maxDrawdown30d=0.3 avgLeverage=n/a lastActive=2026-10-28",
+      "fetchedAt": "2026-10-28T14:29:26.628Z",
+      "endpoint": {
+        "url": "https://copybook-eosin.vercel.app/api/risk/0xa1d0cb85c869e534fe1e0c22af3b238301157b5d",
+        "asOf": "2026-10-28T14:26:39.555Z",
+        "cache": "HIT",
+        "age": "167"
+      }
+    }
+  ]
+}

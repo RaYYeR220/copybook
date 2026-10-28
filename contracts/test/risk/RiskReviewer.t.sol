@@ -12,8 +12,9 @@ import {IAgentRequester, IJsonApiAgent, ILLMInferenceAgent} from "../../src/risk
 import {Tier, RiskMessages} from "../../src/risk/RiskTypes.sol";
 
 contract RiskReviewerTest is RiskBase {
+    /// The published rubric (eval/rubric.ts), sent as the LLM's system message.
     string internal constant PROMPT =
-        "You review perpetual-futures traders for people who copy their positions automatically. Read the 30-day stats (key=value). n/a means unknown, not safe. partial=1 means only the most recent activity was read. history=none means no trades. Answer with exactly one word: BLOCK if a follower copying this trader is likely to be wiped out (repeated liquidations or a drawdown near or above the margin), CAUTION if risk is elevated or the data is too thin to judge, OK otherwise.";
+        "You review perpetual-futures traders for people who copy their positions automatically. Apply this rubric exactly to the 30-day stats (key=value; n/a means unknown, not safe). BLOCK if liquidations30d is 2 or more, or maxDrawdownPct30d is present and at least 50. Otherwise CAUTION if liquidations30d is 1, or trades30d is below 10, or history=none, or partial=1, or maxDrawdownPct30d is present and at least 25. Otherwise OK. Answer with exactly one word: OK, CAUTION or BLOCK.";
 
     uint256 internal constant SUMMARY_DEPOSIT = 0.03 ether + 3 * 0.03 ether;
     uint256 internal constant VERDICT_DEPOSIT = 0.03 ether + 3 * 0.07 ether;
@@ -68,6 +69,9 @@ contract RiskReviewerTest is RiskBase {
         assertEq(reviewer.gate(), address(gate));
         assertEq(reviewer.baseUrl(), BASE_URL);
         assertEq(reviewer.systemPrompt(), PROMPT);
+        assertEq(reviewer.DEFAULT_SYSTEM_PROMPT(), PROMPT);
+        assertEq(reviewer.summarySelector(), "rubric");
+        assertEq(reviewer.DEFAULT_SUMMARY_SELECTOR(), "rubric");
         assertEq(reviewer.jsonAgentId(), 13174292974160097713);
         assertEq(reviewer.llmAgentId(), 12847293847561029384);
         assertEq(reviewer.COMMITTEE_SIZE(), 3);
@@ -100,7 +104,7 @@ contract RiskReviewerTest is RiskBase {
         assertEq(platform.count(), 1);
     }
 
-    // Stage 1: the JSON agent fetches `summary` from baseUrl + the lowercase trader address.
+    // Stage 1: the JSON agent fetches the `rubric` field from baseUrl + the lowercase trader address.
     function test_stage1_fetchesSummaryFromTheEndpoint() public {
         address t = address(uint160(uint256(keccak256("mixed case"))));
         string memory hexLower = vm.toLowercase(vm.toString(t));
@@ -122,7 +126,7 @@ contract RiskReviewerTest is RiskBase {
             abi.encodeWithSelector(
                 IJsonApiAgent.fetchString.selector,
                 string.concat("https://copybook.example/api/risk/", hexLower),
-                "summary"
+                "rubric"
             )
         );
         assertEq(c.size, 3);
@@ -135,7 +139,8 @@ contract RiskReviewerTest is RiskBase {
         assertEq(jn, nonce);
     }
 
-    // Stage 2: the LLM agent gets the stored prompt plus the agreed summary, restricted to the three words.
+    // Stage 2: the stored prompt goes in as the system message, the agreed rubric line as the user prompt, and the
+    // answer is restricted to the three words.
     function test_stage2_asksTheModelWithTheStoredPrompt() public {
         (uint64 nonce, uint256 summaryId) = _intake(trader);
         vm.expectEmit(true, true, false, true, address(reviewer));
@@ -152,12 +157,14 @@ contract RiskReviewerTest is RiskBase {
         allowed[0] = "OK";
         allowed[1] = "CAUTION";
         allowed[2] = "BLOCK";
-        string memory prompt = string.concat(PROMPT, "\nStats: ", SUMMARY);
+        string memory prompt = string.concat("Stats: ", SUMMARY);
         assertEq(reviewer.promptFor(SUMMARY), prompt);
         assertEq(c.agentId, 12847293847561029384);
         assertEq(c.callback, address(reviewer));
         assertEq(c.selector, RiskReviewer.handleVerdict.selector);
-        assertEq(c.payload, abi.encodeWithSelector(ILLMInferenceAgent.inferString.selector, prompt, "", false, allowed));
+        assertEq(
+            c.payload, abi.encodeWithSelector(ILLMInferenceAgent.inferString.selector, prompt, PROMPT, false, allowed)
+        );
         assertEq(c.size, 3);
         assertEq(c.threshold, 2);
         assertEq(uint8(c.consensus), uint8(IAgentRequester.ConsensusType.Threshold));
@@ -431,6 +438,8 @@ contract RiskReviewerTest is RiskBase {
         vm.expectRevert(unauthorized);
         reviewer.setSystemPrompt("x");
         vm.expectRevert(unauthorized);
+        reviewer.setSummarySelector("x");
+        vm.expectRevert(unauthorized);
         reviewer.setGate(stranger);
         vm.expectRevert(unauthorized);
         reviewer.setAgents(1, 2);
@@ -443,6 +452,8 @@ contract RiskReviewerTest is RiskBase {
         reviewer.setBaseUrl("");
         vm.expectRevert(RiskReviewer.EmptyValue.selector);
         reviewer.setSystemPrompt("");
+        vm.expectRevert(RiskReviewer.EmptyValue.selector);
+        reviewer.setSummarySelector("");
         vm.expectRevert(RiskReviewer.ZeroAddress.selector);
         reviewer.setGate(address(0));
         vm.expectRevert(RiskReviewer.EmptyValue.selector);
@@ -458,6 +469,9 @@ contract RiskReviewerTest is RiskBase {
         vm.expectEmit(false, false, false, true, address(reviewer));
         emit RiskReviewer.SystemPromptSet("Say OK.");
         reviewer.setSystemPrompt("Say OK.");
+        vm.expectEmit(false, false, false, true, address(reviewer));
+        emit RiskReviewer.SummarySelectorSet("summary");
+        reviewer.setSummarySelector("summary");
         vm.expectEmit(false, false, false, true, address(reviewer));
         emit RiskReviewer.AgentsSet(11, 22);
         reviewer.setAgents(11, 22);
@@ -477,7 +491,17 @@ contract RiskReviewerTest is RiskBase {
         _success(summaryId, _three(SUMMARY, SUMMARY, SUMMARY));
         c = platform.callOf(platform.lastId());
         assertEq(c.agentId, 22);
-        assertEq(reviewer.promptFor("s"), "Say OK.\nStats: s");
+        assertEq(reviewer.promptFor("s"), "Stats: s");
+        string[] memory allowed = new string[](3);
+        allowed[0] = "OK";
+        allowed[1] = "CAUTION";
+        allowed[2] = "BLOCK";
+        assertEq(
+            c.payload,
+            abi.encodeWithSelector(
+                ILLMInferenceAgent.inferString.selector, string.concat("Stats: ", SUMMARY), "Say OK.", false, allowed
+            )
+        );
 
         // a re-pointed gate: the old one can no longer start reviews, replies go to the new one
         address newGate = makeAddr("newGate");

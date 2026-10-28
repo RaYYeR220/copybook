@@ -1,0 +1,14 @@
+{
+  "run": "v3",
+  "commit": "5aed53bf2c556d82874cd537cd559f09d51b3d67",
+  "key": "eval/v3/answer-key.json",
+  "keyKeccak": "0x401403823f836081ab51e8eb1d0306cbe9b71d9c36f717ab244031572620902f",
+  "data": "0x5aed53bf2c556d82874cd537cd559f09d51b3d67401403823f836081ab51e8eb1d0306cbe9b71d9c36f717ab244031572620902f",
+  "tx": "0xb67923259aa552c033eba19271020d41f206c04a44d461ef9237c3752dd40e13",
+  "url": "https://explorer.testnet.somnia.network/tokyo/tx/0xb67923259aa552c033eba19271020d41f206c04a44d461ef9237c3752dd40e13",
+  "block": 35446065,
+  "timestamp": "2026-10-28T14:29:44.000Z",
+  "from": "0x5397812d66F3233E0972b7AEB5e195a945504632",
+  "status": "success",
+  "gasUsed": 29320
+}

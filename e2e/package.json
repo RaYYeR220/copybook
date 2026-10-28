@@ -14,6 +14,7 @@
     "eval:test": "tsx --test ../eval/rubric.test.ts"
   },
   "dependencies": {
+    "@copybook/stats": "file:../packages/stats",
     "@somnia-chain/markets-sdk": "0.32.1",
     "viem": "2.57.12"
   },

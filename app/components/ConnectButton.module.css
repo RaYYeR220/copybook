@@ -1,0 +1,91 @@
+.who {
+  position: relative;
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font: 400 12px var(--mono);
+  color: var(--night-4);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0 13px;
+  border: 1px solid var(--hair-2);
+  border-radius: var(--r-pill);
+  color: var(--bone);
+  white-space: nowrap;
+  font: 400 12px var(--mono);
+}
+
+.chip i {
+  display: block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  border: 1px solid var(--bone);
+}
+
+.net i {
+  background: var(--bone);
+}
+
+button.chip {
+  transition: border-color 0.3s var(--ease);
+}
+
+button.chip:hover {
+  border-color: var(--hair-3);
+}
+
+.menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 20;
+  min-width: 200px;
+  padding: 6px;
+  background: var(--night-1);
+  border: 1px solid var(--hair-2);
+  list-style: none;
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  height: 36px;
+  padding: 0 12px;
+  border-radius: var(--r-pill);
+  font: 500 13.5px var(--body);
+  color: var(--bone);
+  text-align: left;
+}
+
+.option:hover {
+  background: var(--night-2);
+}
+
+.option img {
+  flex: none;
+}
+
+.err {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  max-width: 320px;
+  font: 400 11.5px/1.45 var(--mono);
+  color: var(--bone-2);
+  text-align: right;
+}
+
+@media (max-width: 720px) {
+  .net {
+    display: none;
+  }
+}

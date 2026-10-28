@@ -1,0 +1,41 @@
+.page {
+  position: relative;
+  overflow: hidden;
+  min-height: 100svh;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.pools {
+  background:
+    radial-gradient(1100px 700px at 50% -10%, rgba(34, 31, 25, 0.85), transparent 70%),
+    radial-gradient(520px 460px at 14% 24%, rgba(202, 160, 99, 0.07), transparent 72%),
+    radial-gradient(700px 600px at 92% 96%, rgba(34, 31, 25, 0.95), transparent 72%);
+}
+
+/* the app frame: a double rule inset from the viewport */
+.frame {
+  position: absolute;
+  inset: 12px;
+  z-index: 1;
+  border: 1px solid var(--hair-2);
+  pointer-events: none;
+}
+
+.frame::after {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  border: 1px solid var(--hair);
+}
+
+.grain {
+  z-index: 60;
+  background-size: 200px 200px;
+}
+
+@media (max-width: 720px) {
+  .frame {
+    inset: 6px;
+  }
+}

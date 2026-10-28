@@ -1,0 +1,62 @@
+.bar {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 40px;
+  height: 68px;
+  padding: 0 36px;
+  border-bottom: 1px solid var(--hair);
+}
+
+.mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font: 560 23px/1 var(--display);
+  font-variation-settings: "opsz" 48, "SOFT" 0;
+  letter-spacing: -0.03em;
+  color: var(--bone);
+}
+
+.gull {
+  width: 16px;
+  height: 8px;
+  flex: none;
+  overflow: visible;
+}
+
+.nav {
+  display: flex;
+  gap: 6px;
+}
+
+.nav a {
+  padding: 7px 14px;
+  border-radius: var(--r-pill);
+  border: 1px solid transparent;
+  font-size: 13.5px;
+  color: var(--night-4);
+  transition: color 0.3s var(--ease);
+}
+
+.nav a:hover {
+  color: var(--bone);
+}
+
+.nav a[aria-current] {
+  color: var(--bone);
+  border-color: var(--hair-2);
+}
+
+@media (max-width: 720px) {
+  .bar {
+    gap: 12px;
+    padding: 0 20px;
+    height: 60px;
+  }
+
+  .nav {
+    display: none;
+  }
+}

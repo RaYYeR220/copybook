@@ -17,8 +17,9 @@ decision for all 20.**
 - Two thin-history traders (3 and 5 trades) were rated OK where the rubric says CAUTION. The gate acts only on
   BLOCK, so this does not change what a follower can do.
 - No review failed, and every committee answered unanimously.
-- 4 earlier false BLOCKs are still held on the gate until about 14:00 UTC on 2026-10-29 (rows 1, 13 and 14 from run
-  v2, and the leader from run v1; see [what the gate holds](#what-the-gate-holds-now)).
+- 4 earlier false BLOCKs (rows 1, 13, 14 and the leader) are still held on the gate. A fresh review can replace each
+  one from 24 hours after it landed (13:36–14:05 UTC on 2026-10-29); otherwise they expire on 2026-11-04 (see
+  [what the gate holds](#what-the-gate-holds-now)).
 
 ## Three runs
 
@@ -30,8 +31,8 @@ decision for all 20.**
 
 "BLOCK / not-BLOCK agreement" counts the traders whose committee verdict falls on the same side of the gate's line as
 the rubric's tier: BLOCK (refuse new size) or not BLOCK (allow it). It is the gate decision the verdicts imply. The live
-gate can still hold an older BLOCK for 24 hours, so what it does today can differ (see
-[what the gate holds](#what-the-gate-holds-now)).
+gate keeps an older BLOCK against a milder verdict for its first 24 hours, and an unreplaced BLOCK blocks for 7 days,
+so what the gate does can differ (see [what the gate holds](#what-the-gate-holds-now)).
 
 ## The rubric
 
@@ -247,8 +248,8 @@ run v2.
   The thin-data rule is still not applied reliably.
 - **BLOCK / not-BLOCK agreement: 20 of 20** (run v2: 17 of 20). The gate acts on BLOCK only, so the two remaining
   misses do not change the gate decision the verdicts imply. The live gate still refuses new size for 4 of these 20
-  traders (rows 1, 13, 14 and the leader), because it holds their earlier false BLOCKs for 24 hours (see
-  [what the gate holds](#what-the-gate-holds-now)).
+  traders (rows 1, 13, 14 and the leader): their earlier false BLOCKs were less than 24 hours old when run v3's
+  milder verdicts arrived, so the gate kept them (see [what the gate holds](#what-the-gate-holds-now)).
 - **What this run cannot separate.** The inputs and the prompt placement changed together, so this run does not show
   which change removed the false BLOCKs. Each trader was again reviewed once. The answers were unanimous within every
   committee, but run-to-run stability was not tested.
@@ -261,8 +262,10 @@ run v2.
 
 ### Cost and latency
 
-- **Reviewer deposits:** 4.3073 STT for 20 reviews, 0.2154 STT each. The new reviewer went from 10 to 5.6927 STT.
-- **Review fees:** 20 × 0.5 STT, paid to the gate. The gate now holds 21.5 STT, which the owner can withdraw.
+- **Reviewer deposits:** 4.3073 STT for 20 reviews, 0.2154 STT each. Over the run, the new reviewer went from 10 to
+  5.6927 STT.
+- **Review fees:** 20 × 0.5 STT, paid to the gate, which the owner can withdraw. The gate held 21.5 STT at 15:07:08 UTC
+  on 2026-10-28, after run v3.
 - **Gas:**
   - new reviewer: 47,234,479 (0.2834 STT at 6 gwei);
   - `withdraw` from the old reviewer: 58,705;
@@ -497,12 +500,13 @@ to a trader the policy would allow.
 - **Reviewer deposits:** 4.3387 STT for 20 reviews, 0.2169 STT each. The reviewer went from 11.3534 to 7.0147 STT.
   The committees used 0.0003 STT per validator to fetch the summary and 0.07 STT per validator to classify it. The
   platform returns the unused part of each deposit.
-- **Review fees:** 20 × 0.5 STT, paid to the gate. The gate now holds 11.5 STT, which the owner can withdraw.
+- **Review fees:** 20 × 0.5 STT, paid to the gate, which the owner can withdraw. The gate held 11.5 STT after run v2.
 - **Gas:**
   - `requestReview` on Hideki: 194,592 – 407,983;
   - `setSystemPrompt`: 208,877;
   - the anchor: 29,320.
-- **Latency,** from the request to the verdict landing on Hideki (block timestamps): median 14.5 s, range 9 – 26 s.
+- **Latency,** from the request to the verdict landing on Hideki (block timestamps): median 14.5 s, range 9 – 26 s for
+  20 reviews.
 
 ## Run v1: the first prompt
 
@@ -540,13 +544,16 @@ Run v3 rates all three as the rubric does: steady OK, liquidated BLOCK, leader O
 
 ## What the gate holds now
 
+As read from the gate after run v3, on 2026-10-28:
+
 - **BLOCK, 10 traders:**
   - **Rows 2–7.** These are the rubric's six BLOCKs, refreshed by run v3 between 14:30 and 14:38 UTC.
   - **Rows 1, 13 and 14** still hold run v2's false BLOCKs. Run v3's milder verdicts (OK, CAUTION, OK) arrived less than
-    24 hours after those BLOCKs, so the gate kept them (`BlockHeld`), as designed. A new review can replace them after
-    13:57:29, 14:04:43 and 14:05:11 UTC on 2026-10-29, and they stop blocking on 2026-11-04 in any case.
-  - **The leader** still holds its first-run BLOCK. Run v3's OK was likewise held. A new review can replace that BLOCK
-    after 13:36:31 UTC on 2026-10-29.
+    24 hours after those BLOCKs, so the gate kept them (`BlockHeld`), as designed. A fresh review can replace them from
+    13:57:29, 14:04:43 and 14:05:11 UTC on 2026-10-29 respectively. Untouched, they expire at the same times on
+    2026-11-04.
+  - **The leader** still holds its first-run BLOCK. Run v3's OK was likewise held. A fresh review can replace that BLOCK
+    from 13:36:31 UTC on 2026-10-29. Untouched, it expires at 13:36:31 UTC on 2026-11-04.
 - **CAUTION and OK.** The other traders hold CAUTION or OK, and neither restricts anyone.
 
 ## Limitations

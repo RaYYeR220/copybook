@@ -220,9 +220,11 @@ ol {
   animation: rise 0.8s var(--ease) var(--d, 0s) both;
 }
 
+/* from 0.01, not 0: an element first painted fully transparent is never a Largest Contentful Paint candidate,
+   so a hero that fades in from 0 would leave LCP to whatever repaints later */
 @keyframes rise {
   from {
-    opacity: 0;
+    opacity: 0.01;
     transform: translateY(16px);
   }
   to {

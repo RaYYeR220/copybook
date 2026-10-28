@@ -203,7 +203,11 @@ ol {
 }
 
 /* ---------- entrance, reveal and the failsafe ---------- */
-/* .rise plays on load; .reveal waits for the observer to add .in. Either way, everything is visible by 3.5 s. */
+/*
+ * .rise plays on load and is always visible by 3.5 s. .reveal waits for the observer to add .in; until the observer
+ * runs (html.reveal-js), the same 3.5 s failsafe shows it, and anything the failsafe already showed is marked
+ * .shown so it never fades again.
+ */
 .rise {
   animation:
     rise 0.8s var(--ease) var(--d, 0s) both,
@@ -213,11 +217,20 @@ ol {
 .reveal {
   opacity: 0;
   transform: translateY(18px);
+}
+
+html:not(.reveal-js) .reveal {
   animation: failsafe 0s 3.5s forwards;
 }
 
 .reveal.in {
   animation: rise 0.8s var(--ease) var(--d, 0s) both;
+}
+
+.reveal.shown {
+  opacity: 1;
+  transform: none;
+  animation: none;
 }
 
 /* from 0.01, not 0: an element first painted fully transparent is never a Largest Contentful Paint candidate,

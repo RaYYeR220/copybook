@@ -669,6 +669,14 @@ contract HubInvariantTest is Test {
 
     address internal constant OWNER = address(0x0A11);
     address internal constant CREATOR = address(0xC4EA);
+    /// Runs after which every kind of judged step must have happened (a campaign is 256 runs of 50 calls).
+    uint256 internal constant NON_VACUITY_RUNS = 64;
+
+    // the handler's counters as setUp leaves them, so the totals count only fuzzed steps
+    uint256 internal _setUpFollows;
+    uint256 internal _setUpIncreases;
+    uint256 internal _setUpReductions;
+    uint256 internal _setUpRefusals;
 
     function setUp() public {
         vm.etch(address(0x0100), address(new MockReactivity()).code);
@@ -721,6 +729,8 @@ contract HubInvariantTest is Test {
         handler.follow(1, 1, 3, 100, (15_000 << 128) | 50_000e18, 2);
         handler.follow(2, 2, 0, 200, (1_000e18 << 128) | 50_000e18, 2);
         handler.follow(3, 3, 0, 300, (2_000e18 << 128) | 50_000e18, 2);
+        (_setUpFollows, _setUpIncreases, _setUpReductions, _setUpRefusals) =
+        (handler.follows(), handler.increasesChecked(), handler.reductionsSeen(), handler.refusals());
         targetContract(address(handler));
     }
 
@@ -794,20 +804,31 @@ contract HubInvariantTest is Test {
         assertEq(handler.unexpectedReverts(), 0, string(handler.lastUnexpected()));
     }
 
-    /// Totals over every run so far (kept in the test process's environment), so a run with -vv shows
-    /// how much the invariants actually checked.
+    /// Totals over every run so far (kept in the test process's environment), counting only what the fuzzer
+    /// drove (setUp's own follows and fills are left out), so a run with -vv shows how much the invariants
+    /// actually checked. Once NON_VACUITY_RUNS runs have gone by, each kind of step they judge must have
+    /// happened at least once: otherwise they passed without checking anything.
     function afterInvariant() external {
         uint256 runs = _add("HUB_INV_RUNS", 1);
-        uint256 f = _add("HUB_INV_FOLLOWS", handler.follows());
+        uint256 f = _add("HUB_INV_FOLLOWS", handler.follows() - _setUpFollows);
         uint256 fi = _add("HUB_INV_FIRES", handler.fires());
-        uint256 inc = _add("HUB_INV_INCREASES", handler.increasesChecked());
-        uint256 red = _add("HUB_INV_REDUCTIONS", handler.reductionsSeen());
+        uint256 inc = _add("HUB_INV_INCREASES", handler.increasesChecked() - _setUpIncreases);
+        uint256 red = _add("HUB_INV_REDUCTIONS", handler.reductionsSeen() - _setUpReductions);
         uint256 st = _add("HUB_INV_STOPS", handler.stops());
-        uint256 rf = _add("HUB_INV_REFUSALS", handler.refusals());
+        uint256 rf = _add("HUB_INV_REFUSALS", handler.refusals() - _setUpRefusals);
+        uint256 lt = _add("HUB_INV_LATCHED", handler.latchSkips());
         console.log("runs %d follows %d fires %d", runs, f, fi);
         console.log("increase fills checked %d reduction fills %d", inc, red);
         console.log("stops %d refusals %d", st, rf);
-        console.log("latched follows at a delivery %d", _add("HUB_INV_LATCHED", handler.latchSkips()));
+        console.log("latched follows at a delivery %d", lt);
+        if (runs < NON_VACUITY_RUNS) return;
+        assertGt(f, 0, "no follow");
+        assertGt(fi, 0, "no delivery");
+        assertGt(inc, 0, "no increase fill checked");
+        assertGt(red, 0, "no reduction fill");
+        assertGt(st, 0, "no stop");
+        assertGt(rf, 0, "no refusal");
+        assertGt(lt, 0, "no latched follow at a delivery");
     }
 
     function _add(string memory key, uint256 v) internal returns (uint256 total) {

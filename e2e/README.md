@@ -175,7 +175,12 @@ forge verify-contract <gate> src/risk/RiskGate.sol:RiskGate --verifier blockscou
 | `check` | both sides' settings; `allowIncrease` answers true without a verdict |
 | `trade` | the leader opens and closes 0.0005 BTC; the increase passes the gate (one staticcall, traced) and the exit never asks it |
 | `base-url <url>` | points the reviewer at the public risk endpoint |
+| `prompt` | sets the reviewer's system prompt to the published rubric in `eval/rubric.ts` |
 | `review [trader ...]` | pays for reviews and follows each one: the Hyperlane delivery to Shannon, both committee stages with every validator's answer and receipt, the reply, and the gate's verdict on Hideki |
 | `guard` | with a live `Block` on the leader: an unguarded increase copies, a guarded one is refused `RiskGate`, the exit copies; without one, only the guard switch |
 
 Every transaction lands in `deployments/risk.json` with its explorer link.
+
+**Evaluate** the committee against the rubric (results in [`eval/SCORECARD.md`](../eval/SCORECARD.md)):
+`npm run eval:test` runs the rubric's tests, `npm run eval select` picks the sample and writes the answer key
+(commit it before any review), `npm run risk review <trader>` runs each review, and `npm run eval score` scores them.

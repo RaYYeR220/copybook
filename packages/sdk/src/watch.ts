@@ -29,6 +29,8 @@ export interface WatchOptions {
   reconnect?: { minDelayMs?: number; maxDelayMs?: number };
   /** How many delivered event keys to remember. Default 5000. */
   deliveredCapacity?: number;
+  /** A subscription that has not answered after this long counts as failed and is retried. Default 15000. */
+  subscribeTimeoutMs?: number;
   /** Replace the WebSocket transport (tests). */
   transport?: WatchTransport;
 }
@@ -38,6 +40,9 @@ export interface WatchHandle {
   /** The block up to which the chain has been read (the next fetch starts here, inclusive). */
   readonly lastBlock: bigint | undefined;
 }
+
+/** How long the default transport waits for the node to accept a subscription. */
+const SUBSCRIBE_TIMEOUT_MS = 10_000;
 
 /** A socket that stays up this long counts as healthy: the retry backoff starts over. */
 const HEALTHY_MS = 30_000;
@@ -52,29 +57,66 @@ export function somniaWatchTransport(publicClient: PublicClient, wsUrl?: string)
         getRpcClient(): Promise<{ close(): void }>;
         subscribe(a: { params: unknown[]; onData: (d: unknown) => void; onError: (e: unknown) => void }): Promise<{ unsubscribe(): Promise<unknown> }>;
       };
+      // The socket client this subscription runs on. viem keeps one per URL until it is closed explicitly; a dead one
+      // left in that cache would take the next subscription and never answer it, so it is closed (and evicted) the
+      // moment its socket dies, and only this one is ever closed here.
+      const client = await value.getRpcClient();
       let closed = false;
-      const sub = await value.subscribe({
-        params: ["somnia_watch", { address: addresses, eth_calls: [], push_changes_only: false }],
-        onData: () => onTick(),
-        onError: (e) => {
-          if (closed) return;
+      let dropped = false;
+      const drop = () => {
+        if (dropped) return;
+        dropped = true;
+        try {
+          client.close();
+        } catch {
+          /* already closed */
+        }
+      };
+      const sub = await new Promise<{ unsubscribe(): Promise<unknown> }>((resolve, reject) => {
+        // a subscription the socket never answers (a half-dead connection) fails here, and takes its client with it
+        const timer = setTimeout(() => {
           closed = true;
-          onClose(e);
-        },
+          drop();
+          reject(new Error(`somnia_watch did not answer within ${SUBSCRIBE_TIMEOUT_MS} ms`));
+        }, SUBSCRIBE_TIMEOUT_MS);
+        value
+          .subscribe({
+            params: ["somnia_watch", { address: addresses, eth_calls: [], push_changes_only: false }],
+            onData: () => onTick(),
+            onError: (e) => {
+              if (closed) return;
+              closed = true;
+              drop();
+              onClose(e);
+            },
+          })
+          .then(
+            (s) => {
+              clearTimeout(timer);
+              if (closed) {
+                void s.unsubscribe().catch(() => undefined);
+                reject(new Error("somnia_watch closed while subscribing"));
+              } else resolve(s);
+            },
+            (e: unknown) => {
+              clearTimeout(timer);
+              closed = true;
+              drop();
+              reject(e);
+            },
+          );
       });
       return {
         async close() {
           closed = true;
-          try {
-            await sub.unsubscribe();
-          } catch {
-            /* the socket may already be gone */
+          if (!dropped) {
+            try {
+              await sub.unsubscribe();
+            } catch {
+              /* the socket may already be gone */
+            }
           }
-          try {
-            (await value.getRpcClient()).close();
-          } catch {
-            /* nothing to close */
-          }
+          drop();
         },
       };
     },
@@ -96,6 +138,7 @@ export async function watchHub(opts: WatchOptions): Promise<WatchHandle> {
   const minDelay = opts.reconnect?.minDelayMs ?? 1_000;
   const maxDelay = opts.reconnect?.maxDelayMs ?? 30_000;
   const capacity = opts.deliveredCapacity ?? 5_000;
+  const subscribeTimeout = opts.subscribeTimeoutMs ?? 15_000;
 
   let stopped = false;
   let cursor: bigint | undefined;
@@ -162,18 +205,23 @@ export async function watchHub(opts: WatchOptions): Promise<WatchHandle> {
     }
   }
 
+  let attemptSeq = 0;
+
   async function connect(isReconnect: boolean) {
     if (stopped) return;
     status(isReconnect ? "reconnecting" : "connecting");
+    const me = ++attemptSeq;
+    const mine = () => me === attemptSeq;
     try {
-      const sub = await transport.subscribe({
+      const pending = transport.subscribe({
         addresses,
         onTick: () => {
+          if (!mine()) return;
           attempt = 0;
           request("live");
         },
         onClose: (err) => {
-          if (stopped) return;
+          if (stopped || !mine()) return;
           const dead = current;
           current = undefined;
           if (healthy) clearTimeout(healthy);
@@ -183,6 +231,17 @@ export async function watchHub(opts: WatchOptions): Promise<WatchHandle> {
           schedule();
         },
       });
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const sub = await Promise.race([
+        pending,
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(() => {
+            attemptSeq++; // whatever this attempt does later is ignored
+            void pending.then((late) => late.close(), () => undefined);
+            reject(new Error(`somnia_watch did not answer within ${subscribeTimeout} ms`));
+          }, subscribeTimeout);
+        }),
+      ]).finally(() => clearTimeout(timer));
       if (stopped) {
         await sub.close();
         return;

@@ -70,7 +70,16 @@ describe("getHubHistory", () => {
 class FakeSocket implements WatchTransport {
   subs: { tick: () => void; drop: (e?: unknown) => void; closed: boolean }[] = [];
   failNext = 0;
+  hangNext = 0;
+  hung: { closed: boolean; resolve: () => void }[] = [];
   async subscribe(p: Parameters<WatchTransport["subscribe"]>[0]) {
+    if (this.hangNext > 0) {
+      // a socket that accepts the subscription and never answers it (a dead cached client)
+      this.hangNext--;
+      const h = { closed: false, resolve: () => {} };
+      this.hung.push(h);
+      return new Promise<{ close(): Promise<void> }>((r) => (h.resolve = () => r({ close: async () => void (h.closed = true) })));
+    }
     if (this.failNext > 0) {
       this.failNext--;
       throw new Error("socket refused");
@@ -212,6 +221,23 @@ describe("watchHub", () => {
     sock.live.drop();
     await wait(50);
     expect(sock.subs).toHaveLength(2);
+  });
+
+  it("a subscription that never answers times out and is retried on a new one", async () => {
+    const c = world();
+    const sock = new FakeSocket();
+    sock.hangNext = 1;
+    const statuses: string[] = [];
+    const { h, errors } = await start(c, sock, { subscribeTimeoutMs: 30, onStatus: (s) => statuses.push(s) });
+    await wait(120);
+    expect(errors.some((e) => String(e).includes("did not answer"))).toBe(true);
+    expect(sock.subs).toHaveLength(1); // the retry got through
+    expect(statuses.at(-1)).toBe("live");
+    // the stale subscription answering late is closed and its socket never drives the watcher
+    sock.hung[0]!.resolve();
+    await wait(20);
+    expect(sock.hung[0]!.closed).toBe(true);
+    await h.stop();
   });
 
   it("forgets old keys past the delivered capacity but never repeats a recent one", async () => {

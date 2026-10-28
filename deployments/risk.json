@@ -1,0 +1,307 @@
+{
+  "shannon": {
+    "reviewer": "0x45b46d39697Cfd191BfEb215512d012d28E6ECc3",
+    "constructorGate": "0x5397812d66F3233E0972b7AEB5e195a945504632",
+    "constructorBaseUrl": "https://copybook.invalid/api/risk/",
+    "chainId": 50312,
+    "owner": "0x5397812d66F3233E0972b7AEB5e195a945504632",
+    "gate": "0xEe54c49E9e70a0e5C2218Eec1b1BDBd4e1Cb20f1",
+    "mailbox": "0xF805734aAC42cf238eAef9E905e3A04F2Ab554f9",
+    "gateDomain": 50383,
+    "agentPlatform": "0x037Bb9C718F3f7fe5eCBDB0b600D607b52706776",
+    "jsonAgentId": "13174292974160097713",
+    "llmAgentId": "12847293847561029384",
+    "committee": {
+      "size": 3,
+      "threshold": 2,
+      "timeoutSeconds": 300
+    },
+    "depositsPerReview": {
+      "summary": "0.12",
+      "verdict": "0.24",
+      "total": "0.36"
+    },
+    "baseUrl": "https://copybook.invalid/api/risk/",
+    "systemPrompt": "You review perpetual-futures traders for people who copy their positions automatically. Read the 30-day stats (key=value). n/a means unknown, not safe. partial=1 means only the most recent activity was read. history=none means no trades. Answer with exactly one word: BLOCK if a follower copying this trader is likely to be wiped out (repeated liquidations or a drawdown near or above the margin), CAUTION if risk is elevated or the data is too thin to judge, OK otherwise.",
+    "balance": "12",
+    "explorer": "https://shannon-explorer.somnia.network/address/0x45b46d39697Cfd191BfEb215512d012d28E6ECc3",
+    "verification": {
+      "verifier": "blockscout",
+      "result": "Pass - Verified",
+      "readBack": "api/v2/smart-contracts: is_fully_verified true, compiler v0.8.30+commit.73712a01"
+    }
+  },
+  "hideki": {
+    "gate": "0xEe54c49E9e70a0e5C2218Eec1b1BDBd4e1Cb20f1",
+    "hub": "0xdF73BBbB6517B712BBeD9bfAe6253A5E1FCDE154",
+    "chainId": 50383,
+    "owner": "0x5397812d66F3233E0972b7AEB5e195a945504632",
+    "reviewer": "0x45b46d39697Cfd191BfEb215512d012d28E6ECc3",
+    "mailbox": "0xD7C2E95c62De3c0ad95b2C1cf08E4B85DF6b332D",
+    "reviewerDomain": 50312,
+    "reviewFee": "0.5",
+    "verdictTtlSeconds": 604800,
+    "blockHoldSeconds": 86400,
+    "reviewCooldownSeconds": 600,
+    "pendingTimeoutSeconds": 1800,
+    "hubRiskGate": "0xEe54c49E9e70a0e5C2218Eec1b1BDBd4e1Cb20f1",
+    "riskGateGas": 2000000,
+    "explorer": "https://explorer.testnet.somnia.network/tokyo/address/0xEe54c49E9e70a0e5C2218Eec1b1BDBd4e1Cb20f1",
+    "verification": {
+      "verifier": "blockscout (Tokyo explorer)",
+      "result": "Pass - Verified",
+      "readBack": "not possible: the explorer API answers 'Not available' / 'Not found'"
+    }
+  },
+  "endpoint": {
+    "status": "not public yet",
+    "checked": "2026-10-28",
+    "production": "https://copybook-olv2us20q-rayyer220s-projects.vercel.app",
+    "anonymousHttp": 302,
+    "note": "baseUrl stays a placeholder and no review has been requested until /api/risk/<trader> answers anonymously"
+  },
+  "reviewTargets": {
+    "steady": "0xfc2fb08cccf87bfc472cded8e7ebef588fcf7fd2",
+    "liquidated": "0xa14d4561f2697859ab6c2d5eb62e1172a6cc3d14",
+    "leader": "0xA1d0CB85c869e534Fe1e0c22af3b238301157b5d"
+  },
+  "txs": [
+    {
+      "chain": "hideki",
+      "step": "bridge",
+      "label": "bridge 15 STT to Shannon (transferRemote)",
+      "hash": "0xc7aefa63e066ae6fdcd00892bb5f5e9fb24d776143cee7083fcea5e00947f85d",
+      "block": 35358283,
+      "gasUsed": 200559,
+      "status": "success",
+      "from": "0x5397812d66F3233E0972b7AEB5e195a945504632",
+      "to": "0xB04373932bc05347757da6b8a226d7657584aB35",
+      "url": "https://explorer.testnet.somnia.network/tokyo/tx/0xc7aefa63e066ae6fdcd00892bb5f5e9fb24d776143cee7083fcea5e00947f85d"
+    },
+    {
+      "chain": "shannon",
+      "step": "bridge",
+      "label": "bridge delivery on Shannon (15 STT)",
+      "hash": "0x0cc71fa8372c396f040cf86a8d4802bab84a879ea46945c75801dc50fc6ad285",
+      "block": 526147605,
+      "gasUsed": 544071,
+      "status": "success",
+      "from": "0xcCC32990233cB34008777b2eDB62236F8e432046",
+      "to": "0xF805734aAC42cf238eAef9E905e3A04F2Ab554f9",
+      "url": "https://shannon-explorer.somnia.network/tx/0x0cc71fa8372c396f040cf86a8d4802bab84a879ea46945c75801dc50fc6ad285"
+    },
+    {
+      "chain": "shannon",
+      "step": "record",
+      "label": "deploy RiskReviewer",
+      "hash": "0x7aaa705f0aad43c41404f55685e6b2c2e3df494112876456f4bdc524d8f39f17",
+      "block": 526147746,
+      "gasUsed": 44433467,
+      "status": "success",
+      "from": "0x5397812d66F3233E0972b7AEB5e195a945504632",
+      "to": "0x0000000000000000000000000000000000000000",
+      "url": "https://shannon-explorer.somnia.network/tx/0x7aaa705f0aad43c41404f55685e6b2c2e3df494112876456f4bdc524d8f39f17"
+    },
+    {
+      "chain": "hideki",
+      "step": "record",
+      "label": "deploy RiskGate",
+      "hash": "0x7176d2e229bb9a88e2f853360dc81a6bf6597d3d1602f4f53554b53b469e72a5",
+      "block": 35358791,
+      "gasUsed": 15273899,
+      "status": "success",
+      "from": "0x5397812d66F3233E0972b7AEB5e195a945504632",
+      "to": "0x0000000000000000000000000000000000000000",
+      "url": "https://explorer.testnet.somnia.network/tokyo/tx/0x7176d2e229bb9a88e2f853360dc81a6bf6597d3d1602f4f53554b53b469e72a5"
+    },
+    {
+      "chain": "hideki",
+      "step": "record",
+      "label": "RiskGate.setReviewer(address)",
+      "hash": "0xc003b9aa29275797c526b2fd9b4b1458a4b3b2786387905c02672d1aa1b042a5",
+      "block": 35358805,
+      "gasUsed": 241403,
+      "status": "success",
+      "from": "0x5397812d66F3233E0972b7AEB5e195a945504632",
+      "to": "0xEe54c49E9e70a0e5C2218Eec1b1BDBd4e1Cb20f1",
+      "url": "https://explorer.testnet.somnia.network/tokyo/tx/0xc003b9aa29275797c526b2fd9b4b1458a4b3b2786387905c02672d1aa1b042a5"
+    },
+    {
+      "chain": "shannon",
+      "step": "wire",
+      "label": "reviewer.setGate(gate)",
+      "hash": "0x6ab754a7438e1eec42ecd39b6a5a68a1d4d62bbe42c7f645ac2fa7103bd991d8",
+      "block": 526148326,
+      "gasUsed": 41274,
+      "status": "success",
+      "from": "0x5397812d66F3233E0972b7AEB5e195a945504632",
+      "to": "0x45b46d39697Cfd191BfEb215512d012d28E6ECc3",
+      "url": "https://shannon-explorer.somnia.network/tx/0x6ab754a7438e1eec42ecd39b6a5a68a1d4d62bbe42c7f645ac2fa7103bd991d8"
+    },
+    {
+      "chain": "hideki",
+      "step": "wire",
+      "label": "hub.setRiskGate(gate)",
+      "hash": "0x4c0bac32cca8bd1f21357a671b217f91d50672805e0280735cc884cef6d21cc2",
+      "block": 35359076,
+      "gasUsed": 242086,
+      "status": "success",
+      "from": "0x5397812d66F3233E0972b7AEB5e195a945504632",
+      "to": "0xdF73BBbB6517B712BBeD9bfAe6253A5E1FCDE154",
+      "url": "https://explorer.testnet.somnia.network/tokyo/tx/0x4c0bac32cca8bd1f21357a671b217f91d50672805e0280735cc884cef6d21cc2"
+    },
+    {
+      "chain": "shannon",
+      "step": "fund",
+      "label": "fund reviewer 12 STT",
+      "hash": "0xa104f549439a675426ac87c93b0fad46e732a817ae211fc063afffab71e2e3b8",
+      "block": 526148498,
+      "gasUsed": 21067,
+      "status": "success",
+      "from": "0x5397812d66F3233E0972b7AEB5e195a945504632",
+      "to": "0x45b46d39697Cfd191BfEb215512d012d28E6ECc3",
+      "url": "https://shannon-explorer.somnia.network/tx/0xa104f549439a675426ac87c93b0fad46e732a817ae211fc063afffab71e2e3b8"
+    },
+    {
+      "chain": "hideki",
+      "step": "trade",
+      "label": "leader buys 0.0005 BTC (gated increase)",
+      "hash": "0xee83f43787fcc8b1b2fffd9be6724f0cf421b26a18aa4d1a5cac971d19955a48",
+      "block": 35360100,
+      "gasUsed": 1688036,
+      "status": "success",
+      "from": "0xA1d0CB85c869e534Fe1e0c22af3b238301157b5d",
+      "to": "0x4181dd08E73BbCdd1Ba3E615A18f6abD941b94C0",
+      "url": "https://explorer.testnet.somnia.network/tokyo/tx/0xee83f43787fcc8b1b2fffd9be6724f0cf421b26a18aa4d1a5cac971d19955a48"
+    },
+    {
+      "chain": "hideki",
+      "step": "trade",
+      "label": "open through the gate (hub handler)",
+      "hash": "0xaf42db532b9270bc6ed447adb41bbc7859e548b89186c3d377803870acc370fe",
+      "block": 35360100,
+      "gasUsed": 1928359,
+      "status": "success",
+      "from": "0xdF73BBbB6517B712BBeD9bfAe6253A5E1FCDE154",
+      "to": "0xEFf35D485c4559D9f44e5138B38Cd93052f2E7BF",
+      "url": "https://explorer.testnet.somnia.network/tokyo/tx/0xaf42db532b9270bc6ed447adb41bbc7859e548b89186c3d377803870acc370fe"
+    },
+    {
+      "chain": "hideki",
+      "step": "trade",
+      "label": "leader sells 0.0005 BTC (exit)",
+      "hash": "0xc5f6b7d1bfa5c3492c60607d2f02b564d8fb699dbf22e87ac6c4f342ff1e0488",
+      "block": 35360151,
+      "gasUsed": 1588025,
+      "status": "success",
+      "from": "0xA1d0CB85c869e534Fe1e0c22af3b238301157b5d",
+      "to": "0x4181dd08E73BbCdd1Ba3E615A18f6abD941b94C0",
+      "url": "https://explorer.testnet.somnia.network/tokyo/tx/0xc5f6b7d1bfa5c3492c60607d2f02b564d8fb699dbf22e87ac6c4f342ff1e0488"
+    },
+    {
+      "chain": "hideki",
+      "step": "trade",
+      "label": "close (exit, never gated) (hub handler)",
+      "hash": "0x3a6c3caac06422dafbff719d731b1118c7959666bfa1bf13d2c22f34a62468d8",
+      "block": 35360151,
+      "gasUsed": 1816566,
+      "status": "success",
+      "from": "0xdF73BBbB6517B712BBeD9bfAe6253A5E1FCDE154",
+      "to": "0xEFf35D485c4559D9f44e5138B38Cd93052f2E7BF",
+      "url": "https://explorer.testnet.somnia.network/tokyo/tx/0x3a6c3caac06422dafbff719d731b1118c7959666bfa1bf13d2c22f34a62468d8"
+    }
+  ],
+  "checks": {
+    "bridge": [
+      "ok: owner keeps >= 45 STT on Hideki after the bridge (has 99.773463748)",
+      "ok: bridge delivery on Shannon (15 STT): delivered on shannon (found after ~4s of polling)",
+      "ok: owner's Shannon balance rose by 15 (9.001245434 -> 24.001245434)"
+    ],
+    "record": [
+      "ok: deploy RiskReviewer succeeded",
+      "ok: deploy RiskGate succeeded",
+      "ok: RiskGate.setReviewer(address) succeeded"
+    ],
+    "wire": [
+      "ok: RiskGateSet emitted",
+      "ok: reviewer.gate() = 0xEe54c49E9e70a0e5C2218Eec1b1BDBd4e1Cb20f1",
+      "ok: gate.reviewer() = 0x45b46d39697Cfd191BfEb215512d012d28E6ECc3",
+      "ok: hub.riskGate() = 0xEe54c49E9e70a0e5C2218Eec1b1BDBd4e1Cb20f1",
+      "ok: hub riskGateGas stays 2,000,000 (is 2000000)"
+    ],
+    "fund": [
+      "ok: reviewer balance 0 -> 12"
+    ],
+    "check": [
+      "ok: reviewer points at the gate",
+      "ok: gate points at the reviewer",
+      "ok: hub consults the gate",
+      "ok: domains 50312 <-> 50383",
+      "ok: each side uses its own Mailbox",
+      "ok: JSON-API and LLM agent ids",
+      "ok: reviewer holds >= 10 STT (12)",
+      "ok: owner keeps >= 40 STT on Hideki (84.677716066)",
+      "ok: random trader / random follower: gate and hub agree on the source id",
+      "ok: random trader / random follower: allowIncrease = true with no verdict",
+      "ok: leader / follower: gate and hub agree on the source id",
+      "ok: leader / follower: allowIncrease = true with no verdict",
+      "ok: the follower is guarded by default"
+    ],
+    "trade": [
+      "ok: leader and follower flat on BTC",
+      "ok: open through the gate: the hub reacted for the follower",
+      "ok: open through the gate: handler in the trigger's block (delta 0)",
+      "ok: no Refused(RiskGate)",
+      "ok: Copied 0 -> 50000",
+      "ok: the hub asked the gate once, by staticcall",
+      "ok: follower long 0.0005 BTC",
+      "ok: close (exit, never gated): the hub reacted for the follower",
+      "ok: close (exit, never gated): handler in the trigger's block (delta 0)",
+      "ok: the exit did not ask the gate",
+      "ok: follower flat"
+    ]
+  },
+  "measurements": {
+    "bridge": {
+      "amount": "15",
+      "messageId": "0x1f00514528521af6c269a6966ce035d65fe1388cda509dce1c7fb2022955797a",
+      "hidekiTx": "0xc7aefa63e066ae6fdcd00892bb5f5e9fb24d776143cee7083fcea5e00947f85d",
+      "shannonTx": "0x0cc71fa8372c396f040cf86a8d4802bab84a879ea46945c75801dc50fc6ad285"
+    },
+    "allowIncreaseEstimate": {
+      "random trader / random follower": "1051690",
+      "leader / follower": "1051690"
+    },
+    "gatedCopy": {
+      "open": {
+        "handler": "0xaf42db532b9270bc6ed447adb41bbc7859e548b89186c3d377803870acc370fe",
+        "handlerGas": 1928359,
+        "gateCalls": [
+          {
+            "type": "STATICCALL",
+            "from": "0xdf73bbbb6517b712bbed9bfae6253a5e1fcde154",
+            "gasOffered": 2000000,
+            "gasUsed": 2580,
+            "output": "0x0000000000000000000000000000000000000000000000000000000000000001",
+            "error": null
+          }
+        ],
+        "logs": [
+          "Copied(follower=0x7d736A88978e94E60494Ff91C49Ba838EDfb1932, sourceId=0x6744c2cdbcc5b0f6ad21719c8964204a5ffadf668d2b84479c9b14c029b0a40f, pool=0x4181dd08E73BbCdd1Ba3E615A18f6abD941b94C0, fromSize=0, toSize=50000, price=81483700000000000000000, capped=false)",
+          "TankCharged(follower=0x7d736A88978e94E60494Ff91C49Ba838EDfb1932, amount=11579586000000000)"
+        ]
+      },
+      "close": {
+        "handler": "0x3a6c3caac06422dafbff719d731b1118c7959666bfa1bf13d2c22f34a62468d8",
+        "handlerGas": 1816566,
+        "gateCalls": [],
+        "logs": [
+          "Copied(follower=0x7d736A88978e94E60494Ff91C49Ba838EDfb1932, sourceId=0x6744c2cdbcc5b0f6ad21719c8964204a5ffadf668d2b84479c9b14c029b0a40f, pool=0x4181dd08E73BbCdd1Ba3E615A18f6abD941b94C0, fromSize=50000, toSize=0, price=80272200000000000000000, capped=false)",
+          "TankCharged(follower=0x7d736A88978e94E60494Ff91C49Ba838EDfb1932, amount=10900758000000000)"
+        ]
+      },
+      "withoutGate": "the same trades on this hub before the gate was set: open 1.89-2.10M, close 1.79-1.87M handler gas"
+    }
+  },
+  "reviews": []
+}

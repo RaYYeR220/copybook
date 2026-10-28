@@ -13,6 +13,10 @@
 //   prompt              reviewer.setSystemPrompt(the published rubric in eval/rubric.ts)
 //   review [trader ...] the hub owner pays for reviews (default: the steady and liquidated fixture traders and the
 //                       leader) and each is followed across both chains to the verdict
+//   follow <nonce> [shannon block]
+//                       picks up a recorded review whose Hyperlane delivery outlasted the wait, from its Shannon
+//                       delivery (searched from the given block, default the one recorded with the request) to the
+//                       gate's answer
 //   guard               the follower's guard against the leader's verdict
 // Every transaction goes to deployments/risk.json with its explorer link.
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
@@ -701,81 +705,97 @@ async function review(traders: Address[]) {
     const requested = r.logs.map((l) => decode(gateAbi, l as never)).find((d) => d?.eventName === "ReviewRequested");
     const nonce = requested?.args.nonce as bigint;
     const [toShannon] = dispatchedIds(r, "hideki");
-    Object.assign(entry, { nonce: Number(nonce), requestTx: r.transactionHash, messageToShannon: toShannon });
+    Object.assign(entry, { nonce: Number(nonce), requestTx: r.transactionHash, requestBlock: Number(r.blockNumber), messageToShannon: toShannon, shannonFrom: Number(shannonFrom) });
     save();
-    const inbound = toShannon ? await delivery("shannon", toShannon, shannonFrom, `review ${Number(nonce)} delivered to the reviewer`) : undefined;
-    if (!inbound) continue;
-    entry.deliveryToShannon = inbound.transactionHash;
-    entry.summaryRequest = agentRequests(await trace("shannon", inbound.transactionHash));
-
-    // follow the reviewer's events for this review until it replies (two committee stages, up to 300 s each)
-    const mine = (d: { args: Record<string, unknown> } | undefined) =>
-      !!d && typeof d.args.trader === "string" && getAddress(d.args.trader) === trader && d.args.nonce === nonce;
-    const seen = new Set<string>();
-    const stages: Record<string, unknown>[] = [];
-    let sent: { tier: number; messageId: Hex; tx: Hex; block: bigint } | undefined;
-    let replyFailed = false;
-    await findLogs(
-      "shannon",
-      reviewerAddr(),
-      inbound.blockNumber,
-      (logs) => {
-        for (const l of logs) {
-          const key = `${l.transactionHash}:${l.logIndex}`;
-          if (seen.has(key)) continue;
-          seen.add(key);
-          const d = decode(reviewerAbi, l);
-          if (!mine(d)) continue;
-          const ev = { event: d!.eventName, tx: l.transactionHash, block: Number(l.blockNumber), args: d!.args };
-          stages.push(ev);
-          console.log(`    ${d!.eventName} ${JSON.stringify(d!.args, big)} (${l.transactionHash})`);
-          if (d!.eventName === "VerdictSent") {
-            sent = { tier: Number(d!.args.tier), messageId: d!.args.messageId as Hex, tx: l.transactionHash, block: l.blockNumber };
-            return true;
-          }
-          if (d!.eventName === "ReplyFailed") {
-            replyFailed = true;
-            return true;
-          }
-        }
-        return undefined;
-      },
-      15 * 60_000,
-    );
-    entry.shannonEvents = stages;
-    // the committee callbacks (validator transactions into the platform) with each validator's answer and receipt
-    const callbackTxs = [...new Set(stages.filter((x) => ["SummaryReceived", "VerdictTallied"].includes(x.event as string) || (x.event === "ReviewFailed" && x.tx !== inbound.transactionHash)).map((x) => x.tx as Hex))];
-    const callbacks: Record<string, unknown>[] = [];
-    for (const h of callbackTxs) {
-      const rc = await shannonPub.getTransactionReceipt({ hash: h });
-      track("shannon", `review ${Number(nonce)} committee callback`, rc);
-      const c = await committee(h);
-      callbacks.push({ tx: h, submittedBy: rc.from, committee: c.callbacks, agentRequests: c.requests });
-    }
-    entry.callbacks = callbacks;
-    for (const x of stages) {
-      const hash = x.tx as Hex;
-      if (hash === inbound.transactionHash || callbackTxs.includes(hash) || rec.txs.some((t) => t.hash === hash)) continue;
-      track("shannon", `review ${Number(nonce)} ${x.event}`, await shannonPub.getTransactionReceipt({ hash }));
-    }
-    save();
-    if (!check(!!sent && !replyFailed, `review ${Number(nonce)}: the reviewer replied (tier ${sent ? TIERS[sent.tier] : "-"})`)) continue;
-    const hidekiFrom = (await pub.getBlockNumber()) - 900n;
-    const back = await delivery("hideki", sent!.messageId, hidekiFrom, `review ${Number(nonce)} verdict delivered to the gate`);
-    if (!back) continue;
-    const gateEvents = back.logs.map((l) => decode(gateAbi, l as never)).filter((d) => !!d) as { eventName: string; args: Record<string, unknown> }[];
-    entry.deliveryToHideki = back.transactionHash;
-    entry.gateEvents = gateEvents.map((g) => ({ event: g.eventName, args: g.args }));
-    for (const g of gateEvents) console.log(`    gate ${g.eventName} ${JSON.stringify(g.args, big)}`);
-    const v = await readGate<{ tier: number; reviewedAt: bigint; shannonRequestId: bigint; summaryHash: Hex }>("verdictOf", [trader]);
-    entry.verdict = { tier: TIERS[Number(v.tier)], reviewedAt: Number(v.reviewedAt), shannonRequestId: v.shannonRequestId.toString(), summaryHash: v.summaryHash };
-    const failure = stages.find((x) => x.event === "ReviewFailed");
-    if (failure) entry.failure = FAILURES[Number((failure.args as Record<string, unknown>).reason)];
-    const summary = stages.find((x) => x.event === "SummaryReceived");
-    if (summary) entry.summary = (summary.args as Record<string, unknown>).summary;
-    check(gateEvents.some((g) => ["VerdictReceived", "ReviewFailed", "BlockHeld"].includes(g.eventName)), `review ${Number(nonce)}: the gate settled it (${gateEvents.map((g) => g.eventName).join(", ")})`);
-    save();
+    if (toShannon) await followReview(entry, trader, nonce, toShannon, shannonFrom, r.blockNumber);
   }
+}
+
+/** A recorded review whose delivery to Shannon outlasted the wait: followed again from its Shannon delivery. */
+async function followRecorded(nonceArg: string, shannonFromArg?: string) {
+  const entry = rec.reviews.find((x) => Number(x.nonce) === Number(nonceArg));
+  if (!entry) throw new Error(`no recorded review with nonce ${nonceArg}`);
+  if (entry.deliveryToHideki) throw new Error(`review ${nonceArg} is already followed to the gate`);
+  const fromArg = shannonFromArg ?? (entry.shannonFrom as number | undefined);
+  if (fromArg === undefined) throw new Error("give the Shannon block to search from");
+  const request = await pub.getTransactionReceipt({ hash: entry.requestTx as Hex });
+  entry.followedLater = { at: new Date().toISOString(), shannonFrom: Number(fromArg) };
+  await followReview(entry, getAddress(entry.trader as string), BigInt(entry.nonce as number), entry.messageToShannon as Hex, BigInt(fromArg), request.blockNumber);
+}
+
+/** Follows one review from its Hyperlane delivery on Shannon to the gate's answer on Hideki, into `entry`. */
+async function followReview(entry: Record<string, unknown>, trader: Address, nonce: bigint, toShannon: Hex, shannonFrom: bigint, requestBlock: bigint) {
+  const inbound = await delivery("shannon", toShannon, shannonFrom, `review ${Number(nonce)} delivered to the reviewer`);
+  if (!inbound) return;
+  entry.deliveryToShannon = inbound.transactionHash;
+  entry.summaryRequest = agentRequests(await trace("shannon", inbound.transactionHash));
+
+  // follow the reviewer's events for this review until it replies (two committee stages, up to 300 s each)
+  const mine = (d: { args: Record<string, unknown> } | undefined) =>
+    !!d && typeof d.args.trader === "string" && getAddress(d.args.trader) === trader && d.args.nonce === nonce;
+  const seen = new Set<string>();
+  const stages: Record<string, unknown>[] = [];
+  let sent: { tier: number; messageId: Hex; tx: Hex; block: bigint } | undefined;
+  let replyFailed = false;
+  await findLogs(
+    "shannon",
+    reviewerAddr(),
+    inbound.blockNumber,
+    (logs) => {
+      for (const l of logs) {
+        const key = `${l.transactionHash}:${l.logIndex}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        const d = decode(reviewerAbi, l);
+        if (!mine(d)) continue;
+        const ev = { event: d!.eventName, tx: l.transactionHash, block: Number(l.blockNumber), args: d!.args };
+        stages.push(ev);
+        console.log(`    ${d!.eventName} ${JSON.stringify(d!.args, big)} (${l.transactionHash})`);
+        if (d!.eventName === "VerdictSent") {
+          sent = { tier: Number(d!.args.tier), messageId: d!.args.messageId as Hex, tx: l.transactionHash, block: l.blockNumber };
+          return true;
+        }
+        if (d!.eventName === "ReplyFailed") {
+          replyFailed = true;
+          return true;
+        }
+      }
+      return undefined;
+    },
+    15 * 60_000,
+  );
+  entry.shannonEvents = stages;
+  // the committee callbacks (validator transactions into the platform) with each validator's answer and receipt
+  const callbackTxs = [...new Set(stages.filter((x) => ["SummaryReceived", "VerdictTallied"].includes(x.event as string) || (x.event === "ReviewFailed" && x.tx !== inbound.transactionHash)).map((x) => x.tx as Hex))];
+  const callbacks: Record<string, unknown>[] = [];
+  for (const h of callbackTxs) {
+    const rc = await shannonPub.getTransactionReceipt({ hash: h });
+    track("shannon", `review ${Number(nonce)} committee callback`, rc);
+    const c = await committee(h);
+    callbacks.push({ tx: h, submittedBy: rc.from, committee: c.callbacks, agentRequests: c.requests });
+  }
+  entry.callbacks = callbacks;
+  for (const x of stages) {
+    const hash = x.tx as Hex;
+    if (hash === inbound.transactionHash || callbackTxs.includes(hash) || rec.txs.some((t) => t.hash === hash)) continue;
+    track("shannon", `review ${Number(nonce)} ${x.event}`, await shannonPub.getTransactionReceipt({ hash }));
+  }
+  save();
+  if (!check(!!sent && !replyFailed, `review ${Number(nonce)}: the reviewer replied (tier ${sent ? TIERS[sent.tier] : "-"})`)) return;
+  const back = await delivery("hideki", sent!.messageId, requestBlock, `review ${Number(nonce)} verdict delivered to the gate`);
+  if (!back) return;
+  const gateEvents = back.logs.map((l) => decode(gateAbi, l as never)).filter((d) => !!d) as { eventName: string; args: Record<string, unknown> }[];
+  entry.deliveryToHideki = back.transactionHash;
+  entry.gateEvents = gateEvents.map((g) => ({ event: g.eventName, args: g.args }));
+  for (const g of gateEvents) console.log(`    gate ${g.eventName} ${JSON.stringify(g.args, big)}`);
+  const v = await readGate<{ tier: number; reviewedAt: bigint; shannonRequestId: bigint; summaryHash: Hex }>("verdictOf", [trader]);
+  entry.verdict = { tier: TIERS[Number(v.tier)], reviewedAt: Number(v.reviewedAt), shannonRequestId: v.shannonRequestId.toString(), summaryHash: v.summaryHash };
+  const failure = stages.find((x) => x.event === "ReviewFailed");
+  if (failure) entry.failure = FAILURES[Number((failure.args as Record<string, unknown>).reason)];
+  const summary = stages.find((x) => x.event === "SummaryReceived");
+  if (summary) entry.summary = (summary.args as Record<string, unknown>).summary;
+  check(gateEvents.some((g) => ["VerdictReceived", "ReviewFailed", "BlockHeld"].includes(g.eventName)), `review ${Number(nonce)}: the gate settled it (${gateEvents.map((g) => g.eventName).join(", ")})`);
+  save();
 }
 
 /** With a live Block on the leader: an increase is refused for the guarded follower and copied once it opts out,
@@ -873,11 +893,14 @@ try {
     case "review":
       await review(args.length ? args.map((a) => getAddress(a)) : [STEADY, LIQUIDATED, LEADER]);
       break;
+    case "follow":
+      await followRecorded(args[0], args[1]);
+      break;
     case "guard":
       await guard();
       break;
     default:
-      throw new Error("steps: bridge <stt> | record | swap-reviewer [stt] | wire | fund <stt> | check | trade | base-url <url> | prompt | review [trader ...] | guard");
+      throw new Error("steps: bridge <stt> | record | swap-reviewer [stt] | wire | fund <stt> | check | trade | base-url <url> | prompt | review [trader ...] | follow <nonce> [shannon block] | guard");
   }
 } catch (e) {
   failed = true;

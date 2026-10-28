@@ -5,27 +5,33 @@ trader's 30-day risk line from our public endpoint and another classify it as OK
 travels over Hyperlane to the `RiskGate` on Hideki, and the hub then refuses new size to guarded followers of a
 BLOCKed trader.
 
-This page measures how faithfully the live committee applies a published rubric to real Hideki traders. For each run
-we wrote down the expected answer for every trader and committed it before requesting a single review, and wrote the
-commit on chain. The scorecard compares the committee's verdicts with that answer key.
+This page measures how faithfully the live committee applies a published rubric to real Hideki traders. For runs v2
+and v3 we wrote down the expected answer for every trader and committed it before requesting a single review, and
+wrote the commit on chain. Run v1, three reviews under the launch prompt, was scored against the rubric afterwards.
+The scorecard compares the committee's verdicts with the answer key.
 
-**Latest result (run v3): 18 of 20 verdicts match the rubric, and the gate made the right call on all 20.**
+**Latest result (run v3): 18 of 20 verdicts match the rubric, and the committee's verdicts imply the right gate
+decision for all 20.**
 - Every trader the rubric blocks was blocked: 6 of 6.
-- No trader was blocked that the rubric would not block.
+- The committee blocked no trader the rubric would not block.
 - Two thin-history traders (3 and 5 trades) were rated OK where the rubric says CAUTION. The gate acts only on
   BLOCK, so this does not change what a follower can do.
 - No review failed, and every committee answered unanimously.
+- 4 earlier false BLOCKs are still held on the gate until about 14:00 UTC on 2026-10-29 (rows 1, 13 and 14 from run
+  v2, and the leader from run v1; see [what the gate holds](#what-the-gate-holds-now)).
 
 ## Three runs
 
-| run | what the model is given | traders | tiers matching the rubric | gate decisions right | BLOCK recall | false BLOCKs |
+| run | what the model is given | traders | tiers matching the rubric | BLOCK / not-BLOCK agreement | BLOCK recall | false BLOCKs |
 |---|---|---|---|---|---|---|
 | [v1](#run-v1-the-first-prompt) | the first prompt (no rubric) and the full summary, in the user prompt | 3, scored afterwards | 1 of 3 | 1 of 3 | 1 of 1 | 2 of 2 |
 | [v2](#run-v2-the-rubric-in-the-user-prompt-with-the-full-summary) | the rubric and the full summary, in the user prompt | 20, pre-registered | 14 of 20 | 17 of 20 | 6 of 6 | 3 of 14 |
 | [v3](#run-v3-the-rubric-as-the-system-message-and-only-the-keys-it-reads) | the rubric as the system message; only the rubric's keys in the user prompt | the same 20, pre-registered again | 18 of 20 | 20 of 20 | 6 of 6 | 0 of 14 |
 
-"Gate decisions right" counts the traders for whom the committee's verdict leads to the gate decision the rubric
-calls for: refuse new size on BLOCK, allow it otherwise.
+"BLOCK / not-BLOCK agreement" counts the traders whose committee verdict falls on the same side of the gate's line as
+the rubric's tier: BLOCK (refuse new size) or not BLOCK (allow it). It is the gate decision the verdicts imply. The live
+gate can still hold an older BLOCK for 24 hours, so what it does today can differ (see
+[what the gate holds](#what-the-gate-holds-now)).
 
 ## The rubric
 
@@ -41,6 +47,9 @@ committee classifies (the full summary in runs v1 and v2, the rubric line in run
   - `maxDrawdownPct30d` is present and `>= 25`
 - **OK** otherwise.
 
+The rubric's logic in `rubric.ts` is unchanged since the anchored commits. Only a comment was corrected later, and
+`git diff 5aed53b HEAD -- eval/rubric.ts` shows it.
+
 Runs v2 and v3 use the same system prompt, which states the rule in words. The runs differ in how this text and the
 trader's data reach the LLM agent.
 
@@ -55,7 +64,9 @@ trader's data reach the LLM agent.
 ### What changed from run v2
 
 Two things changed. Everything else is the same as in run v2: the 20 traders in the same order, the rubric and the
-words of the prompt, the agents, the committee of 3 with a threshold of 2, and the gate.
+words of the prompt, the agents, the committee of 3 with a threshold of 2, and the gate. Both changes were chosen
+after reading run v2's errors on this same sample. Run v3 therefore measures them on the traders they were chosen
+against, so it is not an out-of-sample estimate; a fresh sample would be.
 
 - **The model sees only the rubric's inputs.** The endpoint now also serves a `rubric` field next to `summary`. It
   holds `liquidations30d`, `trades30d`, `maxDrawdownPct30d` (only when it could be estimated, as in the summary),
@@ -106,7 +117,7 @@ changed between the anchor and the last review. This run's reviews have nonces 2
 
 ### Result
 
-**18 of 20 verdicts match the rubric, and the gate made the right call on all 20.**
+**18 of 20 verdicts match the rubric, and the committee's verdicts imply the right gate decision for all 20.**
 - **BLOCK recall:** 6 of 6.
 - **False BLOCKs:** none, out of 14 traders the rubric does not block.
 - **Misses:** two thin-history traders were rated OK where the rubric says CAUTION.
@@ -234,10 +245,13 @@ run v2.
   - rows 17 and 19 (3 and 5 trades) still get OK.
 
   The thin-data rule is still not applied reliably.
-- **The gate's decisions: 20 of 20** (run v2: 17 of 20). The gate acts on BLOCK only, so the two remaining misses
-  change nothing a follower can do.
+- **BLOCK / not-BLOCK agreement: 20 of 20** (run v2: 17 of 20). The gate acts on BLOCK only, so the two remaining
+  misses do not change the gate decision the verdicts imply. The live gate still refuses new size for 4 of these 20
+  traders (rows 1, 13, 14 and the leader), because it holds their earlier false BLOCKs for 24 hours (see
+  [what the gate holds](#what-the-gate-holds-now)).
 - **What this run cannot separate.** The inputs and the prompt placement changed together, so this run does not show
-  which change removed the false BLOCKs. Each trader was again reviewed once, and the committees are deterministic.
+  which change removed the false BLOCKs. Each trader was again reviewed once. The answers were unanimous within every
+  committee, but run-to-run stability was not tested.
 - **Review 30 (row 7) took 320 seconds.** The Hyperlane relayer delivered its request to Shannon about 5 minutes after
   it was sent, a few blocks before the next review's request, which had gone out in the meantime. The review script's
   300-second wait ran out first. The review completed on its own: BLOCK, 3 votes of 3, and `VerdictReceived` on the
@@ -256,8 +270,8 @@ run v2.
   - `setReviewer`: 41,403;
   - the anchor: 29,320;
   - `requestReview`: 194,592 – 203,553.
-- **Latency,** from the request to the verdict landing on Hideki (block timestamps): median 12 s, range 7 – 18 s for 19
-  reviews, and 320 s for review 30.
+- **Latency,** from the request to the verdict landing on Hideki (block timestamps): median 11 s, range 7 – 18 s for 19
+  reviews. One delivery, review 30, took about 320 s.
 
 ## Run v2: the rubric in the user prompt, with the full summary
 
@@ -469,10 +483,10 @@ every review. In the verdict stage, the three answers were also identical on eve
 
   No single key in the summary separates the false BLOCKs from the correct OKs.
 - **`partial=1`: 1 of 2.**
-- **Repeatable, not noisy.** Within each committee all three validators gave the same word, which fits the platform's
-  deterministic inference. A committee of three therefore confirms one model output; it does not give three
-  independent opinions. The steady trader of row 1 got BLOCK from the same summary bytes under both the first prompt
-  and this one.
+- **Unanimous within every committee.** All three validators gave the same word on every request. A committee of
+  three therefore confirmed one model output here; it did not give three independent opinions. Run-to-run stability
+  was not tested: each trader was reviewed once in this run. The steady trader of row 1 got BLOCK from the same summary
+  bytes under both the first prompt and this one.
 
 The gate acts on BLOCK only (`allowIncrease` refuses a guarded follower's increase for a BLOCK younger than 7 days).
 Confusing OK with CAUTION therefore changes nothing a follower can do, but a false BLOCK stops a follower from adding
@@ -543,11 +557,14 @@ Run v3 rates all three as the rubric does: steady OK, liquidated BLOCK, leader O
 - **The platform's per-response `receipt` field is 0** in every response of both runs. What the validators actually
   signed is the callback transactions above and the responses they carry, decoded in each run's `results.json`.
 - **LLM output depends on the prompt.** In each run, each trader was reviewed once. The three validators always agreed,
-  but the answer depends on the exact prompt and line bytes, and a trader whose line changes can get a different
-  answer. Twenty reviews per run is a small sample, and run v3 changed two things at once.
+  but run-to-run stability was not tested. The answer depends on the exact prompt and line bytes, and a trader whose
+  line changes can get a different answer. Twenty reviews per run is a small sample, and run v3 changed two things at once.
 - **Some rules were barely tested.** `maxDrawdownPct30d` appears for only one trader (92.2%, already BLOCK for its
   liquidations), so the 25% and 50% drawdown thresholds were not tested on their own. No screened trader had
   `history=none`.
+- **Run v3 is not an out-of-sample estimate.** Run v3's changes were chosen after reading run v2's errors on this
+  same sample. The prompt's words did not change, but 18 of 20 is not an out-of-sample estimate; a fresh sample would
+  be.
 - **The thin-data rule is not reliable.** Run v3 applied it to 1 of 3 thin traders. The gate does not act on CAUTION,
   but the published policy is not fully applied.
 - **The rubric is public.** It is a published policy that the validators apply, not a secret model. A trader can read
@@ -582,6 +599,8 @@ npm run eval score v3                                  # eval/v3/results.json an
 To check a pre-registration, hash the committed key with keccak256 and compare the result with the last 32 bytes of
 the anchor transaction's input:
 - run v2: `git show 6b1b074:eval/answer-key.json`, anchor
-  [0x1f70dc46…](https://explorer.testnet.somnia.network/tokyo/tx/0x1f70dc46bfee488d482591cffb54200795ed332b903678dfa77c85359a4dcd31);
+  [0x1f70dc46…](https://explorer.testnet.somnia.network/tokyo/tx/0x1f70dc46bfee488d482591cffb54200795ed332b903678dfa77c85359a4dcd31)
+  (recorded in [`anchor.json`](anchor.json));
 - run v3: `git show 5aed53b:eval/v3/answer-key.json`, anchor
-  [0xb6792325…](https://explorer.testnet.somnia.network/tokyo/tx/0xb67923259aa552c033eba19271020d41f206c04a44d461ef9237c3752dd40e13).
+  [0xb6792325…](https://explorer.testnet.somnia.network/tokyo/tx/0xb67923259aa552c033eba19271020d41f206c04a44d461ef9237c3752dd40e13)
+  (recorded in [`v3/anchor.json`](v3/anchor.json)).

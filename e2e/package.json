@@ -5,6 +5,8 @@
   "license": "MIT",
   "type": "module",
   "scripts": {
+    "rpc-shim": "tsx src/rpc-shim.ts",
+    "record-deploy": "tsx src/record-deploy.ts",
     "live": "tsx src/live.ts",
     "typecheck": "tsc --noEmit"
   },

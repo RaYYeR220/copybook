@@ -17,6 +17,8 @@ export interface Deps {
   agent?: Address;
   /** Wallets never listed as top traders (the hub, the agent itself). */
   exclude?: Address[];
+  /** Strings scrubbed from every error and log line: endpoint URLs (they may carry API keys) and the agent key. */
+  secrets?: string[];
 }
 
 export interface ToolDef {

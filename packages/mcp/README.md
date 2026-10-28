@@ -6,13 +6,15 @@ Copybook is on-chain copy-trading for dreamDEX perps on Somnia. This server talk
 
 ## Install and run
 
+Not published to npm: run it from a clone of this repo. Requires Node 22.18 or newer (24 recommended), which runs TypeScript directly.
+
 ```
 npm install            # from the repo root; the package is a workspace
 npm test -w @copybook/mcp
 node packages/mcp/bin/copybook-mcp.mjs
 ```
 
-There is no build step: Node 24 runs the TypeScript sources directly. `npm run typecheck -w @copybook/mcp` checks types.
+There is no build step: Node runs the TypeScript sources directly. `npm run typecheck -w @copybook/mcp` checks types.
 
 ## Configure a client
 
@@ -60,6 +62,7 @@ Write (registered only when `COPYBOOK_AGENT_KEY` is set; all dry-run by default)
 | `follow_trader {trader, scaleBps?, maxNotionalUsdso, maxTotalNotionalUsdso?, bandBps?, equityFloorUsdso?, markets?, tankStt, dryRun?}` | Mirror a trader into the agent's wallet. |
 | `follow_thesis {themeId, allocationUsdso, maxNotionalUsdso, ..., tankStt, dryRun?}` | Open a thesis basket in one block. |
 | `unfollow {flatten, dryRun?}` | Stop and take the tank back; `flatten` also closes positions. |
+| `revoke_operator {dryRun?}` | Withdraw the hub's operator approval (refused while the wallet follows something). |
 | `request_review {trader, dryRun?}` | Pay the fee for a fresh RiskGate review. |
 | `create_thesis {name, legs, uri?, dryRun?}` | Publish a new basket. |
 
@@ -70,8 +73,10 @@ Money is always a decimal string: `...Usdso` fields are USDso, `...Stt` fields a
 - **Own key, own wallet.** The key is the agent's own, read once from the environment, used only to sign, and never logged or returned. Do not give an agent a key that holds anything you care about; fund a dedicated testnet wallet.
 - **Dry-run by default.** Every write tool returns the preflight and the exact calls (target, function, arguments, value, calldata) and sends nothing until called again with `dryRun: false`.
 - **Preflight always runs, and refuses.** Before any follow the SDK's `preflightFollow` checks the policy, tank, balance, market minimums, one-source-per-wallet and the trader's verdict at live marks. On any error the call is refused with each reason and the least value that clears it, even with `dryRun: false`.
-- **Operator approval.** Following needs a one-time `setOperatorApprovalGlobal(hub, [placeOrderFor], true)` on dreamDEX's operator registry, so the hub can place orders in the agent's account. It is the first transaction of a live follow, skipped when already granted, and a re-run after a partial failure resumes at the first undone step.
-- **No hidden caps.** There is no default per-position cap: the agent must choose `maxNotionalUsdso`. Only the sender's own wallet is ever written for.
+- **Operator approval (read this).** Following needs a one-time `setOperatorApprovalGlobal(hub, [placeOrderFor], true)` on dreamDEX's operator registry. The grant is **global**: it covers every perps market for the wallet, not just one follow or trader, and it **persists after unfollow** until you call `revoke_operator`. While it stands the hub can place, cancel and reduce orders in the wallet's dreamDEX account; it can never withdraw funds. It is the first transaction of a live follow, skipped when already granted, and a re-run after a partial failure resumes at the first undone step.
+- **Failures after a send are reported, not hidden.** If anything fails once a transaction has gone out (timeout, RPC error, revert), the answer lists every hash already sent and how to resume.
+- **No secrets in output.** Errors returned to the agent and lines logged to stderr have configured endpoint URLs and key-shaped strings scrubbed; unexpected errors are reduced to a generic message.
+- **No hidden caps.** There is no default per-position cap: the agent must choose `maxNotionalUsdso`. A zero cap is rejected.
 
 What a follow means, so an agent does not assume more:
 

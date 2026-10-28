@@ -2,6 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { CopybookError, type PreflightResult } from "@copybook/sdk";
+import { depsFromEnv, banner } from "../src/config.ts";
+import { parseDecimal, InputError } from "../src/units.ts";
 import { buildTools } from "../src/tools.ts";
 import { createServer, runTool } from "../src/server.ts";
 import type { Deps, ToolDef } from "../src/types.ts";
@@ -35,6 +37,7 @@ function fakeDeps(over: { agent?: boolean; pre?: PreflightResult; copybook?: Rec
     requestReview: vi.fn(async () => tx("0xddd")),
     createTheme: vi.fn(async () => tx("0xeee", [{ name: "ThemeCreated", themeId: 7n }])),
     followOf: vi.fn(async () => null),
+    isOperatorApproved: vi.fn(async () => true),
     market: vi.fn(async (pool: string) => ({ pool, mark: E18, tick: 1n, lot: 1n, minQty: 1n, oneBase: E18 })),
     verdictOf: vi.fn(async () => ({ tier: "Block", reviewedAt: 1_700_000_000, shannonRequestId: 1n, summaryHash: "0x", blocking: true, blockExpiresAt: 1_700_086_400 })),
     reviewPendingOf: vi.fn(async () => null),
@@ -77,7 +80,7 @@ function fakeDeps(over: { agent?: boolean; pre?: PreflightResult; copybook?: Rec
 
 const find = (tools: ToolDef[], name: string) => tools.find((t) => t.name === name)!;
 const call = async (deps: Deps, name: string, args: Record<string, unknown> = {}) => {
-  const r = await runTool(find(buildTools(deps), name), args);
+  const r = await runTool(find(buildTools(deps), name), args, deps.secrets);
   return { isError: r.isError ?? false, body: JSON.parse(r.content[0]!.text) };
 };
 
@@ -161,6 +164,7 @@ describe("write tools without a key", () => {
     ["follow_trader", { trader: TRADER, ...policyArgs }],
     ["follow_thesis", { themeId: 1, allocationUsdso: "200", ...policyArgs }],
     ["unfollow", { flatten: true }],
+    ["revoke_operator", {}],
     ["request_review", { trader: TRADER }],
     ["create_thesis", { name: "x", legs: [{ pool: POOL, weightBps: 5000 }] }],
   ] as const;
@@ -191,7 +195,8 @@ describe("write tools without a key", () => {
     expect(readOnly).toEqual(["get_copy_history", "get_follow", "get_thesis", "get_trader_stats", "get_verdict", "list_theses", "list_top_traders"]);
     const all = await names(true);
     expect(all).toEqual(expect.arrayContaining(["follow_trader", "follow_thesis", "unfollow", "request_review", "create_thesis", ...readOnly]));
-    expect(all).toHaveLength(12);
+    expect(all).toContain("revoke_operator");
+    expect(all).toHaveLength(13);
   });
 });
 
@@ -358,5 +363,130 @@ describe("create_thesis", () => {
     const { deps } = fakeDeps({ copybook: { market: vi.fn(async () => { throw new Error("no code"); }) } });
     const r = await call(deps, "create_thesis", { name: "x", legs: [{ pool: POOL, weightBps: 5000 }] });
     expect(r.body.errors[0]).toMatch(/not a readable dreamDEX perp market/);
+  });
+});
+
+describe("parseDecimal", () => {
+  it.each([["-1"], ["abc"], ["0." + "1".repeat(19)], [""], ["1e3"], [-5]])("rejects %j", (v) => {
+    expect(() => parseDecimal(v as string, "x")).toThrow(InputError);
+  });
+  it("accepts 0, 18 decimals and numbers", () => {
+    expect(parseDecimal("0", "x")).toBe(0n);
+    expect(parseDecimal("0." + "1".repeat(18), "x")).toBe(111111111111111111n);
+    expect(parseDecimal(2.5, "x")).toBe((25n * E18) / 10n);
+  });
+});
+
+describe("zero cap", () => {
+  it("rejects maxNotionalUsdso 0 before any chain call", async () => {
+    const { deps, copybook } = fakeDeps();
+    const r = await call(deps, "follow_trader", { trader: TRADER, maxNotionalUsdso: "0", tankStt: "0.5" });
+    expect(r.isError).toBe(true);
+    expect(r.body.reason).toMatch(/above 0/);
+    expect(copybook.preflightFollow).not.toHaveBeenCalled();
+  });
+});
+
+describe("partial failures", () => {
+  it("approve succeeds, follow rejects with a non-SDK error: alreadySent carries the approve hash and a resume hint", async () => {
+    const { deps, copybook } = fakeDeps();
+    copybook.follow.mockRejectedValue(new Error("socket hang up"));
+    const { isError, body } = await call(deps, "follow_trader", { trader: TRADER, ...policyArgs, dryRun: false });
+    expect(isError).toBe(true);
+    expect(body.alreadySent).toEqual(["approveOperator 0xaaa"]);
+    expect(body.resume).toMatch(/resumes/);
+  });
+
+  it("a timeout while waiting still reports the hash that was sent", async () => {
+    const { deps, copybook } = fakeDeps();
+    copybook.follow.mockResolvedValue({ hash: "0xbbb", wait: vi.fn(async () => { throw new Error("timed out"); }) });
+    const { body } = await call(deps, "follow_trader", { trader: TRADER, ...policyArgs, dryRun: false });
+    expect(body.alreadySent).toEqual(["approveOperator 0xaaa", "follow 0xbbb"]);
+  });
+
+  it("single-tx writes report their hash when the wait fails", async () => {
+    const { deps, copybook } = fakeDeps();
+    copybook.createTheme.mockResolvedValue({ hash: "0xeee", wait: vi.fn(async () => { throw new Error("rpc down"); }) });
+    const { body } = await call(deps, "create_thesis", { name: "x", legs: [{ pool: POOL, weightBps: 5000 }], dryRun: false });
+    expect(body.alreadySent).toEqual(["createTheme 0xeee"]);
+  });
+});
+
+describe("approval scope disclosure and revoke_operator", () => {
+  it("follow descriptions and the dry-run note say the grant is global, persists and cannot withdraw", async () => {
+    const { deps } = fakeDeps();
+    for (const name of ["follow_trader", "follow_thesis"]) {
+      const d = find(buildTools(deps), name).description;
+      expect(d).toMatch(/GLOBAL/);
+      expect(d).toMatch(/PERSISTS after unfollow/);
+      expect(d).toMatch(/place, cancel and reduce orders/);
+      expect(d).toMatch(/never withdraw/);
+    }
+    const { body } = await call(deps, "follow_trader", { trader: TRADER, ...policyArgs });
+    expect(body.note).toMatch(/GLOBAL/);
+    expect(body.note).toMatch(/PERSISTS/);
+  });
+
+  it("dry-runs, then revokes with approveOperator(false)", async () => {
+    const { deps, copybook } = fakeDeps();
+    const dry = await call(deps, "revoke_operator", {});
+    expect(dry.body).toMatchObject({ dryRun: true, calls: [{ function: "setOperatorApprovalGlobal", args: [HUB, ["0x80054449"], false] }] });
+    expect(copybook.approveOperator).not.toHaveBeenCalled();
+    await call(deps, "revoke_operator", { dryRun: false });
+    expect(copybook.approveOperator).toHaveBeenCalledWith(false);
+  });
+
+  it("refuses while following, and when there is nothing to revoke", async () => {
+    const f = fakeDeps({ copybook: { followOf: vi.fn(async () => ({ kind: "Trader" })) } });
+    expect((await call(f.deps, "revoke_operator", { dryRun: false })).isError).toBe(true);
+    expect(f.copybook.approveOperator).not.toHaveBeenCalled();
+    const n = fakeDeps({ copybook: { isOperatorApproved: vi.fn(async () => false) } });
+    expect((await call(n.deps, "revoke_operator", { dryRun: false })).body.reason).toMatch(/nothing to revoke/);
+  });
+});
+
+describe("secrets never reach tool output, logs or the banner", () => {
+  const KEY = "0x" + "ab".repeat(32);
+  const URL_ = "https://rpc.example.com/v1?apikey=SECRET";
+
+  it("an RPC error carrying the RPC URL and a 64-hex string is scrubbed (unexpected and sent-then-failed paths)", async () => {
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const leaky = Object.assign(new Error(`request to ${URL_} failed with ${KEY}`), { shortMessage: `HTTP request failed. URL: ${URL_} key ${KEY}` });
+    const { deps, copybook } = fakeDeps({ copybook: { verdictOf: vi.fn(async () => { throw leaky; }) } });
+    (deps as { secrets?: string[] }).secrets = [URL_];
+    const a = await runTool(find(buildTools(deps), "get_verdict"), { trader: TRADER }, deps.secrets);
+    copybook.follow.mockRejectedValue(leaky);
+    const b = await runTool(find(buildTools(deps), "follow_trader"), { trader: TRADER, ...policyArgs, dryRun: false }, deps.secrets);
+    const out = a.content[0]!.text + b.content[0]!.text + errSpy.mock.calls.flat().join("\n");
+    for (const bad of ["SECRET", "apikey", "rpc.example.com", KEY, "ab".repeat(32)]) expect(out).not.toContain(bad);
+    expect(a.isError).toBe(true);
+    expect(JSON.parse(b.content[0]!.text).alreadySent).toEqual(["approveOperator 0xaaa"]);
+    errSpy.mockRestore();
+  });
+
+  it("a plain unexpected error gives a generic message, not the raw one", async () => {
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { deps } = fakeDeps({ copybook: { verdictOf: vi.fn(async () => { throw new Error("internal detail xyzzy"); }) } });
+    const { body } = await call(deps, "get_verdict", { trader: TRADER });
+    expect(JSON.stringify(body)).not.toContain("xyzzy");
+    expect(body.error).toMatch(/Unexpected error/);
+    errSpy.mockRestore();
+  });
+
+  it("an invalid key config error does not echo the key; the banner shows only the address", () => {
+    const bad = "0x" + "zz".repeat(32);
+    let msg = "";
+    try {
+      depsFromEnv({ COPYBOOK_AGENT_KEY: bad });
+    } catch (e) {
+      msg = (e as Error).message;
+    }
+    expect(msg).toMatch(/not a 32-byte hex private key/);
+    expect(msg).not.toContain("zz");
+    expect(banner({ agent: AGENT })).toBe(`copybook-mcp ready: read + write tools (dry-run by default) for agent wallet ${AGENT}`);
+    expect(banner({})).toMatch(/read tools only/);
+    const real = depsFromEnv({ COPYBOOK_AGENT_KEY: KEY, COPYBOOK_RPC_URL: URL_ });
+    expect(banner(real)).not.toContain("ab".repeat(32));
+    expect(real.secrets).toEqual(expect.arrayContaining([URL_, KEY]));
   });
 });

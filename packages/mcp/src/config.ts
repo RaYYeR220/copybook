@@ -8,6 +8,13 @@ import type { Deps } from "./types.ts";
 
 export const DEFAULT_RPC = "https://api.hideki2.infra.testnet.somnia.network";
 
+/** The startup line: public facts only, never the key. */
+export function banner(deps: Pick<Deps, "agent">): string {
+  return deps.agent
+    ? `copybook-mcp ready: read + write tools (dry-run by default) for agent wallet ${deps.agent}`
+    : "copybook-mcp ready: read tools only (set COPYBOOK_AGENT_KEY to enable write tools)";
+}
+
 export interface Env {
   COPYBOOK_AGENT_KEY?: string;
   COPYBOOK_RPC_URL?: string;
@@ -45,6 +52,7 @@ export function depsFromEnv(env: Env = process.env as Env): Deps {
   return {
     copybook,
     agent,
+    secrets: [rpc, indexerUrl ?? "", key ?? "", key?.replace(/^0x/, "") ?? ""].filter(Boolean),
     stats: {
       getTraderStats: (trader, opts) => stats.getTraderStats(trader, { indexer, ...opts }),
       topTraders: (n, days, opts) => stats.topTraders(n, days, { indexer, ...opts }),

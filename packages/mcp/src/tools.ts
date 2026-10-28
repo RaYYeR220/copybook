@@ -13,7 +13,8 @@ import type { Address } from "viem";
 import { z, type ZodRawShape } from "zod";
 import { presentPreflight } from "./present.ts";
 import { Refusal, type Deps, type ToolDef } from "./types.ts";
-import { addressField, fmt, parseAddress, parseDecimal, sttField, usdsoField } from "./units.ts";
+import { redact } from "./redact.ts";
+import { InputError, addressField, fmt, parseAddress, parseDecimal, sttField, usdsoField } from "./units.ts";
 
 const TESTNET = "Copybook runs on the Somnia Hideki2 testnet (chain 50383); amounts are testnet tokens with no market value.";
 
@@ -104,8 +105,10 @@ const policyShape = {
 };
 
 function basePolicy(a: { maxNotionalUsdso: string | number; maxTotalNotionalUsdso?: string | number; bandBps: number; equityFloorUsdso?: string | number }) {
+  const maxNotional = parseDecimal(a.maxNotionalUsdso, "maxNotionalUsdso");
+  if (maxNotional === 0n) throw new InputError("maxNotionalUsdso must be above 0: the hub refuses a follow whose per-position cap is zero.");
   return {
-    maxNotional: parseDecimal(a.maxNotionalUsdso, "maxNotionalUsdso"),
+    maxNotional,
     maxTotalNotional: a.maxTotalNotionalUsdso === undefined ? 0n : parseDecimal(a.maxTotalNotionalUsdso, "maxTotalNotionalUsdso"),
     bandBps: a.bandBps,
     equityFloor: a.equityFloorUsdso === undefined ? 0n : parseDecimal(a.equityFloorUsdso, "equityFloorUsdso"),
@@ -113,7 +116,32 @@ function basePolicy(a: { maxNotionalUsdso: string | number; maxTotalNotionalUsds
 }
 
 const APPROVAL_NOTE =
-  "The first live call also sends a one-time approval to dreamDEX's operator registry, setOperatorApprovalGlobal(hub, [placeOrderFor], true), which lets the Copybook hub place orders in this wallet's dreamDEX account and nothing else. It is skipped when already granted, and a re-run after a partial failure resumes from the first undone step.";
+  "The first live call also sends a one-time operator approval to dreamDEX's operator registry: setOperatorApprovalGlobal(hub, [placeOrderFor], true). " +
+  "This grant is GLOBAL: it covers every perps market for this wallet, not just this follow or trader, and it PERSISTS after unfollow until revoked (revoke_operator). " +
+  "It lets the Copybook hub place, cancel and reduce orders in this wallet's dreamDEX account; it can never withdraw funds. " +
+  "It is skipped when already granted, and a re-run after a partial failure resumes from the first undone step.";
+
+/** Sends one transaction and waits for it. The hash is recorded BEFORE the wait, so a timeout while waiting still reports it. */
+async function step<O>(sent: string[], label: string, send: () => Promise<{ hash: string; wait(): Promise<O> }>): Promise<O> {
+  const tx = await send();
+  sent.push(`${label} ${tx.hash}`);
+  return tx.wait();
+}
+
+/** Runs a write sequence; every failure after the first send, of any kind, reports what is already on chain. */
+async function sequence<T>(what: string, sent: string[], fn: () => Promise<T>): Promise<T> {
+  try {
+    return await guard(what, fn);
+  } catch (e) {
+    if (!sent.length) throw e;
+    const reason = e instanceof Refusal ? e.message : redact(e instanceof Error ? ((e as { shortMessage?: string }).shortMessage ?? e.message) : String(e));
+    throw new Refusal(`${what} after sending ${sent.length} transaction(s): ${reason}`, {
+      ...(e instanceof Refusal ? e.details : {}),
+      alreadySent: [...sent],
+      resume: "Call again: steps already on chain are skipped, so the flow resumes at the first undone step. Check the hashes on the explorer before retrying.",
+    });
+  }
+}
 
 async function runFollow(
   deps: Deps,
@@ -177,33 +205,19 @@ async function runFollow(
   }
 
   const sent: string[] = [];
-  try {
-    const outcome = await guard("Follow not completed", async () => {
-      if (!approve.done) {
-        const tx = await copybook.approveOperator(true);
-        sent.push(`approveOperator ${tx.hash}`);
-        await tx.wait();
-      }
-      const tx = await copybook.follow({ target, policy: input.policy, tank: input.tank });
-      sent.push(`follow ${tx.hash}`);
-      return tx.wait();
-    });
-    return {
-      dryRun: false,
-      sent: true,
-      follower: account,
-      transactions: sent,
-      followed: outcome.events.some((e) => e.name === "Followed"),
-      events: outcome.events.map((e) => ({ name: e.name })),
-      next: "Call get_follow to watch the book and see any state that needs a call to clear.",
-    };
-  } catch (e) {
-    if (e instanceof Refusal && sent.length) {
-      e.details.alreadySent = sent;
-      e.details.resume = "Call again: steps already on chain are skipped, so the flow resumes at the first undone step.";
-    }
-    throw e;
-  }
+  const outcome = await sequence("Follow not completed", sent, async () => {
+    if (!approve.done) await step(sent, "approveOperator", () => copybook.approveOperator(true));
+    return step(sent, "follow", () => copybook.follow({ target, policy: input.policy, tank: input.tank }));
+  });
+  return {
+    dryRun: false,
+    sent: true,
+    follower: account,
+    transactions: sent,
+    followed: outcome.events.some((e) => e.name === "Followed"),
+    events: outcome.events.map((e) => ({ name: e.name })),
+    next: "Call get_follow to watch the book and see any state that needs a call to clear.",
+  };
 }
 
 // ------------------------------------------------------------------ the tools
@@ -498,9 +512,37 @@ export function buildTools(deps: Deps): ToolDef[] {
         if (!follow) throw new Refusal("This wallet is not following anything; nothing to unfollow.");
         const call = { step: "unfollow", to: copybook.deployments.hub, function: "unfollow", args: [flatten] };
         if (dryRun) return { dryRun: true, sent: false, follower: account, following: presentFollow(follow), calls: [call] };
-        const tx = await guard("Unfollow failed", () => copybook.unfollow(flatten));
-        const out = await guard("Unfollow failed", () => tx.wait());
-        return { dryRun: false, sent: true, transactions: [`unfollow ${tx.hash}`], events: out.events.map((e) => ({ name: e.name })), next: "Call get_follow to confirm nothing is pending." };
+        const sent: string[] = [];
+        const out = await sequence("Unfollow failed", sent, () => step(sent, "unfollow", () => copybook.unfollow(flatten)));
+        return { dryRun: false, sent: true, transactions: sent, events: out.events.map((e) => ({ name: e.name })), next: "Call get_follow to confirm nothing is pending." };
+      },
+    ),
+
+    defineTool(
+      {
+        name: "revoke_operator",
+        title: "Revoke the hub's operator approval",
+        write: true,
+        description:
+          "Withdraws the global operator grant (setOperatorApprovalGlobal(hub, [placeOrderFor], false)) that follow_trader and follow_thesis send. The grant covers every perps market for this wallet and persists after unfollow, so revoke it once the agent is done following. " +
+          "While it stands the hub can place, cancel and reduce orders in this wallet's dreamDEX account (never withdraw). Refused while the wallet still follows something, since the hub could no longer copy: unfollow first. DRY-RUN BY DEFAULT.",
+        inputSchema: { dryRun: dryRunField },
+      },
+      async ({ dryRun }) => {
+        const account = needAgent(deps);
+        const [follow, approved] = await Promise.all([copybook.followOf(account), copybook.isOperatorApproved(account)]);
+        if (follow) throw new Refusal("This wallet still follows a source; revoking now would stop the hub from copying. Unfollow first.");
+        if (!approved) throw new Refusal("The hub has no operator approval on this wallet; nothing to revoke.");
+        const call = {
+          step: "revokeOperator",
+          to: copybook.deployments.operatorRegistry,
+          function: "setOperatorApprovalGlobal",
+          args: [copybook.deployments.hub, [PLACE_ORDER_FOR_SELECTOR], false],
+        };
+        if (dryRun) return { dryRun: true, sent: false, wallet: account, calls: [call] };
+        const sent: string[] = [];
+        await sequence("Revoke failed", sent, () => step(sent, "revokeOperator", () => copybook.approveOperator(false)));
+        return { dryRun: false, sent: true, transactions: sent, next: "A later follow will ask for the approval again." };
       },
     ),
 
@@ -525,9 +567,9 @@ export function buildTools(deps: Deps): ToolDef[] {
         if (dryRun) {
           return { dryRun: true, sent: false, requester: account, calls: [call], ...(pending ? { note: "An earlier request timed out, so this one replaces it." } : {}) };
         }
-        const tx = await guard("Review request failed", () => copybook.requestReview(who, fee));
-        await guard("Review request failed", () => tx.wait());
-        return { dryRun: false, sent: true, transactions: [`requestReview ${tx.hash}`], next: "Poll get_verdict until reviewedAt moves." };
+        const sent: string[] = [];
+        await sequence("Review request failed", sent, () => step(sent, "requestReview", () => copybook.requestReview(who, fee)));
+        return { dryRun: false, sent: true, transactions: sent, next: "Poll get_verdict until reviewedAt moves." };
       },
     ),
 
@@ -576,13 +618,13 @@ export function buildTools(deps: Deps): ToolDef[] {
         if (errors.length) throw new Refusal("The thesis would be refused; nothing was sent.", { errors });
         const call = { step: "createTheme", to: copybook.deployments.themes, function: "createTheme", args: { name, uri, legs: presentLegs(legs) } };
         if (dryRun) return { dryRun: true, sent: false, creator: account, calls: [call] };
-        const tx = await guard("Create thesis failed", () => copybook.createTheme(name, uri, legs));
-        const out = await guard("Create thesis failed", () => tx.wait());
+        const sent: string[] = [];
+        const out = await sequence("Create thesis failed", sent, () => step(sent, "createTheme", () => copybook.createTheme(name, uri, legs)));
         const created = out.events.find((e) => e.name === "ThemeCreated");
         return {
           dryRun: false,
           sent: true,
-          transactions: [`createTheme ${tx.hash}`],
+          transactions: sent,
           themeId: created && created.name === "ThemeCreated" ? created.themeId.toString() : undefined,
           next: "Call get_thesis to see its minimum allocation.",
         };

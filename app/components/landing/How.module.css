@@ -1,0 +1,196 @@
+.how {
+  position: relative;
+  z-index: 1;
+  padding: 112px var(--gut) 150px;
+  background: linear-gradient(180deg, var(--dusk-1) 0%, var(--dusk-1) 45%, #f3e6de 100%);
+}
+
+.pools {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(92% 300px at 50% 0, rgba(246, 210, 184, 0.85), rgba(246, 210, 184, 0) 100%),
+    radial-gradient(560px 520px at 96% 40%, rgba(235, 201, 208, 0.42), transparent 70%),
+    radial-gradient(90% 420px at 50% 100%, rgba(246, 210, 184, 0.75), rgba(246, 210, 184, 0) 100%);
+}
+
+.wrap {
+  position: relative;
+  z-index: 2;
+  max-width: 1184px;
+  margin: 0 auto;
+}
+
+.head {
+  max-width: 46rem;
+}
+
+.beats {
+  --wy: 144px;
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 1.08fr 1.18fr;
+  gap: 0 56px;
+  margin-top: 64px;
+}
+
+/* the telegraph wire, running past the gutters */
+.beats::before {
+  content: "";
+  position: absolute;
+  left: calc(var(--gut) * -1 - 200px);
+  right: calc(var(--gut) * -1 - 200px);
+  top: var(--wy);
+  height: 1px;
+  background: var(--wire);
+}
+
+.beat {
+  position: relative;
+}
+
+.pic {
+  height: var(--wy);
+  position: relative;
+}
+
+.pic > svg {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.post {
+  position: absolute;
+  left: 0;
+  top: calc(var(--wy) - 4px);
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--dusk-1);
+  border: 1px solid var(--ink);
+}
+
+.beat:last-child .post {
+  border-color: var(--gold-deep);
+  background: var(--gold);
+}
+
+.verb {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  margin-top: 34px;
+}
+
+.num {
+  font: italic 500 22px/1 var(--display);
+  font-variation-settings: "opsz" 72, "SOFT" 100;
+  color: var(--ink-3);
+}
+
+.vb {
+  font: 400 11px/1 var(--mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+
+.title {
+  margin-top: 10px;
+}
+
+.body {
+  margin-top: 12px;
+  max-width: 31ch;
+  font-size: 15.5px;
+  line-height: 1.6;
+  color: var(--ink-2);
+}
+
+.note {
+  margin-top: 16px;
+  font: 400 11px/1.4 var(--mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.perchLocal {
+  display: none;
+  stroke: rgba(42, 33, 36, 0.38);
+}
+
+.chev {
+  fill: none;
+  stroke: var(--ink);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.ring {
+  fill: none;
+  stroke: var(--gold-deep);
+  stroke-width: 1;
+}
+
+.trail {
+  fill: none;
+  stroke: var(--ink-3);
+  stroke-width: 1;
+  stroke-dasharray: 1.5 4.5;
+  stroke-linecap: round;
+}
+
+.bird {
+  fill: var(--ink);
+}
+
+.legs {
+  stroke: var(--ink);
+  stroke-width: 1;
+}
+
+@media (max-width: 760px) {
+  .how {
+    padding: 96px var(--gut) 120px;
+  }
+
+  .beats {
+    grid-template-columns: 1fr;
+    gap: 56px;
+    margin-top: 48px;
+    padding-left: 34px;
+  }
+
+  .beats::before {
+    left: 6px;
+    right: auto;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    height: auto;
+  }
+
+  .pic {
+    height: 112px;
+  }
+
+  .post {
+    left: -33px;
+    top: auto;
+    bottom: -5px;
+  }
+
+  .perchLocal {
+    display: inline;
+  }
+
+  .verb {
+    margin-top: 22px;
+  }
+}

@@ -1,0 +1,242 @@
+.track {
+  position: relative;
+  z-index: 1;
+  height: 270vh;
+  background: linear-gradient(180deg, #f3e6de 0%, #e7b598 24%, #80594f 46%, #261d1a 64%, #0c0b09 80%);
+}
+
+/*
+ * The stage. Its custom properties are scrubbed by scroll; the defaults are the settled night, so the proof reads
+ * the same with scripts off and with reduced motion.
+ */
+.stage {
+  --fg: var(--bone);
+  --fg-2: var(--bone-2);
+  --fg-3: var(--night-4);
+  --soft: 0;
+  --plate-o: 1;
+  --mer-o: 1;
+  --lab-o: 1;
+  --grain-dusk-o: 0;
+  --grain-night-o: 0.055;
+  --dial: 1;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  height: 100svh;
+  overflow: hidden;
+  container-type: size;
+}
+
+.sky,
+.glow {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.sky {
+  background: linear-gradient(180deg, #0c0b09 0%, #17130f 100%);
+}
+
+/* placement mirrors atlasGeometry(): centre (64%, 54%), limb radius min(40% h, 27% w); the plate is 33/14 limbs wide */
+.plate {
+  --ps: calc(33 / 14 * min(40cqh, 27cqw));
+  position: absolute;
+  left: calc(64cqw - var(--ps) / 2);
+  top: calc(54cqh - var(--ps) / 2);
+  width: var(--ps);
+  height: var(--ps);
+  pointer-events: none;
+  opacity: var(--plate-o);
+}
+
+.plate > svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.settle,
+.meridian {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.meridian {
+  overflow: visible;
+}
+
+.merLines {
+  opacity: var(--mer-o);
+}
+
+.merLabels {
+  opacity: var(--lab-o);
+}
+
+.ml {
+  stroke: var(--gold);
+  stroke-width: 1;
+}
+
+.md {
+  stroke: var(--gold);
+  stroke-width: 1;
+  stroke-dasharray: 2 6;
+  opacity: 0.5;
+}
+
+.lr {
+  fill: none;
+  stroke: var(--gold);
+  stroke-width: 1;
+}
+
+.cr {
+  fill: none;
+  stroke: var(--bone);
+  stroke-width: 1;
+  opacity: 0.45;
+}
+
+.lab {
+  paint-order: stroke;
+  stroke: var(--night-0);
+  stroke-width: 5px;
+  stroke-linejoin: round;
+  fill: var(--bone);
+  font: 500 11px var(--mono);
+  letter-spacing: 0.08em;
+}
+
+.labDim {
+  fill: var(--night-4);
+  font-size: 10.5px;
+  letter-spacing: 0.05em;
+}
+
+.labGold {
+  fill: var(--gold);
+}
+
+.head {
+  position: absolute;
+  z-index: 4;
+  left: var(--gut);
+  top: clamp(76px, 12vh, 116px);
+  max-width: 31rem;
+  color: var(--fg);
+}
+
+.head p:not(:global(.kicker)) {
+  margin-top: 18px;
+  font-size: 16.5px;
+  line-height: 1.6;
+  color: var(--fg-2);
+  max-width: 27em;
+}
+
+.read {
+  position: absolute;
+  z-index: 4;
+  left: var(--gut);
+  bottom: clamp(28px, 6vh, 60px);
+  width: min(560px, calc(100% - var(--gut) * 2));
+  color: var(--bone);
+  opacity: var(--lab-o);
+  transform: translateY(calc((1 - var(--lab-o)) * 10px));
+  pointer-events: none;
+}
+
+.stage[data-read] .read {
+  pointer-events: auto;
+}
+
+.dial {
+  position: absolute;
+  z-index: 4;
+  right: var(--gut);
+  bottom: clamp(28px, 6vh, 60px);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font: 400 10.5px/1 var(--mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--fg-3);
+}
+
+.bar {
+  position: relative;
+  width: 120px;
+  height: 1px;
+  background: currentColor;
+  opacity: 0.5;
+}
+
+.bar i {
+  position: absolute;
+  top: -3px;
+  left: calc(var(--dial) * 100%);
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--gold);
+  transform: translateX(-50%);
+}
+
+.grainDusk {
+  z-index: 6;
+  opacity: var(--grain-dusk-o);
+}
+
+.grainNight {
+  z-index: 6;
+  opacity: var(--grain-night-o);
+}
+
+/* mobile placement mirrors atlasGeometry() below 760px */
+@container (width < 760px) {
+  .plate {
+    --ps: calc(33 / 14 * min(44cqw, 26cqh));
+    left: calc(50cqw - var(--ps) / 2);
+    top: calc(55cqh - var(--ps) / 2);
+  }
+}
+
+@media (max-width: 760px) {
+  .track {
+    height: 240vh;
+  }
+
+  .head {
+    top: 64px;
+    right: var(--gut);
+  }
+
+  .head p:not(:global(.kicker)) {
+    display: none;
+  }
+
+  .read {
+    bottom: 22px;
+  }
+
+  .dial {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .track {
+    height: auto;
+  }
+
+  .stage {
+    position: relative;
+  }
+}

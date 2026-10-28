@@ -1,0 +1,81 @@
+.limbClip {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.limb {
+  position: absolute;
+  left: 50%;
+  bottom: -560px;
+  width: 1100px;
+  height: 1100px;
+  transform: translateX(-50%);
+  pointer-events: none;
+  overflow: visible;
+}
+
+.ring {
+  fill: none;
+  stroke: rgba(230, 223, 204, 0.2);
+  stroke-width: 1;
+}
+
+.tick {
+  stroke: rgba(230, 223, 204, 0.22);
+  stroke-width: 1;
+}
+
+.mer {
+  stroke: var(--gold);
+  stroke-width: 1.6;
+}
+
+.star {
+  fill: var(--bone);
+}
+
+/* with the plate's own 84px, the limb gets 170px to rise into */
+.body {
+  position: relative;
+  text-align: center;
+  padding-bottom: 86px;
+}
+
+.kicker {
+  justify-content: center;
+}
+
+.body .title {
+  margin: 18px auto 0;
+  font-size: clamp(42px, 5.6vw, 80px);
+  line-height: 0.98;
+  letter-spacing: -0.042em;
+}
+
+.actions {
+  display: flex;
+  justify-content: center;
+  margin-top: 36px;
+}
+
+.small {
+  margin-top: 22px;
+  font: 400 11.5px var(--mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--night-4);
+}
+
+@media (max-width: 760px) {
+  .body {
+    padding-bottom: 74px;
+  }
+
+  .limb {
+    width: 760px;
+    height: 760px;
+    bottom: -420px;
+  }
+}

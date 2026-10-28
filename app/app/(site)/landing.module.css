@@ -1,0 +1,9 @@
+.page {
+  position: relative;
+  overflow-x: clip;
+}
+
+.footWrap {
+  position: relative;
+  background: var(--night-0);
+}

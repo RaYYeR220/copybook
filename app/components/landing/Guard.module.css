@@ -1,0 +1,80 @@
+.verdicts {
+  margin-top: 26px;
+  border-top: 1px solid var(--hair-n);
+}
+
+.verdicts li {
+  display: grid;
+  grid-template-columns: 118px 1fr;
+  gap: 14px;
+  align-items: baseline;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--hair-n);
+}
+
+.verdicts li > span:last-child {
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--bone-2);
+}
+
+.verdicts b {
+  font-weight: 500;
+  color: var(--bone);
+}
+
+.vd {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font: 400 15px/1.5 var(--mono);
+  letter-spacing: 0.14em;
+  color: var(--bone-2);
+}
+
+.vd svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+
+.caution {
+  color: var(--gold);
+}
+
+.record {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font: 400 12.5px/1.5 var(--mono);
+  color: var(--bone-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.record > div {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+
+.k {
+  color: var(--night-4);
+  min-width: 88px;
+}
+
+.gold {
+  color: var(--gold);
+}
+
+@media (max-width: 760px) {
+  .verdicts li {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .k {
+    min-width: 0;
+  }
+}

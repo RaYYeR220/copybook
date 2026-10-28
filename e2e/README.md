@@ -178,6 +178,7 @@ forge verify-contract <gate> src/risk/RiskGate.sol:RiskGate --verifier blockscou
 | `base-url <url>` | points the reviewer at the public risk endpoint |
 | `prompt` | sets the reviewer's system prompt to the published rubric in `eval/rubric.ts` |
 | `review [trader ...]` | pays for reviews and follows each one: the Hyperlane delivery to Shannon, both agent requests as sent (URL and field; user prompt, system message and allowed answers), both committee stages with every validator's answer and receipt, the reply, and the gate's verdict on Hideki |
+| `follow <nonce> [shannon block]` | picks up a recorded review whose Hyperlane delivery outlasted the wait and follows it from chain to the gate's answer |
 | `guard` | with a live `Block` on the leader: an unguarded increase copies, a guarded one is refused `RiskGate`, the exit copies; without one, only the guard switch |
 
 Every transaction lands in `deployments/risk.json` with its explorer link.

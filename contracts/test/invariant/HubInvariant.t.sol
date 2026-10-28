@@ -72,6 +72,10 @@ contract HubHandler is Test {
 
     // per scan
     mapping(address => bool) internal _pausedNow;
+    mapping(address => bool) internal _latchedNow;
+    bool internal _reactive;
+    mapping(address => mapping(address => bool)) internal _bombed;
+    mapping(address => uint256) internal _bombs;
     mapping(address => mapping(address => int256)) internal _lastSize;
 
     uint256 public bandViolations;
@@ -86,6 +90,8 @@ contract HubHandler is Test {
     uint256 public follows;
     uint256 public fires;
     uint256 public refusals;
+    uint256 public latchedOrders;
+    uint256 public latchSkips;
 
     constructor(
         CopybookHub hub_,
@@ -179,11 +185,12 @@ contract HubHandler is Test {
         vm.prank(f);
         try hub.follow{value: tank}(kind, ref, p, join) {
             ++follows;
+            _scan();
         } catch (bytes memory err) {
-            _expect(err, CopybookHub.FollowsPaused.selector);
+            _discard();
+            _expectOr(f, err, CopybookHub.FollowsPaused.selector);
             _clearGhost(f);
         }
-        _scan();
     }
 
     function unfollow(uint256 fSeed, bool flatten) external {
@@ -191,12 +198,15 @@ contract HubHandler is Test {
         if (!_following(f)) return;
         _begin();
         vm.prank(f);
-        try hub.unfollow(flatten) {}
-        catch (bytes memory err) {
-            _unexpected(err);
+        bool left;
+        try hub.unfollow(flatten) {
+            left = true;
+            _scan();
+        } catch (bytes memory err) {
+            _discard();
+            _expectOr(f, err, 0);
         }
-        _scan();
-        _clearGhost(f);
+        if (left) _clearGhost(f);
     }
 
     function updateBand(uint256 fSeed, uint256 bandSeed) external {
@@ -235,7 +245,7 @@ contract HubHandler is Test {
         vm.prank(f);
         try hub.resume() {}
         catch (bytes memory err) {
-            _expect(err, CopybookHub.StillBelowFloor.selector);
+            if (_sel(err) != CopybookHub.FlattenPending.selector) _expect(err, CopybookHub.StillBelowFloor.selector);
         }
     }
 
@@ -248,11 +258,12 @@ contract HubHandler is Test {
         bank.setEquity(f, int256(uint256(p.equityFloor)) - 1);
         _begin();
         vm.prank(STRANGER);
-        try hub.poke(f) {}
-        catch (bytes memory err) {
-            _unexpected(err);
+        try hub.poke(f) {
+            _scan();
+        } catch (bytes memory err) {
+            _discard();
+            _expectOr(f, err, 0);
         }
-        _scan();
         bank.setEquity(f, int256(uint256(p.equityFloor)) * 2);
     }
 
@@ -263,7 +274,21 @@ contract HubHandler is Test {
     /// The follower trades by hand (an approved operator of its own): not a hub action, not scanned.
     function manualTrade(uint256 fSeed, uint256 pSeed, uint256 sizeSeed) external {
         MockPerpPool pool = _pool(pSeed);
-        _force(pool, _actor(fSeed), _size(pool, sizeSeed));
+        address f = _actor(fSeed);
+        if (_bombed[f][address(pool)]) return;
+        _force(pool, f, _size(pool, sizeSeed));
+    }
+
+    /// Makes every order for a follower on one market burn all the gas it gets (a venue order heavier than any
+    /// budget), or stops it. The handler latches what it cannot finish; non-reactive calls revert out of gas.
+    function bomb(uint256 fSeed, uint256 pSeed, bool on) external {
+        MockPerpPool pool = _pool(pSeed);
+        address f = _actor(fSeed);
+        if (_bombed[f][address(pool)] == on) return;
+        _bombed[f][address(pool)] = on;
+        if (on) ++_bombs[f];
+        else --_bombs[f];
+        pool.setBombFor(f, on);
     }
 
     // ---------------------------------------------------------------- keepers
@@ -274,11 +299,12 @@ contract HubHandler is Test {
         address[] memory pools = _subset(mask);
         _begin();
         vm.prank(STRANGER);
-        try hub.catchUp(f, pools) {}
-        catch (bytes memory err) {
-            _unexpected(err);
+        try hub.catchUp(f, pools) {
+            _scan();
+        } catch (bytes memory err) {
+            _discard();
+            _expectOr(f, err, 0);
         }
-        _scan();
     }
 
     function poke(uint256 fSeed) external {
@@ -286,17 +312,18 @@ contract HubHandler is Test {
         if (!_following(f)) return;
         _begin();
         vm.prank(STRANGER);
-        try hub.poke(f) {}
-        catch (bytes memory err) {
-            _unexpected(err);
+        try hub.poke(f) {
+            _scan();
+        } catch (bytes memory err) {
+            _discard();
+            _expectOr(f, err, 0);
         }
-        _scan();
     }
 
     // ---------------------------------------------------------------- sources and venue
 
     /// A trader moves; every subscribed group of its source gets the venue's event.
-    function traderMove(uint256 tSeed, uint256 pSeed, uint256 sizeSeed, uint256 gasSeed) external {
+    function traderMove(uint256 tSeed, uint256 pSeed, uint256 sizeSeed, uint256 gasSeed) public {
         address t = _traders[tSeed % _traders.length];
         MockPerpPool pool = _pool(pSeed);
         _force(pool, t, _size(pool, sizeSeed));
@@ -304,13 +331,15 @@ contract HubHandler is Test {
         topics[0] = POSITION_UPDATED;
         topics[1] = bytes32(uint256(uint160(t)));
         topics[2] = bytes32(uint256(uint160(address(pool))));
+        _reactive = true;
         _begin();
         _fireAll(hub.sourceIdOf(SourceKind.Trader, uint256(uint160(t))), address(bank), topics, gasSeed);
         _scan();
+        _reactive = false;
     }
 
     /// The creator rebalances a theme; every subscribed group of it gets the registry's event.
-    function rebalance(uint256 thSeed, uint256 legSeed, uint256 gasSeed) external {
+    function rebalance(uint256 thSeed, uint256 legSeed, uint256 gasSeed) public {
         uint256 id = _themeIds[thSeed % _themeIds.length];
         Leg[] memory legs = _legs(legSeed);
         vm.warp(block.timestamp + themes.MIN_REBALANCE_INTERVAL());
@@ -330,9 +359,29 @@ contract HubHandler is Test {
         bytes32[] memory topics = new bytes32[](2);
         topics[0] = THEME_REBALANCED;
         topics[1] = bytes32(id);
+        _reactive = true;
         _begin();
         _fireAll(hub.sourceIdOf(SourceKind.Theme, id), address(themes), topics, gasSeed);
         _scan();
+        _reactive = false;
+    }
+
+    /// Orders on one market get heavier than any budget while a trader moves or a theme rebalances, then
+    /// recover: members with exits there latch, and must get nothing from the handler until a caller
+    /// finishes their work.
+    function heavyEvent(uint256 pSeed, uint256 srcSeed, uint256 sizeSeed, uint256 gasSeed) external {
+        MockPerpPool pool = _pool(pSeed);
+        _heavy(pool, true);
+        if (srcSeed % 2 == 0) traderMove(srcSeed >> 1, pSeed, sizeSeed, gasSeed);
+        else rebalance(srcSeed >> 1, sizeSeed, gasSeed);
+        _heavy(pool, false);
+    }
+
+    function _heavy(MockPerpPool pool, bool on) internal {
+        for (uint256 i; i < _actors.length; ++i) {
+            address a = _actors[i];
+            if (!_bombed[a][address(pool)]) pool.setBombFor(a, on);
+        }
     }
 
     function setMark(uint256 pSeed, uint256 moveSeed) external {
@@ -409,6 +458,9 @@ contract HubHandler is Test {
             address a = _actors[i];
             (,,,, bool paused,) = hub.followOf(a);
             _pausedNow[a] = paused;
+            (bool exitPending, bool flattenPending) = hub.pendingOf(a);
+            _latchedNow[a] = exitPending || flattenPending;
+            if (_reactive && _latchedNow[a]) ++latchSkips;
         }
         vm.recordLogs();
     }
@@ -425,12 +477,16 @@ contract HubHandler is Test {
             } else if (_isPool[l.emitter] && t0 == MockPerpPool.MockFill.selector) {
                 (address o, bool isBid, uint256 qty, uint256 level) =
                     abi.decode(l.data, (address, bool, uint256, uint256));
-                if (_isActor[o]) _checkFill(o, MockPerpPool(l.emitter), isBid, qty, level);
+                if (_isActor[o]) {
+                    _checkLatch(o);
+                    _checkFill(o, MockPerpPool(l.emitter), isBid, qty, level);
+                }
             } else if (l.emitter == address(hub)) {
                 if (t0 == CopybookHub.Stopped.selector) {
                     _pausedNow[_addr(l.topics[1])] = true;
                     ++stops;
                 } else if (t0 == CopybookHub.Copied.selector) {
+                    _checkLatch(_addr(l.topics[1]));
                     _checkAllowed(_addr(l.topics[1]), _addr(l.topics[3]));
                 } else if (t0 == CopybookHub.Refused.selector) {
                     ++refusals;
@@ -457,6 +513,11 @@ contract HubHandler is Test {
         uint256 mark = pool.mark();
         uint256 band = ghostBand[o];
         if (isBid ? level * 1e4 > mark * (1e4 + band) : level * 1e4 < mark * (1e4 - band)) ++bandViolations;
+    }
+
+    /// A follow latched when the event came in gets nothing from the handler.
+    function _checkLatch(address f) internal {
+        if (_reactive && _latchedNow[f]) ++latchedOrders;
     }
 
     function _checkAllowed(address f, address pool) internal {
@@ -556,7 +617,24 @@ contract HubHandler is Test {
     }
 
     function _expect(bytes memory err, bytes4 sel) internal {
-        if (err.length < 4 || bytes4(err) != sel) _unexpected(err);
+        if (_sel(err) != sel) _unexpected(err);
+    }
+
+    /// `sel` (when set), or out of gas for a follower with a bombed market: a non-reactive call reverts then.
+    function _expectOr(address f, bytes memory err, bytes4 sel) internal {
+        bytes4 got = _sel(err);
+        if (_bombs[f] != 0 && got == CopybookHub.OutOfGasInSync.selector) return;
+        if (sel != 0 && got == sel) return;
+        _unexpected(err);
+    }
+
+    /// Logs of a hub call that reverted (recordLogs keeps them) describe nothing that happened.
+    function _discard() internal {
+        vm.getRecordedLogs();
+    }
+
+    function _sel(bytes memory err) internal pure returns (bytes4) {
+        return err.length < 4 ? bytes4(0) : bytes4(err);
     }
 
     function _unexpected(bytes memory err) internal {
@@ -703,6 +781,11 @@ contract HubInvariantTest is Test {
         assertEq(handler.outsideTouches(), 0);
     }
 
+    /// A follow whose exits or stop closes are latched gets no order or copy from the handler (R35).
+    function invariant_latchedNeverTradedReactively() public view {
+        assertEq(handler.latchedOrders(), 0);
+    }
+
     /// Hub calls that must not fail (catchUp, poke, unfollow, the handler under fire) never revert, and the
     /// ones that may fail do so only with their documented error.
     function invariant_noUnexpectedReverts() public view {
@@ -722,6 +805,7 @@ contract HubInvariantTest is Test {
         console.log("runs %d follows %d fires %d", runs, f, fi);
         console.log("increase fills checked %d reduction fills %d", inc, red);
         console.log("stops %d refusals %d", st, rf);
+        console.log("latched follows at a delivery %d", _add("HUB_INV_LATCHED", handler.latchSkips()));
     }
 
     function _add(string memory key, uint256 v) internal returns (uint256 total) {

@@ -25,7 +25,7 @@ function errorText(err: unknown): string | null {
 }
 
 /**
- * Wallet state for the app bar: connect (choosing among announced wallets), switch to Hideki (adding it
+ * Wallet state for the app bar: connect (choosing among announced wallets), switch to the network (adding it
  * to the wallet first when it is missing), or show the network and the connected account.
  */
 export function ConnectButton() {
@@ -75,10 +75,10 @@ export function ConnectButton() {
       return (
         <div className={styles.who}>
           <Button size="md" onClick={() => switchChain({ chainId: hideki.id })} disabled={switching}>
-            {switching ? "Check your wallet…" : "Switch to Somnia testnet"}
+            {switching ? "Check your wallet…" : `Switch to ${hideki.name}`}
           </Button>
-          <Button size="md" variant="quiet" onClick={addThenSwitch}>
-            Add Hideki to wallet
+          <Button size="md" variant="quiet" onClick={addThenSwitch} className={styles.add}>
+            Add {hideki.name} to wallet
           </Button>
           {message && <p className={styles.err} role="alert">{message}</p>}
         </div>
@@ -88,7 +88,7 @@ export function ConnectButton() {
       <div className={styles.who}>
         <span className={`${styles.chip} ${styles.net}`}>
           <i aria-hidden="true" />
-          Somnia testnet
+          {hideki.name}
         </span>
         <button className={styles.chip} type="button" onClick={() => disconnect()} title="Disconnect this wallet">
           <i aria-hidden="true" />

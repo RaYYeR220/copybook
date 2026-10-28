@@ -29,7 +29,13 @@ const fragmentMono = Fragment_Mono({
   fallback: ["ui-monospace", "SFMono-Regular", "Consolas", "monospace"],
 });
 
+/** Absolute base for metadata URLs: set NEXT_PUBLIC_SITE_URL, or Vercel's production URL is used. */
+const siteUrl =
+  process.env.NEXT_PUBLIC_SITE_URL ??
+  (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : "http://localhost:3000");
+
 export const metadata: Metadata = {
+  metadataBase: new URL(siteUrl),
   title: { default: "Copybook", template: "%s · Copybook" },
   description:
     "Follow a trader or a thesis on dreamDEX perps. Somnia validators run your copy in your own account, in the same block as the move.",
@@ -38,7 +44,6 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: "#0c0b09",
-  colorScheme: "dark",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

@@ -84,8 +84,10 @@ button.chip:hover {
   text-align: right;
 }
 
+/* on a phone the switch alone is enough: switching adds the network when the wallet lacks it */
 @media (max-width: 720px) {
-  .net {
+  .net,
+  .who .add {
     display: none;
   }
 }

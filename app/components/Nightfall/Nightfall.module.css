@@ -132,6 +132,12 @@
   color: var(--fg);
 }
 
+/* the nightfall headline keeps the token optical size (144); its tracking is opened so the line sets at the
+   width the scene was approved at */
+.head :global(.h2) {
+  letter-spacing: 0.015em;
+}
+
 .head p:not(:global(.kicker)) {
   margin-top: 18px;
   font-size: 16.5px;

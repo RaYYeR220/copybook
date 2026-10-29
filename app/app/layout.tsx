@@ -29,10 +29,12 @@ const fragmentMono = Fragment_Mono({
   fallback: ["ui-monospace", "SFMono-Regular", "Consolas", "monospace"],
 });
 
-/** Absolute base for metadata URLs: set NEXT_PUBLIC_SITE_URL, or Vercel's production URL is used. */
-const siteUrl =
-  process.env.NEXT_PUBLIC_SITE_URL ??
-  (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : "http://localhost:3000");
+/**
+ * Absolute base for metadata URLs (share cards, canonical links): NEXT_PUBLIC_SITE_URL when set; on a Vercel preview
+ * the preview's own URL, so its cards come from the code it runs; otherwise the production URL.
+ */
+const vercelHost = process.env.VERCEL_ENV === "preview" ? process.env.VERCEL_URL : process.env.VERCEL_PROJECT_PRODUCTION_URL;
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? (vercelHost ? `https://${vercelHost}` : "http://localhost:3000");
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),

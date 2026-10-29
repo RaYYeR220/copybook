@@ -30,9 +30,11 @@ const ID_RE = /^[0-9]{1,9}$/;
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const { id } = await params;
-  if (!ID_RE.test(id)) return { title: "Not a thesis" };
-  const thesis = await loadThesis(BigInt(id)).catch(() => null);
-  if (!thesis) return { title: `Thesis #${id}` };
+  // the page answers a bad or missing id with a note rather than a 404 status: keep those notes out of search indexes
+  if (!ID_RE.test(id) || BigInt(id) === 0n) return { title: "Not a thesis", robots: { index: false } };
+  const thesis = await loadThesis(BigInt(id)).catch(() => undefined);
+  if (thesis === undefined) return { title: `Thesis #${id}` };
+  if (!thesis) return { title: `No thesis #${id}`, robots: { index: false } };
   const title = `${thesis.name} · thesis #${id}`;
   const description = `The legs, version and minimum allocation of thesis #${id} on dreamDEX perps.`;
   const image = { url: `/og/thesis/${id}`, width: 1200, height: 630, alt: `${thesis.name}: thesis #${id} on Copybook, its legs and the least allocation that opens them` };

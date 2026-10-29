@@ -10,11 +10,13 @@ v3 and v4 we wrote down the expected answer for every trader and committed it be
 wrote the commit on chain. Run v1, three reviews under the launch prompt, was scored against the rubric afterwards.
 The scorecard compares the committee's verdicts with the answer key.
 
-**Latest result (run v4, held out): 19 of 20 verdicts match the rubric on 20 traders no earlier run had seen.**
+**Latest result (run v4, held out): 19 of 20 verdicts match the rubric on 20 traders no earlier run had seen**
+(95% interval 76–99%).
 - **The setup was run v3's, unchanged:** the rubric, the prompt, the endpoint's line, the reviewer and the scorer.
-- **BLOCK recall: 7 of 8.** One trader with 10 liquidations got CAUTION, 3 votes of 3, where the rubric says BLOCK.
+- **BLOCK recall: 7 of 8** (53–98%). One trader with 10 liquidations got CAUTION, 3 votes of 3, where the rubric says
+  BLOCK.
   The gate stores that CAUTION, so guarded followers of that trader are not protected until a new review.
-- **No false BLOCKs.** The committee blocked none of the 12 traders the rubric does not block.
+- **No false BLOCKs.** The committee blocked none of the 12 traders the rubric does not block (0–24%).
 - **Thin history and `partial=1`:** CAUTION, as the rubric says.
 - **Failures:** no review failed, and every committee answered unanimously.
 
@@ -91,8 +93,9 @@ could not answer: does the same setup hold on traders it has never seen?
 
 ### Sampling
 
-The rule was committed (`dfceabc`) before the sample was drawn, and it is recorded in
-[`v4/answer-key.json`](v4/answer-key.json) with every account screened:
+The rule is in commit `dfceabc`, the parent of the anchored key commit `a7c42c2`. Git records that commit's time
+(22:38:43 UTC) locally; only the anchor (22:43:34 UTC) is on chain. The rule and every account screened are in
+[`v4/answer-key.json`](v4/answer-key.json).
 
 - **Exclusions.** The rule leaves out 77 accounts:
   - every trader reviewed in runs v1 to v3;
@@ -114,8 +117,8 @@ The rule was committed (`dfceabc`) before the sample was drawn, and it is record
   moved to the clean stratum:
   - 6 with 2 or more liquidations;
   - 4 with exactly one;
-  - 3 thin (fewer than 10 trades);
-  - 7 clean.
+  - 3 thin (fewer than 10 trades, or no history);
+  - 7 clean (no liquidation, 10 or more trades).
 - **The fallback.** If a quota is still open after the pools, its places go to the screened accounts not taken, in
   screening order, whatever their stratum.
 
@@ -123,21 +126,41 @@ The rule was committed (`dfceabc`) before the sample was drawn, and it is record
 - **Thin stratum short by 2.** The thin pool was read to its end and held only one thin trader; most of its accounts
   had 10 or more trades. The fallback therefore filled the two open places with the first accounts screened but not
   taken, which both had 2+ liquidations.
+- **Where the clean traders came from.** All 7 came from pool 3, where they were taken as they were screened because
+  the clean quota was open. Pools 4 and 5 were never read. So "clean" here means accounts with few rows among the
+  latest position changes, not the largest gainers.
 - **The sample:** 8 traders with 2+ liquidations, 4 with exactly one, 1 thin and 7 clean. One of the clean traders is
   a high-frequency account with `partial=1`.
 - **Expected tiers:** 8 BLOCK, 6 CAUTION, 6 OK.
 
+**Drawing it again.** Running `eval:v4 select` today would draw a different sample, for two reasons:
+- **The window moves.** The draw's 30-day window ends at the clock time it runs, and its indexer reads have no upper
+  time bound, so newer rows change the pools and the screening.
+- **The exclusions grow.** The exclusion files have grown since: they now include run v4's own reviews.
+
+To draw it as it was, `npm run eval:v4 replay 2026-10-29T22:39:04Z` does two things:
+- it bounds every timestamp filter the draw sends at that time;
+- it reads the exclusion files as committed in `dfceabc`.
+
+The replay screens the same 53 accounts in the same order, with the same strata, and picks the same 20 traders. No
+screened line differs. The draw's clock was not written down at the time; it fell between the settings read at
+22:39:03 and the first screening. The replay is recorded in [`v4/draw.json`](v4/draw.json), and the anchored key is
+unchanged.
+
 ### Pre-registration of run v4
 
-| step | when (UTC, 2026-10-29) | evidence |
-|---|---|---|
-| sampling rule and tooling committed | 22:38:43 | commit `dfceabc` |
-| reviewer settings read from the chain | 22:39:03 | `frozen` in [`v4/answer-key.json`](v4/answer-key.json) |
-| rubric lines fetched from the public endpoint | 22:41:07 – 22:41:57 | `fetchedAt` per trader, all fresh (cache miss) |
-| answer key committed | 22:42:44 | commit `a7c42c247a038b65d502826df7dc703a4cdcaa9a` |
-| commit hash and key hash written on chain | 22:43:34 | [Hideki tx 0xadd80abe…](https://explorer.testnet.somnia.network/tokyo/tx/0xadd80abe7fdd825fe6f4086d62b09c44f50d2aeb2519b0479462e0a14be06b09) (block 36,605,996), recorded in [`v4/anchor.json`](v4/anchor.json) |
-| first review requested | 22:44:02 | row 1 below |
-| last verdict delivered to Hideki | 22:51:00 | row 20 below |
+| step | when (UTC, 2026-10-29) | where the time is recorded | evidence |
+|---|---|---|---|
+| sampling rule and tooling committed | 22:38:43 | git, locally | commit `dfceabc`, the parent of the key commit |
+| reviewer settings read from the chain | 22:39:03 | the key file, locally | `frozen` in [`v4/answer-key.json`](v4/answer-key.json) |
+| rubric lines fetched from the public endpoint | 22:41:07 – 22:41:57 | the key file, locally | `fetchedAt` per trader, all fresh (cache miss) |
+| answer key committed | 22:42:44 | git, locally; the commit hash is in the anchor | commit `a7c42c247a038b65d502826df7dc703a4cdcaa9a` |
+| commit hash and key hash written on chain | 22:43:34 | **chain** | [Hideki tx 0xadd80abe…](https://explorer.testnet.somnia.network/tokyo/tx/0xadd80abe7fdd825fe6f4086d62b09c44f50d2aeb2519b0479462e0a14be06b09) (block 36,605,996), recorded in [`v4/anchor.json`](v4/anchor.json) |
+| first review requested | 22:44:02 | **chain** | row 1 below |
+| last verdict delivered to Hideki | 22:51:00 | **chain** | row 20 below |
+
+Only the rows marked chain are timestamped by a block. The anchor fixes the key's content at 22:43:34; the times
+before it are what git and the key file say.
 
 The anchor carries the commit hash followed by the keccak256 of `eval/v4/answer-key.json` as committed
 (`0x8cbca4b63fd467637337b29518b003ed4e0ff998f93bf1d93764224363782287`). This run's reviews have nonces 48 to 67 on the
@@ -145,9 +168,11 @@ gate. The reviewer's settings read the same after the run as before it.
 
 ### Run v4 result
 
-**19 of 20 verdicts match the rubric. The committee's verdicts imply the right gate decision for 19 of 20.**
-- **BLOCK recall:** 7 of 8. One trader the rubric blocks got CAUTION (row 6).
-- **False BLOCKs:** none, out of 12 traders the rubric does not block.
+**19 of 20 verdicts match the rubric (95% interval 76–99%). The committee's verdicts imply the right gate decision
+for 19 of 20 (76–99%).**
+- **BLOCK recall:** 7 of 8 (53–98%). One trader the rubric blocks got CAUTION (row 6).
+- **False BLOCKs:** none, out of 12 traders the rubric does not block (0–24%).
+- **The intervals** are Wilson 95% intervals, and they show how little 20 traders pin down.
 - **Thin history and `partial=1`:** CAUTION, as the rubric says (1 of 1 each).
 - **Failures:** none. Every committee answered unanimously, and 57 of 60 validator answers match the rubric.
 - **Summary hashes:** all 20 lines the committee agreed on are byte-identical to the key. The JSON stage returned the
@@ -778,8 +803,8 @@ As read from the gate at block 36,612,170 (22:53:52 UTC on 2026-10-29), after ru
   after it landed.
 - **Run v4's row 6** holds CAUTION, the missed BLOCK above. Guarded followers of that trader are not protected.
 - **Run v3's earlier false BLOCKs are gone.** Rows 1, 13, 14 and the leader held BLOCKs from runs v1 and v2 that run
-  v3's milder verdicts could not replace inside the 24-hour hold. Fresh reviews between 17:08 and 17:09 UTC on
-  2026-10-29 (gate nonces 44–47) replaced them with OK, CAUTION, OK and OK.
+  v3's milder verdicts could not replace inside the 24-hour hold. Re-reviews outside any scored run, between 17:08
+  and 17:09 UTC on 2026-10-29 (gate nonces 44–47), replaced them with OK, CAUTION, OK and OK.
 - **CAUTION and OK.** The other traders hold CAUTION or OK, and neither restricts anyone. Run v3's rows 17 and 19 hold
   OK where the rubric says CAUTION.
 
@@ -838,6 +863,7 @@ npm run eval score v3                                  # eval/v3/results.json an
 
 # run v4 (held out): the same reviewer and settings, nothing changed
 COPYBOOK_ENV=keys.env npm run eval:v4 select           # fresh sample + eval/v4/answer-key.json (commit it)
+COPYBOOK_ENV=keys.env npm run eval:v4 replay 2026-10-29T22:39:04Z  # run v4's draw as it stood -> eval/v4/draw.json
 COPYBOOK_ENV=keys.env npm run eval:v4 anchor <commit>  # commit + key hash on Hideki
 COPYBOOK_ENV=keys.env npm run risk review <trader>     # each trader in the key, in order
 npm run eval:v4 score                                  # eval.ts unchanged, on run v4's key -> eval/v4/results.json

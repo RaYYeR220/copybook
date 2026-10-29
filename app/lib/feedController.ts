@@ -43,6 +43,8 @@ export interface FeedDeps {
   hidden(): boolean;
   live: boolean;
   cap: number;
+  /** Backoff when starting a watcher fails outright (watch() itself retries a socket that will not subscribe). */
+  retryMs?: { min: number; max: number };
 }
 
 const firstMissing = (missing: readonly MissingRange[]) => missing.reduce<bigint | undefined>((m, r) => (m === undefined || r.from < m ? r.from : m), undefined);
@@ -78,6 +80,10 @@ export function createFeed(deps: FeedDeps, emit: (s: FeedState) => void) {
   let handle: WatchHandle | undefined;
   let starting = false;
   let gen = 0;
+  let attempt = 0;
+  let retryTimer: ReturnType<typeof setTimeout> | undefined;
+  const retryMin = deps.retryMs?.min ?? 1_000;
+  const retryMax = deps.retryMs?.max ?? 30_000;
   let wasDown = false;
   /** Where the next watcher starts (inclusive). */
   let resume: bigint | undefined;
@@ -106,12 +112,28 @@ export function createFeed(deps: FeedDeps, emit: (s: FeedState) => void) {
     }
   }
 
-  async function start() {
+  function retryLater() {
+    if (retryTimer || disposed) return;
+    const ms = Math.min(retryMax, retryMin * 2 ** attempt++);
+    retryTimer = setTimeout(() => {
+      retryTimer = undefined;
+      void start();
+    }, ms);
+  }
+
+  /**
+   * Starts a watcher unless one runs or is connecting. A start that settles after the page was hidden (or after a
+   * stop) is closed; if the page is visible again by then, a fresh watcher replaces it, so a visible page always
+   * ends with exactly one. A start that fails outright is retried with backoff.
+   */
+  async function start(): Promise<void> {
     if (!deps.live || disposed || handle || starting || deps.hidden()) return;
     starting = true;
     const g = ++gen;
+    let h: WatchHandle | undefined;
+    let failed = false;
     try {
-      const h = await deps.watch({
+      h = await deps.watch({
         fromBlock: resume,
         onEvent: (e) => {
           if (g !== gen || !deps.keep(e)) return;
@@ -128,10 +150,26 @@ export function createFeed(deps: FeedDeps, emit: (s: FeedState) => void) {
           set({ status: s });
         },
       });
-      if (disposed || deps.hidden() || g !== gen) await h.stop();
-      else handle = h;
+    } catch {
+      failed = true;
     } finally {
       starting = false;
+    }
+    if (h) {
+      if (!disposed && !deps.hidden() && g === gen) {
+        handle = h;
+        attempt = 0;
+        return;
+      }
+      await h.stop().catch(() => undefined);
+    }
+    if (disposed || deps.hidden()) return;
+    if (failed) {
+      if (g === gen) set({ status: "reconnecting" });
+      retryLater();
+    } else {
+      // stopped while connecting, and visible again: this page still needs a watcher
+      void start();
     }
   }
 
@@ -139,6 +177,8 @@ export function createFeed(deps: FeedDeps, emit: (s: FeedState) => void) {
   function stop(): { gen: number; done: Promise<void> } {
     const h = handle;
     handle = undefined;
+    if (retryTimer) clearTimeout(retryTimer);
+    retryTimer = undefined;
     const g = ++gen;
     if (!h) return { gen: g, done: Promise.resolve() };
     const last = h.lastBlock;

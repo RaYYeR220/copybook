@@ -24,19 +24,31 @@ const copy = (block: number, logIndex = 0): LoggedEvent =>
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /** A scripted chain behind the watcher: what it holds, from which block each watcher was started, and its sockets. */
-function harness(answers: HistoryAnswer[], chain: LoggedEvent[], opts: { stopMs?: number } = {}) {
+function harness(
+  answers: HistoryAnswer[],
+  chain: LoggedEvent[],
+  opts: { stopMs?: number; deferFirst?: boolean; rejectFirst?: number } = {},
+) {
   const historyCalls: (bigint | undefined)[] = [];
   const watches: { fromBlock?: bigint; status: (s: WatchStatus) => void; stopped: boolean }[] = [];
   let hidden = false;
+  let calls = 0;
+  let release: () => void = () => {};
   const deps: FeedDeps = {
+    retryMs: { min: 5, max: 20 },
     history: async (fromBlock) => {
       historyCalls.push(fromBlock);
       const a = answers[Math.min(historyCalls.length - 1, answers.length - 1)]!;
       return { ...a, events: a.events.filter((e) => fromBlock === undefined || e.log.blockNumber! >= fromBlock) };
     },
     watch: async ({ fromBlock, onEvent, onStatus }) => {
+      const n = ++calls;
+      if (n <= (opts.rejectFirst ?? 0)) throw new Error("the somnia_watch socket did not open within 10000 ms");
       const w = { fromBlock, status: onStatus, stopped: false };
       watches.push(w);
+      onStatus("connecting");
+      // the first watcher can be held mid-connect until the test releases it
+      if (n === 1 && opts.deferFirst) await new Promise<void>((r) => (release = r));
       onStatus("live");
       // like the SDK: the first read covers [fromBlock, head] of what the chain holds
       for (const e of chain) if (fromBlock === undefined || e.log.blockNumber! >= fromBlock) onEvent(e);
@@ -58,7 +70,16 @@ function harness(answers: HistoryAnswer[], chain: LoggedEvent[], opts: { stopMs?
   };
   const states: FeedState[] = [];
   const feed = createFeed(deps, (s) => states.push(s));
-  return { feed, historyCalls, watches, states, setHidden: (h: boolean) => (hidden = h), last: () => states.at(-1)! };
+  return {
+    feed,
+    historyCalls,
+    watches,
+    states,
+    setHidden: (h: boolean) => (hidden = h),
+    last: () => states.at(-1)!,
+    release: () => release(),
+    running: () => watches.filter((w) => !w.stopped).length,
+  };
 }
 
 const keysOf = (s: FeedState) => s.events.map(eventKey);
@@ -142,6 +163,76 @@ describe("feed", () => {
     h.watches[0]!.status("live");
     await wait(5);
     expect(h.historyCalls).toEqual([undefined, 1015n]);
+  });
+
+  describe("while a watcher is still connecting", () => {
+    const answer: HistoryAnswer = { events: [copy(1003)], toBlock: 1010n, complete: true, missing: [] };
+
+    it("hidden then shown: the connecting one is closed and exactly one live watcher remains", async () => {
+      const h = harness([answer], [copy(1003)], { deferFirst: true });
+      void h.feed.open();
+      await wait(5);
+      expect(h.watches).toHaveLength(1); // connecting
+      h.setHidden(true);
+      await h.feed.visibility(true);
+      h.setHidden(false);
+      await h.feed.visibility(false); // its start finds the first one still connecting
+      h.release();
+      await wait(20);
+      expect(h.watches).toHaveLength(2);
+      expect(h.watches[0]!.stopped).toBe(true);
+      expect(h.running()).toBe(1);
+      expect(h.last().status).toBe("live");
+    });
+
+    it("hidden and staying hidden: no watcher, paused", async () => {
+      const h = harness([answer], [copy(1003)], { deferFirst: true });
+      void h.feed.open();
+      await wait(5);
+      h.setHidden(true);
+      await h.feed.visibility(true);
+      h.release();
+      await wait(20);
+      expect(h.running()).toBe(0);
+      expect(h.watches).toHaveLength(1);
+      expect(h.last().status).toBe("paused");
+    });
+
+    it("disposed: no watcher", async () => {
+      const h = harness([answer], [copy(1003)], { deferFirst: true });
+      void h.feed.open();
+      await wait(5);
+      await h.feed.dispose();
+      h.release();
+      await wait(20);
+      expect(h.running()).toBe(0);
+      expect(h.watches).toHaveLength(1);
+    });
+  });
+
+  it("a watcher that fails to start is retried with backoff, not left as an unhandled rejection", async () => {
+    const h = harness([{ events: [], toBlock: 1010n, complete: true, missing: [] }], [copy(1012)], { rejectFirst: 2 });
+    await h.feed.open(); // resolves: the failure is handled
+    expect(h.last().status).toBe("reconnecting");
+    expect(h.watches).toHaveLength(0);
+    await wait(60); // 5 ms, then 10 ms
+    expect(h.watches).toHaveLength(1);
+    expect(h.running()).toBe(1);
+    expect(h.watches[0]!.fromBlock).toBe(1010n);
+    expect(h.last().status).toBe("live");
+    expect(h.last().events.map((e) => e.log.blockNumber)).toEqual([1012n]);
+  });
+
+  it("a retry pending when the tab is hidden is dropped; the show starts a watcher", async () => {
+    const h = harness([{ events: [], toBlock: 1010n, complete: true, missing: [] }], [], { rejectFirst: 1 });
+    await h.feed.open();
+    h.setHidden(true);
+    await h.feed.visibility(true);
+    await wait(30);
+    expect(h.watches).toHaveLength(0);
+    h.setHidden(false);
+    await h.feed.visibility(false);
+    expect(h.running()).toBe(1);
   });
 
   it("a stopped watcher's late reports are ignored", async () => {

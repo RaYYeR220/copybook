@@ -223,6 +223,20 @@ describe("watchHub", () => {
     expect(sock.subs).toHaveLength(2);
   });
 
+  it("a first connect that fails resolves the handle anyway and retries until live", async () => {
+    // watch() never rejects for a socket that will not subscribe: it reports it and keeps trying with backoff
+    const c = world();
+    const sock = new FakeSocket();
+    sock.failNext = 1;
+    const statuses: string[] = [];
+    const { h, errors } = await start(c, sock, { onStatus: (s) => statuses.push(s) });
+    expect(errors.some((e) => String(e).includes("refused"))).toBe(true);
+    await wait(60);
+    expect(statuses).toEqual(["connecting", "reconnecting", "reconnecting", "live"]);
+    expect(sock.subs).toHaveLength(1);
+    await h.stop();
+  });
+
   it("a subscription that never answers times out and is retried on a new one", async () => {
     const c = world();
     const sock = new FakeSocket();

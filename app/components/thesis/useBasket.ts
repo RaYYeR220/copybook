@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import type { Address, PublicClient } from "viem";
 import type { Copybook, Leg } from "@copybook/sdk";
-import { checkBasket, parseRows, type BasketIssue, type BasketRow, type RegistryRules } from "@/lib/builder/basket";
+import { checkBasket, parseRows, type BasketIssue, type BasketRow, type Registration, type RegistryRules } from "@/lib/builder/basket";
 import { basketMinimum } from "@/lib/builder/registry";
 import type { MarketMeta } from "@/lib/tape";
 import { useMarketReads, useRegistration } from "./hooks";
@@ -19,7 +19,7 @@ export interface BasketContext {
 }
 
 /** The registry's verdict on a set of legs: `checkBasket` for a new thesis, `checkRebalance` for a change. */
-export type LegCheck = (legs: Leg[], registration: Record<string, boolean | undefined>, label: (pool: Address) => string) => BasketIssue[];
+export type LegCheck = (legs: Leg[], registration: Registration, label: (pool: Address) => string) => BasketIssue[];
 
 /**
  * Everything the form derives from its rows: the legs, the registry's verdict on them (issues mapped back to form
@@ -28,7 +28,7 @@ export type LegCheck = (legs: Leg[], registration: Record<string, boolean | unde
 export function useBasket(rows: readonly BasketRow[], ctx: BasketContext, check?: LegCheck) {
   const parsed = useMemo(() => parseRows(rows), [rows]);
   const pools = useMemo(() => rows.filter((r) => r.pool).map((r) => r.pool as Address), [rows]);
-  const registration = useRegistration(ctx.client, ctx.bank, pools, ctx.registered);
+  const { registration, retry: retryRegistration } = useRegistration(ctx.client, ctx.bank, pools, ctx.registered);
   const { reads, readAt } = useMarketReads(ctx.cb, pools);
   const label = (pool: Address) => marketLabel(ctx.markets, pool);
 
@@ -40,5 +40,5 @@ export function useBasket(rows: readonly BasketRow[], ctx: BasketContext, check?
   const rowIssues = new Map<number, BasketIssue[]>();
   for (const x of issues) if (x.row !== undefined) rowIssues.set(x.row, [...(rowIssues.get(x.row) ?? []), x]);
   const minimum = basketMinimum(parsed.legs, reads);
-  return { parsed, issues, rowIssues, reads, readAt, minimum, registration, label };
+  return { parsed, issues, rowIssues, reads, readAt, minimum, registration, retryRegistration, label };
 }

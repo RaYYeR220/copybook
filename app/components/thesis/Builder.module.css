@@ -235,3 +235,22 @@
     grid-template-columns: minmax(0, 1fr) auto;
   }
 }
+
+/* what is wrong with this row, next to it (the list below the legs says it again, in the registry's order) */
+.rowErr {
+  grid-column: 2 / -1;
+  display: flex;
+  gap: 8px;
+  font: 400 12px/1.45 var(--body);
+  color: var(--bone);
+}
+
+.rowErr::before {
+  content: "";
+  flex: none;
+  width: 7px;
+  height: 7px;
+  margin-top: 5px;
+  border-radius: 50%;
+  border: 1px dashed var(--bone);
+}

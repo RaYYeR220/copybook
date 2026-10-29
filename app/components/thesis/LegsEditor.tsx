@@ -1,9 +1,9 @@
 "use client";
 
-import { useRef, type Dispatch, type SetStateAction } from "react";
+import { useEffect, useRef, type Dispatch, type SetStateAction } from "react";
 import type { Address } from "viem";
 import { minOrderQty } from "@copybook/sdk";
-import type { BasketIssue, BasketRow, RegistryRules } from "@/lib/builder/basket";
+import type { BasketIssue, BasketRow, Registration, RegistryRules } from "@/lib/builder/basket";
 import type { BasketMinimum, MarketRead } from "@/lib/builder/registry";
 import { shortHex } from "@/lib/format";
 import type { MarketMeta } from "@/lib/tape";
@@ -26,7 +26,7 @@ interface Props {
   rows: BasketRow[];
   setRows: Dispatch<SetStateAction<BasketRow[]>>;
   markets: Record<string, MarketMeta>;
-  registered: Record<string, boolean | undefined>;
+  registered: Registration;
   rules: RegistryRules;
   reads: Record<string, MarketRead | undefined>;
   minimum: BasketMinimum;
@@ -38,9 +38,29 @@ interface Props {
 /** The legs as an editable ledger: a market, long or short, and a weight, with what the venue says about each. */
 export function LegsEditor({ rows, setRows, markets, registered, rules, reads, minimum, rowIssues, idPrefix }: Props) {
   const added = useRef(0);
+  // a control to focus once the rows the last action produced are on the page
+  const focusNext = useRef<string | null>(null);
+  useEffect(() => {
+    if (!focusNext.current) return;
+    document.getElementById(focusNext.current)?.focus();
+    focusNext.current = null;
+  }, [rows]);
+
+  const addId = `${idPrefix}-add`;
   const options = Object.entries(markets).sort((a, b) => a[1].symbol.localeCompare(b[1].symbol));
   const set = (key: string, patch: Partial<BasketRow>) => setRows((rs) => rs.map((r) => (r.key === key ? { ...r, ...patch } : r)));
-  const remove = (key: string) => setRows((rs) => rs.filter((r) => r.key !== key));
+  const remove = (i: number) => {
+    // focus goes to the row above, or to "Add a leg" when the first row goes
+    focusNext.current = i > 0 ? `${idPrefix}-${rows[i - 1].key}-x` : addId;
+    const key = rows[i].key;
+    setRows((rs) => rs.filter((r) => r.key !== key));
+  };
+  const add = () => {
+    // the key is taken outside the updater, which React may run twice
+    const row = blankRow(`a${++added.current}`);
+    focusNext.current = `${idPrefix}-${row.key}-m`;
+    setRows((rs) => [...rs, row]);
+  };
   const perLeg = minimum.status === "ok" ? new Map(minimum.minimum.perLeg.map((p) => [p.pool.toLowerCase(), p])) : new Map();
   const binding = minimum.status === "ok" ? minimum.minimum.bindingPool.toLowerCase() : null;
 
@@ -53,6 +73,7 @@ export function LegsEditor({ rows, setRows, markets, registered, rules, reads, m
           const read = pool ? reads[pool] : undefined;
           const meta = pool ? markets[pool] : undefined;
           const issues = rowIssues.get(i) ?? [];
+          const invalid = issues.some((x) => x.severity === "error");
           const leg = perLeg.get(pool);
           let facts: string | null = null;
           if (pool && read?.status === "ok") {
@@ -62,8 +83,10 @@ export function LegsEditor({ rows, setRows, markets, registered, rules, reads, m
             facts = parts.join(" · ");
           } else if (pool && read?.status === "error") facts = "the pool did not answer: its mark and minimum order are unknown";
           else if (pool) facts = "reading the pool…";
+          const showFacts = !!facts || (binding === pool && rows.length > 1);
+          const describedBy = [showFacts ? `${id}-facts` : "", issues.length ? `${id}-err` : ""].filter(Boolean).join(" ") || undefined;
           return (
-            <li key={r.key} className={styles.row} data-invalid={issues.some((x) => x.severity === "error") ? "" : undefined}>
+            <li key={r.key} className={styles.row} data-invalid={invalid ? "" : undefined}>
               <span className={styles.idx} aria-hidden="true">
                 {i + 1}
               </span>
@@ -71,7 +94,15 @@ export function LegsEditor({ rows, setRows, markets, registered, rules, reads, m
                 <label className="sr-only" htmlFor={`${id}-m`}>
                   Market for leg {i + 1}
                 </label>
-                <select id={`${id}-m`} className={styles.select} value={pool} onChange={(e) => set(r.key, { pool: e.target.value as Address | "" })}>
+                <select
+                  id={`${id}-m`}
+                  className={styles.select}
+                  value={pool}
+                  onChange={(e) => set(r.key, { pool: e.target.value as Address | "" })}
+                  aria-invalid={invalid ? true : undefined}
+                  aria-describedby={describedBy}
+                  aria-errormessage={invalid ? `${id}-err` : undefined}
+                >
                   <option value="">Choose a market</option>
                   {options.map(([p, m]) => (
                     <option key={p} value={p} disabled={registered[p] === false}>
@@ -103,17 +134,24 @@ export function LegsEditor({ rows, setRows, markets, registered, rules, reads, m
                   autoComplete="off"
                   spellCheck={false}
                   placeholder="0"
-                  aria-invalid={issues.some((x) => x.severity === "error") ? true : undefined}
+                  aria-invalid={invalid ? true : undefined}
+                  aria-describedby={describedBy}
+                  aria-errormessage={invalid ? `${id}-err` : undefined}
                 />
                 <span aria-hidden="true">%</span>
               </span>
-              <button type="button" className={styles.remove} onClick={() => remove(r.key)} aria-label={`Remove leg ${i + 1}`}>
+              <button type="button" id={`${id}-x`} className={styles.remove} onClick={() => remove(i)} aria-label={`Remove leg ${i + 1}`}>
                 <span aria-hidden="true">×</span>
               </button>
-              {(facts || (binding && binding === pool && rows.length > 1)) && (
-                <p className={styles.facts}>
+              {showFacts && (
+                <p id={`${id}-facts`} className={styles.facts}>
                   {facts}
                   {binding === pool && rows.length > 1 && leg && <span className={styles.sets}> · sets the minimum</span>}
+                </p>
+              )}
+              {issues.length > 0 && (
+                <p id={`${id}-err`} className={styles.rowErr}>
+                  {issues.map((x) => x.message).join(" ")}
                 </p>
               )}
             </li>
@@ -121,11 +159,7 @@ export function LegsEditor({ rows, setRows, markets, registered, rules, reads, m
         })}
       </ol>
       <div className={styles.add}>
-        <button type="button" className={f.apply} onClick={() => {
-            // the key is taken outside the updater, which React may run twice
-            const row = blankRow(`a${++added.current}`);
-            setRows((rs) => [...rs, row]);
-          }} disabled={rows.length >= rules.maxLegs}>
+        <button type="button" id={addId} className={f.apply} onClick={add} disabled={rows.length >= rules.maxLegs}>
           Add a leg
         </button>
         <span className={f.hint}>{rows.length >= rules.maxLegs ? `${rules.maxLegs} legs is the registry's limit` : `${rows.length} of ${rules.maxLegs} legs`}</span>
@@ -137,7 +171,18 @@ export function LegsEditor({ rows, setRows, markets, registered, rules, reads, m
 const KIND: Record<BasketIssue["severity"], string> = { error: "Refused", checking: "Checking", wait: "Wait" };
 
 /** What would stop the transaction, before it is signed: each named by the registry error it mirrors, or the app's own rule. */
-export function IssueList({ issues, onFix, label }: { issues: readonly BasketIssue[]; onFix?: (row: number, weight: string) => void; label: string }) {
+export function IssueList({
+  issues,
+  onFix,
+  onRetry,
+  label,
+}: {
+  issues: readonly BasketIssue[];
+  onFix?: (row: number, weight: string) => void;
+  /** Reads again what could not be read (a market's registration). */
+  onRetry?: () => void;
+  label: string;
+}) {
   return (
     <div aria-live="polite">
       {issues.length > 0 && (
@@ -150,11 +195,18 @@ export function IssueList({ issues, onFix, label }: { issues: readonly BasketIss
                   <span className={f.rkind}>{KIND[x.severity]}</span>
                   {x.message}
                 </p>
-                {x.fix && onFix && (
+                {((x.fix && onFix) || (x.retry && onRetry)) && (
                   <p className={f.rneeds}>
-                    <button type="button" className={f.apply} onClick={() => onFix(x.fix!.row, x.fix!.weight)}>
-                      Use {x.fix.weight}%
-                    </button>
+                    {x.fix && onFix && (
+                      <button type="button" className={f.apply} onClick={() => onFix(x.fix!.row, x.fix!.weight)}>
+                        Use {x.fix.weight}%
+                      </button>
+                    )}
+                    {x.retry && onRetry && (
+                      <button type="button" className={f.apply} onClick={onRetry}>
+                        Read again
+                      </button>
+                    )}
                   </p>
                 )}
               </div>

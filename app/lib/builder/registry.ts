@@ -49,7 +49,8 @@ export async function readUpdatedAt(
   expect: { creator: Address; version: number },
 ): Promise<number | null> {
   const word = await client.getStorageAt({ address: themes, slot: themeSlot(id) });
-  if (!word) return null;
+  // some nodes answer an empty slot with "0x": no word, no clock
+  if (!word || word === "0x") return null;
   const d = decodeThemeWord(word);
   if (d.creator.toLowerCase() !== expect.creator.toLowerCase() || d.version !== expect.version || d.updatedAt === 0) return null;
   return d.updatedAt;

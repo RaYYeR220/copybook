@@ -32,7 +32,7 @@ export type RegistryError =
   | "RebalanceTooSoon"
   | "NoChange";
 
-export type AppCheck = "PickMarket" | "WeightMissing" | "WeightInvalid" | "RegistrationUnknown" | "NameMissing" | "NameTooLong" | "NameInvalid" | "UriInvalid" | "UriTooLong";
+export type AppCheck = "PickMarket" | "WeightMissing" | "WeightInvalid" | "RegistrationUnknown" | "RegistrationUnread" | "NameMissing" | "NameTooLong" | "NameInvalid" | "UriInvalid" | "UriTooLong";
 
 export interface BasketIssue {
   code: RegistryError | AppCheck;
@@ -45,6 +45,8 @@ export interface BasketIssue {
   message: string;
   /** A one-click fix: set this row's weight (percent). */
   fix?: { row: number; weight: string };
+  /** The check could not be read: offer to read it again. */
+  retry?: true;
   /** For RebalanceTooSoon: chain seconds left. */
   waitSeconds?: number;
 }
@@ -110,6 +112,9 @@ export function parseRows(rows: readonly BasketRow[]): ParsedRows {
 
 const lc = (a: string) => a.toLowerCase();
 
+/** The margin bank's answer per pool (lower-case): registered or not, `unread` when the read failed, absent while reading. */
+export type Registration = Record<string, boolean | "unread" | undefined>;
+
 /**
  * `ThemeRegistry._validate`, before signing. The contract reverts on the first failure; this lists every one, each
  * named by the error the contract would revert with, in the contract's order: the leg count, then per leg
@@ -119,7 +124,7 @@ const lc = (a: string) => a.toLowerCase();
 export function checkBasket(
   legs: readonly Leg[],
   rules: RegistryRules,
-  registered: Record<string, boolean | undefined>,
+  registered: Registration,
   label: (pool: Address, i: number) => string = (pool, i) => `Leg ${i + 1} (${shortHex(pool)})`,
 ): BasketIssue[] {
   const out: BasketIssue[] = [];
@@ -145,6 +150,15 @@ export function checkBasket(
     else {
       const r = registered[lc(l.pool)];
       if (r === false) reg("ForeignPool", `${name} is not a perp market registered with the margin bank the registry checks`, { row: i });
+      else if (r === "unread")
+        out.push({
+          code: "RegistrationUnread",
+          by: "registry",
+          severity: "checking",
+          row: i,
+          retry: true,
+          message: `Whether ${name} is registered with the margin bank (ForeignPool) could not be read, so it cannot be signed yet.`,
+        });
       else if (r === undefined)
         out.push({ code: "RegistrationUnknown", by: "registry", severity: "checking", row: i, message: `Checking that ${name} is registered with the margin bank (ForeignPool)…` });
     }
@@ -205,7 +219,7 @@ export interface RebalanceInput {
   /** The chain's clock (the latest block's timestamp, carried forward); null until read. */
   chainNow: number | null;
   rules: RegistryRules;
-  registered: Record<string, boolean | undefined>;
+  registered: Registration;
   label?: (pool: Address, i: number) => string;
 }
 

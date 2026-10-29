@@ -4,6 +4,7 @@ import { useQueries, useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import type { Address, PublicClient } from "viem";
 import type { Copybook } from "@copybook/sdk";
+import type { Registration } from "@/lib/builder/basket";
 import { bankRegistryAbi, type MarketRead } from "@/lib/builder/registry";
 
 const lc = (a: string) => a.toLowerCase();
@@ -34,9 +35,9 @@ export function useMarketReads(cb: Copybook, pools: readonly Address[]): { reads
 
 /**
  * The margin bank's `isPerpPoolRegistered` for each chosen pool: the server's answer where it has one, read here
- * for any it could not read.
+ * for any it could not read. A read that failed is `unread` until `retry` reads it again.
  */
-export function useRegistration(client: PublicClient, bank: Address | null, pools: readonly Address[], known: Record<string, boolean>) {
+export function useRegistration(client: PublicClient, bank: Address | null, pools: readonly Address[], known: Record<string, boolean>): { registration: Registration; retry: () => void } {
   const missing = useMemo(() => [...new Set(pools.map(lc))].filter((p) => known[p] === undefined).sort(), [pools, known]);
   const qs = useQueries({
     queries: missing.map((p) => ({
@@ -47,11 +48,17 @@ export function useRegistration(client: PublicClient, bank: Address | null, pool
       retry: 2,
     })),
   });
-  const out: Record<string, boolean | undefined> = { ...known };
+  const out: Registration = { ...known };
   missing.forEach((p, i) => {
     if (qs[i].data !== undefined) out[p] = qs[i].data;
+    else if (qs[i].isError || (!bank && !qs[i].isFetching)) out[p] = "unread";
   });
-  return out;
+  return {
+    registration: out,
+    retry: () => {
+      for (const q of qs) if (q.isError) void q.refetch();
+    },
+  };
 }
 
 /**

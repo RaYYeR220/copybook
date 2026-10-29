@@ -95,6 +95,12 @@ describe("the ThemeRegistry's rules, mirrored before signing", () => {
     expect(codes([{ pool: FOREIGN, weightBps: 5000 }])).toEqual(["ForeignPool"]);
   });
 
+  it("a registration read that failed says so and offers to read it again", () => {
+    const issues = checkBasket([{ pool: SOL, weightBps: 5000 }], rules, { [SOL.toLowerCase()]: "unread" });
+    expect(issues.map((i) => [i.code, i.severity, i.retry])).toEqual([["RegistrationUnread", "checking", true]]);
+    expect(issues[0].message).toMatch(/could not be read/);
+  });
+
   it("an unread registration holds signing back until it is known", () => {
     const issues = checkBasket([{ pool: SOL, weightBps: 5000 }], rules, {});
     expect(issues.map((i) => [i.code, i.severity])).toEqual([["RegistrationUnknown", "checking"]]);

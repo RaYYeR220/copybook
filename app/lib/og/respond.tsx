@@ -93,7 +93,8 @@ export const thesisCard = (
 ) =>
   cardResponse(
     async () => {
-      if (!ID_RE.test(raw) || BigInt(raw) === 0n) return null;
+      // one card per thesis: "01" or "001" is not another address for #1
+      if (!ID_RE.test(raw) || BigInt(raw) === 0n || BigInt(raw).toString() !== raw) return null;
       const id = BigInt(raw);
       const t = await deps.thesis(id); // throws when the registry cannot be read: a 502, not a 404
       if (!t) return null;

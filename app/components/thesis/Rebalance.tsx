@@ -151,10 +151,15 @@ function RebalanceForm({ pub, thesis, who, markets, registered, bank, rules }: O
   const opensAt = updatedAt === null ? null : updatedAt + rules.minRebalanceInterval;
   const shownWait = opensAt === null || chainNow === undefined ? 0 : rebalanceWait(updatedAt!, chainNow, rules.minRebalanceInterval);
   const confirmedOpen = opensAt === null || (clock.read !== undefined && clock.read.ts >= opensAt);
+  // once the countdown is out, read the head every second until a block's own timestamp is past the interval
+  const refreshClock = clock.refresh;
   useEffect(() => {
-    if (shownWait === 0 && !confirmedOpen) void clock.refresh();
+    if (shownWait > 0 || confirmedOpen) return;
+    void refreshClock();
+    const t = setInterval(() => void refreshClock(), 1_000);
+    return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shownWait, confirmedOpen]);
+  }, [shownWait === 0, confirmedOpen]);
 
   const errors = b.issues.filter((x) => x.severity !== "wait");
   const waiting = !confirmedOpen;
@@ -228,7 +233,7 @@ function RebalanceForm({ pub, thesis, who, markets, registered, bank, rules }: O
           <ShapeLedger legs={b.parsed.legs} rules={rules} />
         </Block>
 
-        <IssueList issues={b.issues} label="What would stop this rebalance" onFix={(row, weight) => setRows((rs) => rs.map((r, i) => (i === row ? { ...r, weight } : r)))} />
+        <IssueList issues={b.issues} label="What would stop this rebalance" onRetry={b.retryRegistration} onFix={(row, weight) => setRows((rs) => rs.map((r, i) => (i === row ? { ...r, weight } : r)))} />
 
         <Call>
           ThemeRegistry {shortHex(reader.deployments.themes)} · <LegsCall fn="rebalance" head={[thesis.id.toString()]} legs={b.parsed.legs} label={b.label} />

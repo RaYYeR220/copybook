@@ -213,6 +213,8 @@ describe("the card routes", () => {
     expect((await thesisCard("2", { ...cardDeps(), thesis })).status).toBe(404);
     expect((await thesisCard("0", { ...cardDeps(), thesis })).status).toBe(404);
     expect((await thesisCard("x", { ...cardDeps(), thesis })).status).toBe(404);
+    expect((await thesisCard("01", { ...cardDeps(), thesis })).status).toBe(404);
+    expect((await thesisCard("001", { ...cardDeps(), thesis })).status).toBe(404);
     const down = await thesisCard("1", {
       ...cardDeps(),
       thesis: async () => {

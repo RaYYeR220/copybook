@@ -137,6 +137,7 @@ export function ThesisBuilder({ pub, markets, registered, bank, rules }: Props) 
           <IssueList
             issues={shown}
             label="What would stop this thesis"
+            onRetry={b.retryRegistration}
             onFix={(row, weight) => edit((rs) => rs.map((r, i) => (i === row ? { ...r, weight } : r)))}
           />
 

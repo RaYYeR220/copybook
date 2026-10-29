@@ -31,6 +31,8 @@ describe("the registry's clock, read from storage", () => {
     expect(await readUpdatedAt(client, THEMES, 1n, { creator: OWNER, version: 3 })).toBeNull();
     expect(await readUpdatedAt(client, THEMES, 1n, { creator: BTC, version: 2 })).toBeNull();
     expect(await readUpdatedAt({ getStorageAt: async () => undefined }, THEMES, 1n, { creator: OWNER, version: 2 })).toBeNull();
+    expect(await readUpdatedAt({ getStorageAt: async () => "0x" }, THEMES, 1n, { creator: OWNER, version: 2 })).toBeNull();
+    expect(await readUpdatedAt({ getStorageAt: async () => `0x${"0".repeat(64)}` as Hex }, THEMES, 1n, { creator: OWNER, version: 2 })).toBeNull();
   });
 
   it("reads the four limits from the registry's constants", async () => {

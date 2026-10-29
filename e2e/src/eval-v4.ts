@@ -10,6 +10,10 @@
 // COPYBOOK_ENV=<env file> tsx src/eval-v4.ts anchor <commit>
 //   writes the commit hash and the keccak256 of the committed key on Hideki (a zero-value self-transfer from the hub
 //   owner), after checking the committed key is byte-identical to the file; the transaction goes to eval/v4/anchor.json.
+// COPYBOOK_ENV=<env file> tsx src/eval-v4.ts replay <ISO time>
+//   draws the sample again as it stood at that time: every timestamp filter the draw sends to the indexer is also
+//   bounded above by it, and the exclusions are read from the commit the key was drawn on (dfceabc). Compares the
+//   screened accounts and the 20 picks with the committed key and writes eval/v4/draw.json; the key is not touched.
 // tsx src/eval-v4.ts score [--reproduce-v3]
 //   runs `tsx e2e/src/eval.ts score v3`, unchanged, in a scratch copy of the tree whose eval/v3/answer-key.json is run
 //   v4's key, and writes its results to eval/v4/results.json (run "v4", with the scorer's git blob). With
@@ -27,6 +31,9 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const KEY = resolve(ROOT, "eval/v4/answer-key.json");
 const RESULTS = resolve(ROOT, "eval/v4/results.json");
 const ANCHOR = resolve(ROOT, "eval/v4/anchor.json");
+const DRAW = resolve(ROOT, "eval/v4/draw.json");
+/** The commit the sample was drawn on: the parent of the anchored key commit. */
+const DRAWN_ON = "dfceabc";
 const ENDPOINT = "https://copybook-eosin.vercel.app/api/risk/";
 /** The endpoint's row cap per trader and table: screening sees what the endpoint sees. */
 const ROW_CAP = 2000;
@@ -52,6 +59,8 @@ const write = (path: string, v: unknown) => {
 };
 const readJson = <T>(rel: string) => JSON.parse(readFileSync(resolve(ROOT, rel), "utf8")) as T;
 const git = (...args: string[]) => execFileSync("git", args, { cwd: ROOT }).toString().trim();
+/** A file as it is in the working tree, or as committed in `rev`. */
+const readJsonAt = <T>(rel: string, rev?: string) => (rev ? (JSON.parse(git("show", `${rev}:${rel}`)) as T) : readJson<T>(rel));
 
 function strataOf(s: TraderStats): Stratum {
   if (s.liquidations30d >= 2) return "liquidated-2+";
@@ -59,8 +68,9 @@ function strataOf(s: TraderStats): Stratum {
   return s.trades30d < 10 || !s.hasHistory ? "thin" : "clean";
 }
 
-/** Accounts no earlier run reviewed or screened, and none of ours. */
-function excluded(): { all: Set<string>; counts: Record<string, number> } {
+/** Accounts no earlier run reviewed or screened, and none of ours; from the working tree, or as committed in `rev`. */
+function excluded(rev?: string): { all: Set<string>; counts: Record<string, number> } {
+  const readJson = <T>(rel: string) => readJsonAt<T>(rel, rev);
   const add = (set: Set<string>, a: unknown) => typeof a === "string" && /^0x[0-9a-fA-F]{40}$/.test(a) && set.add(a.toLowerCase());
   const earlier = new Set<string>();
   const risk = readJson<{ reviews: { trader: string }[]; shannon: { reviewer: string }; hideki: { gate: string }; previousReviewers?: { reviewer: string }[] }>("deployments/risk.json");
@@ -95,6 +105,23 @@ const ACTIVE_ACCOUNTS = `query ActiveAccounts($since:numeric!){
   PerpPositionChange(where:{timestamp:{_gte:$since}},order_by:[{timestamp:desc},{id:desc}],limit:1000){ account timestamp }}`;
 
 type Pool = { name: string; target: Stratum; accounts: string[] };
+
+/** An indexer whose every `timestamp >= since` filter is also bounded above, to read the indexer as it stood at `until`. */
+class BoundedIndexer extends Indexer {
+  constructor(
+    opts: ConstructorParameters<typeof Indexer>[0],
+    private readonly until: number,
+  ) {
+    super(opts);
+  }
+  override query<T>(operationName: string, query: string, variables: Record<string, unknown> = {}): Promise<T> {
+    const bounded = query.split("timestamp:{_gte:$since}").join(`timestamp:{_gte:$since,_lte:${this.until}}`);
+    // every query the draw sends with a time window must carry the bound; the others (leverage, last active,
+    // markets) have no time filter
+    if (/\$since/.test(query) && bounded === query) throw new Error(`${operationName}: no timestamp filter to bound`);
+    return super.query<T>(operationName, bounded, variables);
+  }
+}
 
 async function pools(ix: Indexer, since: number): Promise<Pool[]> {
   const liq = await ix.query<{ LiquidationEvent: { account: string; timestamp: string; txHash: string }[] }>("LiquidatedAccounts", LIQUIDATED_ACCOUNTS, { since: String(since) });
@@ -188,27 +215,10 @@ async function frozenState() {
   return state;
 }
 
-async function select() {
-  const frozen = await frozenState();
-  console.log("  frozen state", JSON.stringify(frozen));
-  const bad = [
-    !frozen.sameReviewerAsRunV3 && "reviewer",
-    !frozen.gateAsksThisReviewer && "gate.reviewer",
-    !frozen.reviewerAnswersThisGate && "reviewer.gate",
-    frozen.summarySelector !== "rubric" && "summarySelector",
-    !frozen.systemPromptIsRunV3s && "systemPrompt",
-    frozen.baseUrl !== ENDPOINT && "baseUrl",
-    frozen.scorerBlob !== frozen.scorerBlobAtRunV3 && "scorer",
-  ].filter(Boolean);
-  if (bad.length) throw new Error(`not run v3's setup: ${bad.join(", ")}`);
-  // eval/rubric.ts changed after run v3 only in a comment: its code lines must be identical
-  const code = (rev: string) => git("show", `${rev}:eval/rubric.ts`).split(/\r?\n/).filter((l) => !/^\s*\/\//.test(l)).join("\n");
-  if (code("HEAD") !== code("5aed53b")) throw new Error("eval/rubric.ts code differs from run v3's");
-
-  const { all: skip, counts: excludedCounts } = excluded();
-  const now = Math.floor(Date.now() / 1000);
+/** The draw: pools in their fixed order, screening by quota, then the fallback. `now` ends the 30-day window. */
+async function draw(now: number, ix: Indexer, exclusionsAt?: string) {
+  const { all: skip, counts: excludedCounts } = excluded(exclusionsAt);
   const since = now - WINDOW_DAYS * 86400;
-  const ix = new Indexer({ maxRows: ROW_CAP, delayMs: 150 });
   const candidatePools = await pools(ix, since);
 
   type Screened = { trader: string; pool: string; stratum: string; taken: boolean; takenBy?: "quota" | "fallback"; line?: string };
@@ -251,6 +261,29 @@ async function select() {
     console.log(`  take (fallback) ${s.stratum.padEnd(13)} ${s.trader}`);
   }
   if (picked.length < TOTAL) throw new Error(`only ${picked.length} of ${TOTAL} traders within ${MAX_SCREENED} screened accounts`);
+
+  return { excludedCounts, candidatePools, screened, picked, shortfall, fallbackUsed };
+}
+
+async function select() {
+  const frozen = await frozenState();
+  console.log("  frozen state", JSON.stringify(frozen));
+  const bad = [
+    !frozen.sameReviewerAsRunV3 && "reviewer",
+    !frozen.gateAsksThisReviewer && "gate.reviewer",
+    !frozen.reviewerAnswersThisGate && "reviewer.gate",
+    frozen.summarySelector !== "rubric" && "summarySelector",
+    !frozen.systemPromptIsRunV3s && "systemPrompt",
+    frozen.baseUrl !== ENDPOINT && "baseUrl",
+    frozen.scorerBlob !== frozen.scorerBlobAtRunV3 && "scorer",
+  ].filter(Boolean);
+  if (bad.length) throw new Error(`not run v3's setup: ${bad.join(", ")}`);
+  // eval/rubric.ts changed after run v3 only in a comment: its code lines must be identical
+  const code = (rev: string) => git("show", `${rev}:eval/rubric.ts`).split(/\r?\n/).filter((l) => !/^\s*\/\//.test(l)).join("\n");
+  if (code("HEAD") !== code("5aed53b")) throw new Error("eval/rubric.ts code differs from run v3's");
+
+  const now = Math.floor(Date.now() / 1000);
+  const { excludedCounts, candidatePools, screened, picked, shortfall, fallbackUsed } = await draw(now, new Indexer({ maxRows: ROW_CAP, delayMs: 150 }));
 
   // the answer key: the rubric line the endpoint serves now, and the rubric's tier for it
   const traders = [];
@@ -303,6 +336,53 @@ async function select() {
     traders,
   });
   console.log(`  wrote ${KEY}: ${traders.length} traders, expected ${JSON.stringify(count(traders.map((t) => t.expectedTier)))}; screened ${screened.length}; fallback ${fallbackUsed ? JSON.stringify(shortfall) : "not used"}`);
+}
+
+/** Draws the sample again as the indexer stood at `at`, and compares it with the committed key. */
+async function replay(at: string) {
+  const ms = Date.parse(at);
+  if (!Number.isFinite(ms)) throw new Error("an ISO time expected, e.g. 2026-10-29T22:39:04Z");
+  const now = Math.floor(ms / 1000);
+  const key = readJson<{ generatedAt: string; frozen: { readAt: string }; selection: { screened: { trader: string; pool: string; stratum: string; taken: boolean; takenBy?: string; line?: string }[] }; traders: { trader: string; pickedAs: string; pool: string; pickedBy: string }[] }>("eval/v4/answer-key.json");
+  const d = await draw(now, new BoundedIndexer({ maxRows: ROW_CAP, delayMs: 150 }, now), DRAWN_ON);
+  const pick = (x: { trader: string; pool: string; stratum: string; taken: boolean; takenBy?: string }) => `${x.trader.toLowerCase()}|${x.pool}|${x.stratum}|${x.taken}|${x.takenBy ?? ""}`;
+  const was = key.selection.screened.map(pick);
+  const is = d.screened.map(pick);
+  const firstDiff = was.findIndex((x, i) => x !== is[i]);
+  const sameScreened = was.length === is.length && firstDiff === -1;
+  const picks = (xs: { trader: string; pickedAs: string; pool: string; by: string }[]) => xs.map((x) => `${x.trader.toLowerCase()}|${x.pickedAs}|${x.pool}|${x.by}`).join(",");
+  const samePicks = picks(key.traders.map((t) => ({ ...t, by: t.pickedBy }))) === picks(d.picked);
+  const lineDiffs = d.screened.filter((x, i) => key.selection.screened[i] && x.line !== key.selection.screened[i].line).map((x) => x.trader);
+  const out = {
+    run: "v4",
+    about:
+      "How run v4's sample was drawn and how to draw it again. Written after the run: the anchored key (eval/v4/answer-key.json) is unchanged.",
+    drawnOn: `${DRAWN_ON} (the parent of the anchored key commit a7c42c2)`,
+    now: {
+      recorded: false,
+      note: `The draw's clock (the end of its 30-day window) was not written down. It was read after the reviewer's settings (frozen.readAt ${key.frozen.readAt}) and before the first account was screened; the key was written at ${key.generatedAt}.`,
+    },
+    windowDays: WINDOW_DAYS,
+    rowCap: ROW_CAP,
+    maxScreened: MAX_SCREENED,
+    replay: {
+      command: `COPYBOOK_ENV=<env file> npm run eval:v4 replay ${at}`,
+      at: new Date(now * 1000).toISOString(),
+      how: `every timestamp filter the draw sends to the indexer is also bounded above by ${now} (${new Date(now * 1000).toISOString()}); the exclusions come from deployments/risk.json, deployments/hideki.json, eval/answer-key.json and eval/v3/answer-key.json as committed in ${DRAWN_ON}, and from the env file's own wallets`,
+      ranAt: new Date().toISOString(),
+      screened: d.screened.length,
+      sameScreenedAccounts: sameScreened,
+      ...(sameScreened ? {} : { firstDifference: { index: firstDiff, key: was[firstDiff], replay: is[firstDiff] } }),
+      samePicks,
+      excluded: d.excludedCounts,
+      pools: d.candidatePools.map((p) => ({ name: p.name, size: p.accounts.length })),
+      screenedLinesThatDiffer: lineDiffs.length,
+      ...(lineDiffs.length ? { screenedLinesThatDifferNote: "lines carry figures the bound does not cover (leverage settings change the drawdown percentage); the strata and picks above are what the draw used" } : {}),
+    },
+  };
+  write(DRAW, out);
+  console.log(JSON.stringify(out.replay, null, 2));
+  if (!sameScreened || !samePicks) process.exitCode = 1;
 }
 
 async function anchor(commit: string) {
@@ -373,6 +453,7 @@ const [cmd, ...args] = process.argv.slice(2);
 if (cmd === "select") {
   if (existsSync(KEY)) throw new Error(`${KEY} exists: the key is written once`);
   await select();
-} else if (cmd === "anchor") await anchor(args[0]);
+} else if (cmd === "replay") await replay(args[0]);
+else if (cmd === "anchor") await anchor(args[0]);
 else if (cmd === "score") score(args[0] === "--reproduce-v3");
-else throw new Error("steps: select | anchor <commit> | score [--reproduce-v3]");
+else throw new Error("steps: select | replay <ISO time> | anchor <commit> | score [--reproduce-v3]");

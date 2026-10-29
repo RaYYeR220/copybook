@@ -204,7 +204,7 @@ passed (`npm run risk review <leader>`).
 **The asymmetry of the hold.** A new BLOCK may replace a stored BLOCK at any time, while a milder verdict must wait out
 the 24 h hold. Re-rolling a trader into BLOCK is therefore cheaper than getting out of one. What limits this is that
 reviews cost a fee (0.5 STT) and a 10-minute cooldown, and that on the rubric line the committees answered unanimously
-in every review of the scorecard's runs, so asking again for the same line returns the same answer.
+in every review; whether a repeat review of the same line gives the same answer was not tested.
 
 **Refilling the reviewer.** Agent deposits are paid on Shannon from the reviewer's balance: 0.36 STT is held per review
 up front (0.12 + 0.24 at today's platform floor) and about 0.215 STT is spent once the platform returns the unused part.

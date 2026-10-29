@@ -23,7 +23,7 @@ basket of perps, long and short, that its creator rebalances).
 | | |
 | --- | --- |
 | App | https://copybook-eosin.vercel.app |
-| Demo video | <!-- VIDEO --> |
+| Demo video | https://youtu.be/HpLdCtyvta0 (2:22) |
 | For judges | [JUDGES.md](JUDGES.md): a five-minute path |
 | Proof ledger | [docs/PROOF.md](docs/PROOF.md): 360 transactions read back from the chain, 360 verified (Hideki block 36,407,680, 2026-10-29) |
 | Claims and their evidence | [docs/CLAIMS.md](docs/CLAIMS.md) |

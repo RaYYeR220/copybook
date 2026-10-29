@@ -80,7 +80,7 @@ block, position, sender, target, function, gas and events checked.
 | How faithfully the committee applies the rubric, with answer keys written on chain before the reviews | [Scorecard result](eval/SCORECARD.md#result), [pre-registration](eval/SCORECARD.md#pre-registration) |
 | Every claim in the README, the landing page and the MCP README, with its evidence | [docs/CLAIMS.md](docs/CLAIMS.md) |
 | Reproducible reports on the dreamDEX stack | [`feedback/`](feedback/) |
-| Demo video | <!-- VIDEO --> |
+| Demo video | https://youtu.be/HpLdCtyvta0 (2:22) |
 
 Re-check it yourself (read-only, public RPCs, no key):
 

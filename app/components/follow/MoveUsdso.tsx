@@ -20,7 +20,7 @@ export function FundsHelp() {
   return (
     <div className={styles.funds} data-funds="">
       <p className={styles.lead}>
-        No USDso in this wallet. Message{" "}
+        No USDso on spot in this wallet. Message{" "}
         <a className="lnk" href={FUNDS_X_URL} target="_blank" rel="noopener noreferrer">
           {FUNDS_X_HANDLE}
         </a>{" "}

@@ -58,6 +58,15 @@ export function suggestedDeposit(equity: bigint | null, target: bigint | undefin
   return short < spot ? short : spot;
 }
 
+/**
+ * Where the form starts: an approval already waiting for its deposit (above zero, below the suggestion) wins, so a
+ * reload after the approval landed resumes on the deposit of that amount; otherwise the suggestion.
+ */
+export function initialMove(equity: bigint | null, target: bigint | undefined, spot: bigint, allowance: bigint | null): bigint {
+  const suggested = suggestedDeposit(equity, target, spot);
+  return allowance !== null && allowance > 0n && allowance < suggested ? allowance : suggested;
+}
+
 /** A USDso amount as typed: up to 18 decimals, so a whole balance can be typed back. */
 export const parseUsdso = (s: string): bigint | null => parseFixed(s, 18);
 

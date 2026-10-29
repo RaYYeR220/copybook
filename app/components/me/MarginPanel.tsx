@@ -7,7 +7,7 @@ import { Ledger, type LedgerRow } from "@/components/Ledger";
 import { PanelNote } from "@/components/app/Panel";
 import { FundsHelp, MOVE_ACTIONS, MoveUsdso } from "@/components/follow/MoveUsdso";
 import { txFor, type useTx } from "@/components/follow/hooks";
-import { suggestedDeposit, type MarginTarget } from "@/lib/follow/margin";
+import { initialMove, type MarginTarget } from "@/lib/follow/margin";
 import { fmtUsd18, fmtUsdso } from "@/lib/units";
 import styles from "./Me.module.css";
 
@@ -58,7 +58,7 @@ export function MarginPanel({
         ) : spot === 0n ? (
           <FundsHelp />
         ) : open || inFlight ? (
-          <MoveUsdso id="me-move-usdso" spot={spot} allowance={funding?.allowance ?? null} initial={suggestedDeposit(equity, target?.amount, spot)} bank={bank} writer={writer} tx={tx} />
+          <MoveUsdso id="me-move-usdso" spot={spot} allowance={funding?.allowance ?? null} initial={initialMove(equity, target?.amount, spot, funding?.allowance ?? null)} bank={bank} writer={writer} tx={tx} />
         ) : (
           <button type="button" className={styles.link} onClick={() => setOpen(true)}>
             Move USDso into your perps account

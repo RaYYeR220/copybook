@@ -388,7 +388,6 @@ function NotFollowing({ who, data, names, reader, writer, tx }: { who: Address; 
   const rows: LedgerRow[] = [
     { label: "Gas tank", value: <b>{fmtStt(st.tank)}</b>, note: st.tank > 0n ? "left from an earlier follow: all of it can come out" : undefined },
     { label: "Operator grant", value: data.approved === undefined ? "unread" : data.approved ? "global" : "none", note: data.approved ? "it outlives a follow until you revoke it" : undefined },
-    { label: "Perps equity", value: data.equity !== null ? fmtUsd18(data.equity) : "unread" },
     { label: "AI guard", value: st.guardOn ? "On" : "Off", note: "applies to the next trader this wallet follows" },
   ];
   return (

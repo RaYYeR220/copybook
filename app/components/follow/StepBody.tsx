@@ -12,7 +12,7 @@ import { DREAMDEX_URL } from "@/content/site";
 import { askValidators, type AskPhase } from "@/lib/ask";
 import { txUrl } from "@/lib/explorer";
 import type { ChainReads, FlowView, LocalChoices, ReadsState } from "@/lib/follow/flow";
-import { suggestedDeposit, type MarginTarget } from "@/lib/follow/margin";
+import { initialMove, type MarginTarget } from "@/lib/follow/margin";
 import type { FormField, ParsedPolicy, PolicyFormValues } from "@/lib/follow/policyForm";
 import { blocks, reasonsFor } from "@/lib/follow/reasons";
 import { takeovers, type HeldPosition, type Takeover } from "@/lib/follow/takeover";
@@ -300,12 +300,12 @@ function MarginStep({ view, data, reader, writer, tx, setLocal, refetch, target 
         (spot === null ? (
           <p className={styles.checking}>This wallet&apos;s USDso could not be read. Check again, or move it on dreamDEX with the Perps ⇆ Spot transfer.</p>
         ) : spot > 0n ? (
-          <MoveUsdso id="move-usdso" spot={spot} allowance={data?.marginAllowance ?? null} initial={suggestedDeposit(equity, target?.amount, spot)} bank={reader.deployments.marginBank} writer={writer} tx={tx} />
+          <MoveUsdso id="move-usdso" spot={spot} allowance={data?.marginAllowance ?? null} initial={initialMove(equity, target?.amount, spot, data?.marginAllowance ?? null)} bank={reader.deployments.marginBank} writer={writer} tx={tx} />
         ) : (
           <FundsHelp />
         ))}
       <Acts>
-        <Button size="md" variant={moving ? "secondary" : "primary"} disabled={tx.busy} onClick={refetch}>
+        <Button size="md" variant={moving ? "quiet" : "primary"} disabled={tx.busy} onClick={refetch}>
           Check again
         </Button>
         {(unreadable || spot === null) && (

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Address } from "viem";
-import { checkMove, followMarginTarget, marginTarget, parseUsdso, suggestedDeposit, usdsoInput } from "@/lib/follow/margin";
+import { checkMove, followMarginTarget, initialMove, marginTarget, parseUsdso, suggestedDeposit, usdsoInput } from "@/lib/follow/margin";
 
 const E = 10n ** 18n;
 const BTC = "0x00000000000000000000000000000000000000b1" as Address;
@@ -41,6 +41,19 @@ describe("the amount the move starts at", () => {
     expect(suggestedDeposit(null, 100n * E, 6n * E)).toBe(6n * E);
     expect(suggestedDeposit(200n * E, 100n * E, 6n * E)).toBe(6n * E);
     expect(suggestedDeposit(0n, 100n * E, 0n)).toBe(0n);
+  });
+});
+
+describe("resuming a move", () => {
+  it("an approval waiting for its deposit sets the amount, so a reload lands on the deposit", () => {
+    // approved 2 of a suggested 3: the form starts at 2, and 2 is covered
+    expect(initialMove(3n * E, undefined, 3n * E, 2n * E)).toBe(2n * E);
+    expect(checkMove(usdsoInput(initialMove(3n * E, undefined, 3n * E, 2n * E)), 3n * E, 2n * E)).toMatchObject({ ok: true, next: "deposit" });
+    // an allowance at or above the suggestion (an unlimited one, say) keeps the suggestion, already covered
+    expect(initialMove(30n * E, 100n * E, 500n * E, 2n ** 255n)).toBe(70n * E);
+    // no allowance, or an unread one: the suggestion
+    expect(initialMove(30n * E, 100n * E, 500n * E, 0n)).toBe(70n * E);
+    expect(initialMove(30n * E, 100n * E, 500n * E, null)).toBe(70n * E);
   });
 });
 

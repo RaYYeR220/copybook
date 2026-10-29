@@ -92,10 +92,14 @@ export function MoveUsdso({ spot, allowance, initial, bank, writer, tx, id }: Pr
       </div>
       <ol className={styles.moveSteps} aria-label="The two transactions">
         <li data-state={check.ok ? (check.next === "approve" ? "current" : "done") : "todo"}>
-          <b>Approve</b> dreamDEX&apos;s margin bank to pull {amount} from this wallet{check.ok && check.next === "deposit" ? ": in place" : ""}
+          <span>
+            <b>Approve</b> dreamDEX&apos;s margin bank to pull {amount} from this wallet{check.ok && check.next === "deposit" ? ": in place" : ""}
+          </span>
         </li>
         <li data-state={check.ok && check.next === "deposit" ? "current" : "todo"}>
-          <b>Deposit</b> {amount} into this wallet&apos;s perps account: equity rises by it
+          <span>
+            <b>Deposit</b> {amount} into this wallet&apos;s perps account: equity rises by it
+          </span>
         </li>
       </ol>
       {check.ok && (

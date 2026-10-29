@@ -81,7 +81,7 @@ describe("ask errors", () => {
   });
 
   it("passes the SDK's message through for other failures and says nothing when the wallet declined", () => {
-    expect(askErrorText(new CopybookError("WRONG_CHAIN", "The wallet is on chain 1; Copybook runs on chain 50383 (Somnia Hideki2 testnet)."))).toMatch(/chain 1/);
+    expect(askErrorText(new CopybookError("WRONG_CHAIN", "The wallet is on chain 1; Copybook runs on Somnia Hideki testnet (Tokyo), chain 50383."))).toMatch(/chain 1/);
     expect(askErrorText(Object.assign(new Error("User rejected the request."), { name: "UserRejectedRequestError" }))).toBeNull();
     expect(askErrorText({ shortMessage: "insufficient funds for gas * price + value" })).toBe("insufficient funds for gas * price + value");
   });

@@ -26,7 +26,7 @@ describe("Hideki chain", () => {
   it("asks the wallet to add it with EIP-3085 parameters", () => {
     expect(addChainParameters(hideki)).toEqual({
       chainId: "0xc4cf",
-      chainName: "Somnia Hideki testnet",
+      chainName: "Somnia Hideki testnet (Tokyo)",
       nativeCurrency: { name: "Somnia Test Token", symbol: "STT", decimals: 18 },
       rpcUrls: ["https://api.hideki2.infra.testnet.somnia.network"],
       blockExplorerUrls: ["https://explorer.testnet.somnia.network/tokyo"],

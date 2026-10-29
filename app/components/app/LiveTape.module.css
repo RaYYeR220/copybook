@@ -60,3 +60,19 @@ a.who:hover {
   color: var(--bone);
   border-color: var(--hair-3);
 }
+
+/* a copy's badge is the way to its share page */
+.share {
+  display: inline-flex;
+  border-radius: var(--r-pill);
+  transition: opacity 0.25s var(--ease);
+}
+
+.share:hover {
+  opacity: 0.8;
+}
+
+.share:focus-visible {
+  outline: 1px solid var(--gold);
+  outline-offset: 3px;
+}

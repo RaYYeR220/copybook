@@ -51,6 +51,9 @@ describe("tape rows", () => {
     expect(plain(r.text)).toBe("0x7d73…1932 copied demo leader 0xA1d0…7b5d · 0 → 0.0005 long · limit 81,065.60");
     expect(r.href).toBe(`https://explorer.testnet.somnia.network/tokyo/tx/${H1}`);
     expect(r.key).toBe(`${H1}:3`);
+    // the badge opens the copy's own page and card
+    expect(r.share).toBe(`/copy/${H1}?log=3`);
+    expect(tapeRow(copy({ via: "call" }), ctx)!.share).toBe(`/copy/${H1}?log=3`);
   });
 
   it("a copy someone sent directly never claims the same block", () => {

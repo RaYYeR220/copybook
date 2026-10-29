@@ -32,7 +32,11 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const { id } = await params;
   if (!ID_RE.test(id)) return { title: "Not a thesis" };
   const thesis = await loadThesis(BigInt(id)).catch(() => null);
-  return thesis ? { title: `${thesis.name} · thesis #${id}`, description: `The legs, version and minimum allocation of thesis #${id} on dreamDEX perps.` } : { title: `Thesis #${id}` };
+  if (!thesis) return { title: `Thesis #${id}` };
+  const title = `${thesis.name} · thesis #${id}`;
+  const description = `The legs, version and minimum allocation of thesis #${id} on dreamDEX perps.`;
+  const image = { url: `/og/thesis/${id}`, width: 1200, height: 630, alt: `${thesis.name}: thesis #${id} on Copybook, its legs and the least allocation that opens them` };
+  return { title, description, openGraph: { title, description, images: [image] }, twitter: { card: "summary_large_image", title, description, images: [image] } };
 }
 
 function legRows(thesis: Thesis, names: Record<string, { symbol: string }>) {

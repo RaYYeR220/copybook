@@ -1,0 +1,88 @@
+/* The copy's share page: the card as it will show, and its address. */
+
+.preview {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1200 / 630;
+  border: 1px solid var(--hair-2);
+  background: var(--night-1);
+}
+
+.figure {
+  padding: 16px 20px 4px;
+}
+
+.share {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 12px 20px 0;
+}
+
+.url {
+  min-width: 0;
+  flex: 1 1 18ch;
+  padding: 8px 10px;
+  border: 1px solid var(--hair);
+  background: rgba(21, 19, 15, 0.6);
+  font: 400 11.5px/1.5 var(--mono);
+  color: var(--bone-2);
+  overflow-wrap: anywhere;
+}
+
+.copyBtn {
+  height: 32px;
+  padding: 0 14px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--hair-3);
+  font: 400 12px var(--mono);
+  color: var(--bone);
+  cursor: pointer;
+  transition: border-color 0.25s var(--ease);
+}
+
+.copyBtn:hover {
+  border-color: var(--bone);
+}
+
+.copyBtn:focus-visible {
+  outline: 1px solid var(--gold);
+  outline-offset: 3px;
+}
+
+.copied {
+  font: 400 11px var(--mono);
+  color: var(--night-4);
+}
+
+.badge {
+  padding: 16px 20px 0;
+}
+
+.siblings {
+  list-style: none;
+  padding: 4px 20px 0;
+}
+
+.siblings li {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--hair);
+  font: 400 12px var(--mono);
+  color: var(--bone-2);
+}
+
+.siblings a {
+  border-bottom: 1px solid var(--hair-3);
+}
+
+@media (max-width: 720px) {
+  .figure,
+  .share,
+  .badge,
+  .siblings {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+}

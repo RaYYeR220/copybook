@@ -40,6 +40,8 @@ export const metadata: Metadata = {
   description:
     "Follow a trader or a thesis on dreamDEX perps. Somnia validators run your copy in your own account, in the same block as the move.",
   applicationName: "Copybook",
+  // trader, thesis and copy pages set their own card (app/og/*); the large card is the format they are drawn for
+  twitter: { card: "summary_large_image" },
 };
 
 export const viewport: Viewport = {

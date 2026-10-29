@@ -43,6 +43,8 @@ export interface TapeRow {
   badge: { tone: "gold" | "refused" | "verdict"; text: string; sameBlock?: true };
   href: string;
   linkLabel: string;
+  /** A copy's own page, with its share card. */
+  share?: string;
 }
 
 export const TIER_LABEL: Record<TierName, string> = { None: "NOT REVIEWED", Ok: "OK", Caution: "CAUTION", Block: "BLOCK" };
@@ -136,6 +138,7 @@ export function tapeRow(e: LoggedEvent, ctx: TapeContext): TapeRow | null {
         text,
         badge: same ? { tone: "gold", text: `same block ${n}`, sameBlock: true } : { tone: "verdict", text: e.via === "call" ? `direct call · ${n}` : `block ${n}` },
         linkLabel: same ? `View the copy in block ${fmtInt(block)} on the Somnia explorer` : `View the copy transaction in block ${fmtInt(block)}`,
+        ...(e.log.logIndex !== undefined ? { share: `/copy/${hash}?log=${e.log.logIndex}` } : {}),
       };
     }
     case "Refused":

@@ -40,8 +40,15 @@ function Seg({ s }: { s: Segment }) {
 }
 
 function Row({ r }: { r: TapeRow }) {
-  const badge =
-    r.badge.sameBlock ? <SameBlockMark block={r.block} /> : <Badge tone={r.badge.tone}>{r.badge.text}</Badge>;
+  const mark = r.badge.sameBlock ? <SameBlockMark block={r.block} /> : <Badge tone={r.badge.tone}>{r.badge.text}</Badge>;
+  // a copy's badge opens its own page, where its share card is
+  const badge = r.share ? (
+    <Link className={styles.share} href={r.share} prefetch={false} aria-label={`${r.badge.text}: open this copy's page and share card`}>
+      {mark}
+    </Link>
+  ) : (
+    mark
+  );
   return (
     <FeedRow block={r.block} kind={r.kind} market={r.market} badge={badge} href={r.href} linkLabel={r.linkLabel}>
       {r.text.map((s, i) => (

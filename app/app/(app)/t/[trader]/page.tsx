@@ -26,7 +26,11 @@ const parse = (raw: string): Address | null => (raw.length === 42 && isAddress(r
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const a = parse((await params).trader);
-  return a ? { title: `Trader ${shortHex(a)}`, description: `30-day record, open positions, AI guard verdict and copies of ${a} on dreamDEX perps.` } : { title: "Not an address" };
+  if (!a) return { title: "Not an address" };
+  const title = `Trader ${shortHex(a)}`;
+  const description = `30-day record, open positions, AI guard verdict and copies of ${a} on dreamDEX perps.`;
+  const image = { url: `/og/trader/${a}`, width: 1200, height: 630, alt: `Trader ${shortHex(a)} on Copybook: 30-day record, the validators' verdict and followers` };
+  return { title, description, openGraph: { title, description, images: [image] }, twitter: { card: "summary_large_image", title, description, images: [image] } };
 }
 
 export default async function TraderPage({ params }: Params) {

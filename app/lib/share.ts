@@ -47,13 +47,20 @@ const oneLine = (s: string) => s.replace(/\s+/g, " ").trim();
 const LIVE_ENTITY = [/[@＠#＃]/, /\$\p{L}/u, /:\/\//, /www\./i, /[\p{L}\p{N}_-]\.\p{L}{2,}/u];
 
 /**
- * A thesis name as a post may carry it, on one line; null when X would turn part of it into a mention, a hashtag, a
- * cashtag or a link under the sharer's account. Anyone can register a thesis under any name, so the post then names
- * it by its id instead.
+ * Characters that can hide a token from the checks above or reorder what a reader sees: format characters (zero-width
+ * spaces and joiners, bidi controls), combining marks that do not compose away, and controls.
+ */
+const HIDDEN = /[\p{Cf}\p{Mn}\p{Me}\p{Cc}]/u;
+
+/**
+ * A thesis name as a post may carry it: NFKC-normalized (full-width forms fold to ASCII) and on one line. Null when X
+ * could turn part of it into a mention, a hashtag, a cashtag or a link under the sharer's account, or when it holds
+ * characters that could hide one: anyone can register a thesis under any name, so the post then names it by its id.
+ * The post carries this normalized string, the one that was checked.
  */
 export function postableName(name: string | null | undefined): string | null {
-  const s = oneLine(name ?? "");
-  return s && !LIVE_ENTITY.some((re) => re.test(s)) ? s : null;
+  const s = oneLine((name ?? "").normalize("NFKC"));
+  return s && !HIDDEN.test(s) && !LIVE_ENTITY.some((re) => re.test(s)) ? s : null;
 }
 
 /** User-perceived characters, so a cut never splits an emoji sequence or a flag. */

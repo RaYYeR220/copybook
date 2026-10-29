@@ -136,13 +136,14 @@ describe("what a trader's and a thesis's posts say", () => {
   });
 
   it("a cut never splits an emoji sequence or a flag", () => {
-    const family = "👨‍👩‍👧";
-    const t = thesisShareText({ id: 2n, name: `${family}🇯🇵`.repeat(40), legs: 2 });
+    // a skin-tone sequence and a flag: two code points each, one grapheme each (ZWJ sequences give way to the id, below)
+    const thumb = "👍🏽";
+    const t = thesisShareText({ id: 2n, name: `${thumb}🇯🇵`.repeat(40), legs: 2 });
     expect(postLength(t)).toBeLessThanOrEqual(POST_LIMIT);
     const cut = t.match(/^Follow the thesis '(.*)…' on Copybook/u)![1];
     expect(cut.length).toBeGreaterThan(0);
-    // what is left is whole family-and-flag pairs, or a pair and one more family: never a part of either
-    expect(cut).toMatch(/^(?:👨‍👩‍👧🇯🇵)*(?:👨‍👩‍👧)?$/u);
+    // what is left is whole thumb-and-flag pairs, or a pair and one more thumb: never a part of either
+    expect(cut).toMatch(/^(?:👍🏽🇯🇵)*(?:👍🏽)?$/u);
   });
 
   it("every post fits with its link at X's 23 characters", () => {
@@ -172,6 +173,19 @@ describe("names X would make live", () => {
     ["a bare .xyz", "free.xyz"],
     ["a bare .ai", "best.ai picks"],
     ["a bare upper-case domain", "VISIT EXAMPLE.NET NOW"],
+    // characters that hide a token from the checks, or reorder what a reader sees
+    ["a zero-width space in a mention", "@\u200bname"],
+    ["a zero-width space in a domain", "ex\u200bample.com"],
+    ["a zero-width space before the dot", "copybook\u200b.xyz"],
+    ["full-width www and dots (NFKC folds them)", "ｗｗｗ．example．com"],
+    ["a full-width mention alone (NFKC folds it to @)", "＠name"],
+    ["a combining mark before the dot", "copybook\u034f.xyz"],
+    ["an enclosing mark", "BTC\u20dd majors"],
+    ["a right-to-left override", "majors \u202eUSD"],
+    ["a reversed domain behind a right-to-left override", "BTC \u202emoc.elpmaxe"],
+    ["a bidi isolate", "\u2066BTC vs ETH\u2069"],
+    ["a soft hyphen", "copy\u00adbook"],
+    ["a zero-width-joined emoji", "👨\u200d👩\u200d👧 basket"],
   ] as const;
 
   it.each(live)("%s gives way to the thesis id", (_, name) => {
@@ -189,6 +203,16 @@ describe("names X would make live", () => {
     }
     expect(postableName("  BTC\n vs\tETH ")).toBe("BTC vs ETH");
     expect(postableName("")).toBeNull();
+  });
+
+  it("the post carries the normalized name, the one that was checked", () => {
+    // a decomposed accent composes away (NFKC), full-width letters and odd spaces fold to plain ones
+    expect(postableName("Cafe\u0301 majors")).toBe("Café majors");
+    expect(postableName("ＢＴＣ\u3000vs\u00a0ＥＴＨ")).toBe("BTC vs ETH");
+    expect(thesisShareText({ id: 7n, name: "ＢＴＣ vs ＥＴＨ", legs: 2 })).toBe("Follow the thesis 'BTC vs ETH' on Copybook: 2 legs, opened in one transaction on @DreamDEXSomnia perps.");
+    expect(copyShareText({ source: { kind: "Theme", themeId: 7n, name: "Cafe\u0301 majors" }, block: 1n, sameBlock: true, mine: true })).toBe(
+      "My copy of the thesis 'Café majors' landed in the same block as its rebalance: block #1 on Somnia's Tokyo testnet, via Copybook on @DreamDEXSomnia perps.",
+    );
     expect(postableName(null)).toBeNull();
   });
 });

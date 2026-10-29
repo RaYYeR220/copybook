@@ -5,29 +5,31 @@ trader's 30-day risk line from our public endpoint and another classify it as OK
 travels over Hyperlane to the `RiskGate` on Hideki, and the hub then refuses new size to guarded followers of a
 BLOCKed trader.
 
-This page measures how faithfully the live committee applies a published rubric to real Hideki traders. For runs v2
-and v3 we wrote down the expected answer for every trader and committed it before requesting a single review, and
+This page measures how faithfully the live committee applies a published rubric to real Hideki traders. For runs v2,
+v3 and v4 we wrote down the expected answer for every trader and committed it before requesting a single review, and
 wrote the commit on chain. Run v1, three reviews under the launch prompt, was scored against the rubric afterwards.
 The scorecard compares the committee's verdicts with the answer key.
 
-**Latest result (run v3): 18 of 20 verdicts match the rubric, and the committee's verdicts imply the right gate
-decision for all 20.**
-- Every trader the rubric blocks was blocked: 6 of 6.
-- The committee blocked no trader the rubric would not block.
-- Two thin-history traders (3 and 5 trades) were rated OK where the rubric says CAUTION. The gate acts only on
-  BLOCK, so this does not change what a follower can do.
-- No review failed, and every committee answered unanimously.
-- 4 earlier false BLOCKs (rows 1, 13, 14 and the leader) are still held on the gate. A fresh review can replace each
-  one from 24 hours after it landed (13:36–14:05 UTC on 2026-10-29); otherwise they expire on 2026-11-04 (see
-  [what the gate holds](#what-the-gate-holds-now)).
+**Latest result (run v4, held out): 19 of 20 verdicts match the rubric on 20 traders no earlier run had seen.**
+- **The setup was run v3's, unchanged:** the rubric, the prompt, the endpoint's line, the reviewer and the scorer.
+- **BLOCK recall: 7 of 8.** One trader with 10 liquidations got CAUTION, 3 votes of 3, where the rubric says BLOCK.
+  The gate stores that CAUTION, so guarded followers of that trader are not protected until a new review.
+- **No false BLOCKs.** The committee blocked none of the 12 traders the rubric does not block.
+- **Thin history and `partial=1`:** CAUTION, as the rubric says.
+- **Failures:** no review failed, and every committee answered unanimously.
 
-## Three runs
+**Run v3, on the 20 traders its changes were chosen on: 18 of 20, with no missed and no false BLOCK.** The four earlier
+false BLOCKs that run v3 left held on the gate were replaced by fresh reviews on 2026-10-29 (see
+[what the gate holds](#what-the-gate-holds-now)).
+
+## Four runs
 
 | run | what the model is given | traders | tiers matching the rubric | BLOCK / not-BLOCK agreement | BLOCK recall | false BLOCKs |
 |---|---|---|---|---|---|---|
 | [v1](#run-v1-the-first-prompt) | the first prompt (no rubric) and the full summary, in the user prompt | 3, scored afterwards | 1 of 3 | 1 of 3 | 1 of 1 | 2 of 2 |
 | [v2](#run-v2-the-rubric-in-the-user-prompt-with-the-full-summary) | the rubric and the full summary, in the user prompt | 20, pre-registered | 14 of 20 | 17 of 20 | 6 of 6 | 3 of 14 |
 | [v3](#run-v3-the-rubric-as-the-system-message-and-only-the-keys-it-reads) | the rubric as the system message; only the rubric's keys in the user prompt | the same 20, pre-registered again | 18 of 20 | 20 of 20 | 6 of 6 | 0 of 14 |
+| [v4](#run-v4-held-out-20-fresh-traders) | as in run v3, unchanged | 20 fresh traders, pre-registered (held out) | 19 of 20 | 19 of 20 | 7 of 8 | 0 of 12 |
 
 "BLOCK / not-BLOCK agreement" counts the traders whose committee verdict falls on the same side of the gate's line as
 the rubric's tier: BLOCK (refuse new size) or not BLOCK (allow it). It is the gate decision the verdicts imply. The live
@@ -37,7 +39,8 @@ so what the gate does can differ (see [what the gate holds](#what-the-gate-holds
 ## The rubric
 
 The rubric is published in [`rubric.ts`](rubric.ts), which also applies it in code. It reads the keys of the line the
-committee classifies (the full summary in runs v1 and v2, the rubric line in run v3), and n/a means unknown, not safe.
+committee classifies (the full summary in runs v1 and v2, the rubric line in runs v3 and v4), and n/a means unknown,
+not safe.
 
 - **BLOCK** if `liquidations30d >= 2`, or `maxDrawdownPct30d` is present and `>= 50`.
 - **CAUTION** if the trader is not BLOCKed and any of these holds:
@@ -51,7 +54,7 @@ committee classifies (the full summary in runs v1 and v2, the rubric line in run
 The rubric's logic in `rubric.ts` is unchanged since the anchored commits. Only a comment was corrected later, and
 `git diff 5aed53b HEAD -- eval/rubric.ts` shows it.
 
-Runs v2 and v3 use the same system prompt, which states the rule in words. The runs differ in how this text and the
+Runs v2, v3 and v4 use the same system prompt, which states the rule in words. The runs differ in how this text and the
 trader's data reach the LLM agent.
 
 > You review perpetual-futures traders for people who copy their positions automatically. Apply this rubric exactly to
@@ -59,6 +62,227 @@ trader's data reach the LLM agent.
 > maxDrawdownPct30d is present and at least 50. Otherwise CAUTION if liquidations30d is 1, or trades30d is below 10,
 > or history=none, or partial=1, or maxDrawdownPct30d is present and at least 25. Otherwise OK. Answer with exactly one
 > word: OK, CAUTION or BLOCK.
+
+## Run v4: held out, 20 fresh traders
+
+### What is held out
+
+Run v3's changes were chosen after reading run v2's errors on the same 20 traders. Run v4 asks the question run v3
+could not answer: does the same setup hold on traders it has never seen?
+
+- **Fresh traders.** None of the 20 was reviewed in runs v1 to v3 or screened for run v2's sample. None is one of our
+  own wallets.
+- **Nothing else changed.** These are run v3's, unchanged:
+  - the rubric (the code of [`rubric.ts`](rubric.ts));
+  - the system prompt and the endpoint's `rubric` line;
+  - the reviewer [`0xc999…7c25`](https://shannon-explorer.somnia.network/address/0xc999B6924179a0dc9649DA7eBa8F3aC8b7CF7c25)
+    and its settings;
+  - the scorer, `e2e/src/eval.ts`.
+- **How this was checked before the sample was drawn:**
+  - **On chain.** At 22:39:03 UTC the reviewer's field (`rubric`), system prompt, base URL and agents were read from the
+    chain. Each matched run v3's, and the gate and the reviewer still pointed at each other.
+  - **In the repository.** `eval.ts` is the same git blob (`a518a66`) as at run v3's pre-registration (`5aed53b`).
+    `rubric.ts` differs from it only in a comment.
+  - **At the endpoint.** The `rubric` line it served for three run-v3 traders matched one computed locally from the
+    same code.
+- **How it was scored.** [`eval-v4.ts`](../e2e/src/eval-v4.ts) runs `eval.ts score v3` unchanged, in a scratch copy of
+  the tree that holds run v4's key in place of run v3's. Pointed at run v3's own key, the same wrapper reproduces
+  [`v3/results.json`](v3/results.json) exactly, apart from the time it was scored.
+
+### Sampling
+
+The rule was committed (`dfceabc`) before the sample was drawn, and it is recorded in
+[`v4/answer-key.json`](v4/answer-key.json) with every account screened:
+
+- **Exclusions.** The rule leaves out 77 accounts:
+  - every trader reviewed in runs v1 to v3;
+  - every account in run v2's key (its 20 traders and all 59 screened accounts);
+  - our demo wallets (`deployments/hideki.json`), our contracts, and the wallets of our own keys.
+- **Pools.** The pools are run v2's, without its first-live-run pool, each read in a fixed order from the dreamDEX
+  indexer over the last 30 days:
+
+  | # | pool | target stratum | accounts |
+  |---|---|---|---|
+  | 1 | 2+ liquidations in the latest 1000 liquidation rows | liquidated-2+ | 59 |
+  | 2 | 1 liquidation in the latest 1000 liquidation rows | liquidated-1 | 220 |
+  | 3 | fewest rows in the latest 1000 position changes | thin | 48 |
+  | 4 | largest single realized gains | clean | 25 |
+  | 5 | latest position changes | clean | 48 |
+
+- **Taking a trader.** Each account is screened with `packages/stats` over the endpoint's 2,000-row cap. It is taken
+  when the quota of the stratum it falls in is still open. The quotas are runs v2 and v3's, with the leader's place
+  moved to the clean stratum:
+  - 6 with 2 or more liquidations;
+  - 4 with exactly one;
+  - 3 thin (fewer than 10 trades);
+  - 7 clean.
+- **The fallback.** If a quota is still open after the pools, its places go to the screened accounts not taken, in
+  screening order, whatever their stratum.
+
+**What happened.** 53 accounts were screened.
+- **Thin stratum short by 2.** The thin pool was read to its end and held only one thin trader; most of its accounts
+  had 10 or more trades. The fallback therefore filled the two open places with the first accounts screened but not
+  taken, which both had 2+ liquidations.
+- **The sample:** 8 traders with 2+ liquidations, 4 with exactly one, 1 thin and 7 clean. One of the clean traders is
+  a high-frequency account with `partial=1`.
+- **Expected tiers:** 8 BLOCK, 6 CAUTION, 6 OK.
+
+### Pre-registration of run v4
+
+| step | when (UTC, 2026-10-29) | evidence |
+|---|---|---|
+| sampling rule and tooling committed | 22:38:43 | commit `dfceabc` |
+| reviewer settings read from the chain | 22:39:03 | `frozen` in [`v4/answer-key.json`](v4/answer-key.json) |
+| rubric lines fetched from the public endpoint | 22:41:07 – 22:41:57 | `fetchedAt` per trader, all fresh (cache miss) |
+| answer key committed | 22:42:44 | commit `a7c42c247a038b65d502826df7dc703a4cdcaa9a` |
+| commit hash and key hash written on chain | 22:43:34 | [Hideki tx 0xadd80abe…](https://explorer.testnet.somnia.network/tokyo/tx/0xadd80abe7fdd825fe6f4086d62b09c44f50d2aeb2519b0479462e0a14be06b09) (block 36,605,996), recorded in [`v4/anchor.json`](v4/anchor.json) |
+| first review requested | 22:44:02 | row 1 below |
+| last verdict delivered to Hideki | 22:51:00 | row 20 below |
+
+The anchor carries the commit hash followed by the keccak256 of `eval/v4/answer-key.json` as committed
+(`0x8cbca4b63fd467637337b29518b003ed4e0ff998f93bf1d93764224363782287`). This run's reviews have nonces 48 to 67 on the
+gate. The reviewer's settings read the same after the run as before it.
+
+### Run v4 result
+
+**19 of 20 verdicts match the rubric. The committee's verdicts imply the right gate decision for 19 of 20.**
+- **BLOCK recall:** 7 of 8. One trader the rubric blocks got CAUTION (row 6).
+- **False BLOCKs:** none, out of 12 traders the rubric does not block.
+- **Thin history and `partial=1`:** CAUTION, as the rubric says (1 of 1 each).
+- **Failures:** none. Every committee answered unanimously, and 57 of 60 validator answers match the rubric.
+- **Summary hashes:** all 20 lines the committee agreed on are byte-identical to the key. The JSON stage returned the
+  same bytes from all 3 validators every time.
+- **Requests:** all 20 inference requests were the published prompt and line.
+
+| expected \ committee | OK | CAUTION | BLOCK | no verdict |
+|---|---|---|---|---|
+| **OK** | **6** | 0 | 0 | 0 |
+| **CAUTION** | 0 | **6** | 0 | 0 |
+| **BLOCK** | 0 | 1 | **7** | 0 |
+
+### Run v4 per trader
+
+**Rule inputs** come from the line the committee saw. A tier in bold disagrees with the rubric.
+
+| # | trader | picked as | rule inputs seen | seen = key | expected | committee (OK/CAU/BLK) | gate |
+|---|---|---|---|---|---|---|---|
+| 1 | [`0xbbD7…C50A`](https://explorer.testnet.somnia.network/tokyo/address/0xbbD7Bd1984D2Dec78bAdfA1b97F9dd71C58AC50A) | liquidated-2+ | liq 135 · trades 245 | yes | BLOCK | BLOCK (0/0/3) | VerdictReceived BLOCK |
+| 2 | [`0x8b2e…c6B4`](https://explorer.testnet.somnia.network/tokyo/address/0x8b2e23fF6ae00bB2122B4270Dec9cfd0E3FAc6B4) | liquidated-2+ | liq 14 · trades 160 | yes | BLOCK | BLOCK (0/0/3) | VerdictReceived BLOCK |
+| 3 | [`0x6F8c…36F7`](https://explorer.testnet.somnia.network/tokyo/address/0x6F8c34D620007cC828ea5463bd9FCc22E95836F7) | liquidated-2+ | liq 12 · trades 26 | yes | BLOCK | BLOCK (0/0/3) | VerdictReceived BLOCK |
+| 4 | [`0xBF9d…2b2E`](https://explorer.testnet.somnia.network/tokyo/address/0xBF9dE4B042765dF49702754eb750b861b4432b2E) | liquidated-2+ | liq 15 · trades 126 | yes | BLOCK | BLOCK (0/0/3) | VerdictReceived BLOCK |
+| 5 | [`0x7eCA…81FF`](https://explorer.testnet.somnia.network/tokyo/address/0x7eCA608ab206d5763459eA3eB0133933a6aC81FF) | liquidated-2+ | liq 11 · trades 91 | yes | BLOCK | BLOCK (0/0/3) | VerdictReceived BLOCK |
+| 6 | [`0x6D73…6b1e`](https://explorer.testnet.somnia.network/tokyo/address/0x6D73E0A82aE20EE0C0de7E9061369a9E3c9f6b1e) | liquidated-2+ | liq 10 · trades 27 | yes | BLOCK | **CAUTION** (0/3/0) | VerdictReceived CAUTION |
+| 7 | [`0xF57A…DeFe`](https://explorer.testnet.somnia.network/tokyo/address/0xF57A291a0366143e184bFD7A86244d1d9feCDeFe) | liquidated-1 | liq 1 · trades 25 | yes | CAUTION | CAUTION (0/3/0) | VerdictReceived CAUTION |
+| 8 | [`0x23db…6823`](https://explorer.testnet.somnia.network/tokyo/address/0x23db970515C7d7ad2D553574Ef7f4a4cDD496823) | liquidated-1 | liq 1 · trades 79 | yes | CAUTION | CAUTION (0/3/0) | VerdictReceived CAUTION |
+| 9 | [`0xFD89…54A5`](https://explorer.testnet.somnia.network/tokyo/address/0xFD891304E3F6f6Ffd8e928F402708282f4c254A5) | liquidated-1 | liq 1 · trades 44 | yes | CAUTION | CAUTION (0/3/0) | VerdictReceived CAUTION |
+| 10 | [`0x7E82…9Ec5`](https://explorer.testnet.somnia.network/tokyo/address/0x7E820809898Bce669A3A8Cf50e406651750a9Ec5) | liquidated-1 | liq 1 · trades 1206 | yes | CAUTION | CAUTION (0/3/0) | VerdictReceived CAUTION |
+| 11 | [`0xaf0D…1d75`](https://explorer.testnet.somnia.network/tokyo/address/0xaf0D8dC490406aA41cf9563C5D5f3e4f132e1d75) | clean | liq 0 · trades 1409 | yes | OK | OK (3/0/0) | VerdictReceived OK |
+| 12 | [`0x44F4…3e06`](https://explorer.testnet.somnia.network/tokyo/address/0x44F49964F9e0491d1BB083a8230C101B18Cd3e06) | clean | liq 0 · trades 35 | yes | OK | OK (3/0/0) | VerdictReceived OK |
+| 13 | [`0x7383…40b0`](https://explorer.testnet.somnia.network/tokyo/address/0x7383ae1664cdbB8359B2EbBD0eebdba2E91b40b0) | clean | liq 0 · trades 33 | yes | OK | OK (3/0/0) | VerdictReceived OK |
+| 14 | [`0x716D…D605`](https://explorer.testnet.somnia.network/tokyo/address/0x716D25FA3a3cBd2854022db424811464fa91D605) | clean | liq 0 · trades 154 | yes | OK | OK (3/0/0) | VerdictReceived OK |
+| 15 | [`0x1aB4…61f8`](https://explorer.testnet.somnia.network/tokyo/address/0x1aB43A002bEEEA905F938Ca9E24d9BcC43Ad61f8) | clean | liq 0 · trades 2000 · partial=1 | yes | CAUTION | CAUTION (0/3/0) | VerdictReceived CAUTION |
+| 16 | [`0xB61f…05D1`](https://explorer.testnet.somnia.network/tokyo/address/0xB61f13A44c3E83946A39861D2b67F8b6050a05D1) | clean | liq 0 · trades 59 | yes | OK | OK (3/0/0) | VerdictReceived OK |
+| 17 | [`0x4680…2184`](https://explorer.testnet.somnia.network/tokyo/address/0x4680a54939F915cf0F3e4653755FbB2D1Dc52184) | clean | liq 0 · trades 38 | yes | OK | OK (3/0/0) | VerdictReceived OK |
+| 18 | [`0x518E…9A18`](https://explorer.testnet.somnia.network/tokyo/address/0x518EB8ee6D091F74D673B6331b65ab5318B39A18) | thin | liq 0 · trades 4 | yes | CAUTION | CAUTION (0/3/0) | VerdictReceived CAUTION |
+| 19 | [`0x9e18…3495`](https://explorer.testnet.somnia.network/tokyo/address/0x9e18c49EfC49ac55D9F7E4c4aDa469Aef4073495) | liquidated-2+ | liq 4 · trades 367 | yes | BLOCK | BLOCK (0/0/3) | VerdictReceived BLOCK |
+| 20 | [`0xC1DA…f5b1`](https://explorer.testnet.somnia.network/tokyo/address/0xC1DA1F512528b0b77C5fF199904951B7B9Dcf5b1) | liquidated-2+ | liq 2 · trades 298 | yes | BLOCK | BLOCK (0/0/3) | VerdictReceived BLOCK |
+
+<details><summary>Lines the committee saw (from each review's <code>SummaryReceived</code> event)</summary>
+
+| # | rubric line |
+|---|---|
+| 1 | `liquidations30d=135 trades30d=245 history=yes partial=0` |
+| 2 | `liquidations30d=14 trades30d=160 history=yes partial=0` |
+| 3 | `liquidations30d=12 trades30d=26 history=yes partial=0` |
+| 4 | `liquidations30d=15 trades30d=126 history=yes partial=0` |
+| 5 | `liquidations30d=11 trades30d=91 history=yes partial=0` |
+| 6 | `liquidations30d=10 trades30d=27 history=yes partial=0` |
+| 7 | `liquidations30d=1 trades30d=25 history=yes partial=0` |
+| 8 | `liquidations30d=1 trades30d=79 history=yes partial=0` |
+| 9 | `liquidations30d=1 trades30d=44 history=yes partial=0` |
+| 10 | `liquidations30d=1 trades30d=1206 history=yes partial=0` |
+| 11 | `liquidations30d=0 trades30d=1409 history=yes partial=0` |
+| 12 | `liquidations30d=0 trades30d=35 history=yes partial=0` |
+| 13 | `liquidations30d=0 trades30d=33 history=yes partial=0` |
+| 14 | `liquidations30d=0 trades30d=154 history=yes partial=0` |
+| 15 | `liquidations30d=0 trades30d=2000 history=yes partial=1` |
+| 16 | `liquidations30d=0 trades30d=59 history=yes partial=0` |
+| 17 | `liquidations30d=0 trades30d=38 history=yes partial=0` |
+| 18 | `liquidations30d=0 trades30d=4 history=yes partial=0` |
+| 19 | `liquidations30d=4 trades30d=367 history=yes partial=0` |
+| 20 | `liquidations30d=2 trades30d=298 history=yes partial=0` |
+
+</details>
+
+#### Run v4 transactions
+
+| # | Hideki: requestReview | Shannon: summary request | Shannon: verdict request | Shannon: verdict | Hideki: verdict delivered |
+|---|---|---|---|---|---|
+| 1 | [0xb79030ad…](https://explorer.testnet.somnia.network/tokyo/tx/0xb79030ad48734fdd37da80329fa8d97800e96bf336fcafca9f627b077ec57c7f) | [0x5337408d…](https://shannon-explorer.somnia.network/tx/0x5337408d7ffa7e274c8f264994dfcb97e6ea6864db6c0a538b66b92aa03a26c0) | [0x878a8df2…](https://shannon-explorer.somnia.network/tx/0x878a8df236bda56f7112bef212a5cf2faa89c11d6f2afa1bebeca41d313577d6) | [0x870b1fef…](https://shannon-explorer.somnia.network/tx/0x870b1fef8bda5271b46066ce01b355c6697dc871997e35da31de2f292ea97d6a) | [0xa4d146a2…](https://explorer.testnet.somnia.network/tokyo/tx/0xa4d146a28ce0ebb903f3c5deff17b57143eb72aa9aa02fa20d2e4b52fdf5b535) |
+| 2 | [0x60d9d7da…](https://explorer.testnet.somnia.network/tokyo/tx/0x60d9d7da365b00eda3d5f267a1323fa30fcebec10c83dcbf3c909c05f12f5e7e) | [0xa3a92026…](https://shannon-explorer.somnia.network/tx/0xa3a9202631074c76cb9d68df2d5c77c40acfb292e24dfa1e8b20e2f782257c29) | [0x21e97ae8…](https://shannon-explorer.somnia.network/tx/0x21e97ae8a7997d83895407355fc7749b2411d054d2c740b7358651a34259cb5b) | [0xba1a577a…](https://shannon-explorer.somnia.network/tx/0xba1a577a20534316521e49fa0f448afa46866fc6d9720187e48e51f862291b22) | [0x85537b08…](https://explorer.testnet.somnia.network/tokyo/tx/0x85537b08a0bf7e955fd86cf152a08a9f7d89797facc9198daa4a1c1677734126) |
+| 3 | [0x82516831…](https://explorer.testnet.somnia.network/tokyo/tx/0x82516831b44bb1805400300866cf01705cb6d8062cd14a03a7b8a326e4c02aa2) | [0x755d75ae…](https://shannon-explorer.somnia.network/tx/0x755d75ae075678a997f1e64945d32ce514cf09c08249ec877bc40a30c16dde3b) | [0xf4285874…](https://shannon-explorer.somnia.network/tx/0xf42858746d3f30661f7b1e6003b9900bd510e9af484ca690cd7c4d96f205ad7f) | [0x5e1ab403…](https://shannon-explorer.somnia.network/tx/0x5e1ab403378fde583e325cd6ec6c9adcd6ca05c6472943c9030f0da43ae3294a) | [0x9fa4c8d2…](https://explorer.testnet.somnia.network/tokyo/tx/0x9fa4c8d226d5e459bb08acda89281c7034b7d9dca9ec4c854459efd8f05d30d3) |
+| 4 | [0x6a0cf815…](https://explorer.testnet.somnia.network/tokyo/tx/0x6a0cf815cd923643f89005acd72f8a87352a86f3a8deacf5d71e4f460fe6197b) | [0xeed3f724…](https://shannon-explorer.somnia.network/tx/0xeed3f72442f67d1ca7cedb9755726bef2cf9e99103ae9374ea8b66f43ee1d411) | [0x1b365089…](https://shannon-explorer.somnia.network/tx/0x1b365089693ff190aaf728e7217acd2421963ce3ff7a0fd8efffbc1c4d0fb655) | [0x5fa6a823…](https://shannon-explorer.somnia.network/tx/0x5fa6a82356574383162f9fae1f784475e6eb13a5805337401fee1930d8e837f8) | [0x989d46ed…](https://explorer.testnet.somnia.network/tokyo/tx/0x989d46ed32beb405c6074998a2af5861ddf7d26d30dbe2671ba1aa9ee039fbe6) |
+| 5 | [0xc35b6450…](https://explorer.testnet.somnia.network/tokyo/tx/0xc35b64500a7564ec90f674560034c6410046bd7e75f8a8854fa593b1f1a4caf6) | [0xe02d5ad4…](https://shannon-explorer.somnia.network/tx/0xe02d5ad41d1ad7fb1bc133978b5306b3735aab62e5d4e5a4951d51fd09e8871c) | [0xea3e78c9…](https://shannon-explorer.somnia.network/tx/0xea3e78c90f00adb1e8e555f2c88f8ca79703c48a26b549a15b0c301c1d387023) | [0x58899a1d…](https://shannon-explorer.somnia.network/tx/0x58899a1df1ad95bf22e936d2a381b4b4bfa8d67dacce87fed949e87a05be52f5) | [0x82e55330…](https://explorer.testnet.somnia.network/tokyo/tx/0x82e5533095c33aa4cec46b405069de7a3636e543a7e116e6c505102bf0585f1b) |
+| 6 | [0x138510fa…](https://explorer.testnet.somnia.network/tokyo/tx/0x138510fad9ae58101f0b03ef82b422250ee81f6a9769a490f6975b0160d6125b) | [0x288ba9f7…](https://shannon-explorer.somnia.network/tx/0x288ba9f7fca29069ea8d1037f4c88dcfc4995654b003fddf29cd38c010d2c537) | [0xd87ce07e…](https://shannon-explorer.somnia.network/tx/0xd87ce07e1898ca79fa6dd5b2663a897f87b26eaab547bf19c3b40c9d8fc796fc) | [0xa9bdac8a…](https://shannon-explorer.somnia.network/tx/0xa9bdac8a619c5aaf3d1b458dad1ea83784b26faf0d8f55d18ed4759eb8acece2) | [0x694bb68c…](https://explorer.testnet.somnia.network/tokyo/tx/0x694bb68c33fce2f481372e62fbcf881caa0e14fd57e7f1251e960ce13dfa1d58) |
+| 7 | [0xc71501e2…](https://explorer.testnet.somnia.network/tokyo/tx/0xc71501e262933056b41c89de2eb98b96e2e607ecbb1b81c900ae332470151b36) | [0x8269add6…](https://shannon-explorer.somnia.network/tx/0x8269add662595f12fa0f5978ce2390ba487378d2683e6e7754545209a079ff45) | [0xc5510261…](https://shannon-explorer.somnia.network/tx/0xc55102613205f31c82085e024c4c2026da7fd5e4e8fd5c1cf884072e6d5fa53c) | [0x0d95e30b…](https://shannon-explorer.somnia.network/tx/0x0d95e30b2773cbbd9d18c079dd9720155549a8e5ebbfefcf7f1147c68c5147d4) | [0x0445dcbc…](https://explorer.testnet.somnia.network/tokyo/tx/0x0445dcbc6c9cfbae5995be0f78fd75438d498c713f4102ee6c902a619ed515e8) |
+| 8 | [0xd8f76ec4…](https://explorer.testnet.somnia.network/tokyo/tx/0xd8f76ec44c421f590d183e7cf225e7772f9b8196b17417686f110c1659bb7b03) | [0xa1cbfbe2…](https://shannon-explorer.somnia.network/tx/0xa1cbfbe22cdf29ec56bfd1e3162cc6d1914eb7381aa30036ffe98861eb70653c) | [0xda56c46c…](https://shannon-explorer.somnia.network/tx/0xda56c46c4a023ab2dc3794be846aa3421f04573a0ae1493d4836b94e4bb75bcc) | [0x024392de…](https://shannon-explorer.somnia.network/tx/0x024392de788c8b189c40b44333facfce80b1050797e63f377f5634ec18e57a1f) | [0xd0e08df8…](https://explorer.testnet.somnia.network/tokyo/tx/0xd0e08df8b428759d0c9724b8e7daba49b099a9f1f6f8e2d6ba9421c3ba1e281b) |
+| 9 | [0x91337c9a…](https://explorer.testnet.somnia.network/tokyo/tx/0x91337c9a3ed59cc59038cf1f3eb375f3add23a2cb9c776f22d60a90675fd7ccb) | [0xd117b30c…](https://shannon-explorer.somnia.network/tx/0xd117b30c9e04b2fe1e1143816851ba6a9bffdff33a71dbfd33d845631d6a3924) | [0x2c4d8b19…](https://shannon-explorer.somnia.network/tx/0x2c4d8b1969f69536bb5fbec5739c062637a2af87f5bff09301edc8246a6acb85) | [0x230d9a59…](https://shannon-explorer.somnia.network/tx/0x230d9a59f4a2ea32a4194bec69e6c24c9fac28ad8f3108e3808c5162b79a2851) | [0xaba89023…](https://explorer.testnet.somnia.network/tokyo/tx/0xaba8902345659ab0d2a23a7f3dcf5f45038a9a52c2c58d4cfc2c98a384e17e61) |
+| 10 | [0x496f6ce7…](https://explorer.testnet.somnia.network/tokyo/tx/0x496f6ce7fa121920153ed50945ff4f91bd1de4273fa710c269be44c9d697912b) | [0x17913e94…](https://shannon-explorer.somnia.network/tx/0x17913e944e04ce945b2281d190210bfb9542fd2fd4316bf457efc393a948aeca) | [0x0015c6ff…](https://shannon-explorer.somnia.network/tx/0x0015c6ff83482e090e42107b5508934ad9a2ad1d45a17846d4ddc9dad53f7797) | [0x1f04852b…](https://shannon-explorer.somnia.network/tx/0x1f04852bb5807e7c4aae67c98ac3d01ff7a7ae0cb93fc40dd39b3617bf59fe55) | [0x955b4563…](https://explorer.testnet.somnia.network/tokyo/tx/0x955b4563f0713f114b4a060b6550ad52712f27b4fab58d0050333c4665f137aa) |
+| 11 | [0x52eab7bf…](https://explorer.testnet.somnia.network/tokyo/tx/0x52eab7bfeb1f48bbad20047e9501f1c378e5143e63f49439a4ee6b95daabaaa3) | [0x6ad1ca0a…](https://shannon-explorer.somnia.network/tx/0x6ad1ca0a556238c11a1577169ea116750e7d248b2f0556ca0e4a558de51613bb) | [0x837be4bc…](https://shannon-explorer.somnia.network/tx/0x837be4bc444141dd68d27b3acad8ffb32f9fc9009c852f2350b00dce8ab467ee) | [0xc4977037…](https://shannon-explorer.somnia.network/tx/0xc4977037cd990df5e106d7c3e5242508dfa07761c961078a789310d7cf0c5970) | [0xccfaf1fd…](https://explorer.testnet.somnia.network/tokyo/tx/0xccfaf1fd807bcc45cc17a8af8ae59dd8d75e4abb6fe347446ccdc9bf325f014c) |
+| 12 | [0x39c891d4…](https://explorer.testnet.somnia.network/tokyo/tx/0x39c891d4501755dac464e89ee300b05db247b9346a98f13434c7518159f996b4) | [0x369a9f68…](https://shannon-explorer.somnia.network/tx/0x369a9f681a671aa948ddb550c144f4c379500095bbd29dca85097aa290fd3ebe) | [0xe31f8881…](https://shannon-explorer.somnia.network/tx/0xe31f88810558dd19a97893646228c8df95a0db28404ba7938235c501d32f5d6f) | [0xe47db37c…](https://shannon-explorer.somnia.network/tx/0xe47db37c7e3133edf5437bc7c8acef317cd7ce977394e68dc33811f7b6263d58) | [0x8658d693…](https://explorer.testnet.somnia.network/tokyo/tx/0x8658d6938d160f39f9f084b77333f9f07b6423d9a73b92dd5ab32eb3cb3b22b7) |
+| 13 | [0xdbc0afbd…](https://explorer.testnet.somnia.network/tokyo/tx/0xdbc0afbd8d5e67f7e6cd5a1019eb0b4be0943ec9c67646d0199f772e6a20c8b1) | [0xd812b6af…](https://shannon-explorer.somnia.network/tx/0xd812b6af861074d51266bd378558e152652c796c71a87ce46fd3a493fe11388f) | [0x806a04cb…](https://shannon-explorer.somnia.network/tx/0x806a04cbaf19e20b47c798155ad21c86b1295f158f34f23447aada7fbe18cd2f) | [0x7acadd39…](https://shannon-explorer.somnia.network/tx/0x7acadd391fce17e013a53f60ec06da47b574c28de605c9dbfd086d1de29ba175) | [0x293135f8…](https://explorer.testnet.somnia.network/tokyo/tx/0x293135f868fb914497583b53ae192aa1a3e49848cc2b2db6a98bae6f08e4a787) |
+| 14 | [0x22155772…](https://explorer.testnet.somnia.network/tokyo/tx/0x22155772da5d8ae431338d6fb7b4c3b4cb4a53becdf2f30ee3a48617a079b560) | [0x31db3aab…](https://shannon-explorer.somnia.network/tx/0x31db3aabd31c69459746bacea422d2378498f2085ab378f58114c9c3e83747e3) | [0x17d0fa49…](https://shannon-explorer.somnia.network/tx/0x17d0fa4939a6de3c7d5586ae3b086723d60ffbe484a18d9a05151ad0f8826260) | [0x2cf8de38…](https://shannon-explorer.somnia.network/tx/0x2cf8de38d958e45afaa04e00e4e749b56fe8b9ac71a6715f2d6a7aa6698aae93) | [0x495844c5…](https://explorer.testnet.somnia.network/tokyo/tx/0x495844c5f56640657919d25015d000bf5bc3a27415a7aca1d5d530cd4aa4b1a8) |
+| 15 | [0xba096fe8…](https://explorer.testnet.somnia.network/tokyo/tx/0xba096fe8f8559c06b3298a6a05f2a839b907750e32dcfb000dd3e94ce051d5ca) | [0x1584d839…](https://shannon-explorer.somnia.network/tx/0x1584d8397cec0e2307a88ac2a58c657508735d7301f090dedf10415723ea828a) | [0x67791fa0…](https://shannon-explorer.somnia.network/tx/0x67791fa0a2779b6be2771d397d320bdd3a05f7f9b22119cf1d678a097d8fc8cc) | [0xe299fadf…](https://shannon-explorer.somnia.network/tx/0xe299fadfe8f36a83619881093b46f48880f4966179c76af1b0ee27926aabfa15) | [0x296d7f2a…](https://explorer.testnet.somnia.network/tokyo/tx/0x296d7f2aed5c47a2468782124b9d2463b1e4edddb93bc57cfc2678f20788b862) |
+| 16 | [0xf6a41f07…](https://explorer.testnet.somnia.network/tokyo/tx/0xf6a41f0740a09a0e74ec6740af4e1b8cfdcc9cb468365ac86f284cce9a671426) | [0x47dab520…](https://shannon-explorer.somnia.network/tx/0x47dab520e5000023465030b92d9dae4d372be09ec56e841abaf28c33234761ab) | [0xfd6ba327…](https://shannon-explorer.somnia.network/tx/0xfd6ba327b8af40b12c695aa0bbdeb935fb146d153880e8c8aa9e2839c9fceeb8) | [0x63865a8f…](https://shannon-explorer.somnia.network/tx/0x63865a8ffadfd197288ef7c4fcf2cf30b6f620c433172d6b4add909cdb9e462a) | [0x3266c83d…](https://explorer.testnet.somnia.network/tokyo/tx/0x3266c83d89fede3385ae2c69f087ef79cfe22b0374ea30ad2e213bd818c93805) |
+| 17 | [0x541b0a21…](https://explorer.testnet.somnia.network/tokyo/tx/0x541b0a2160f1e3d27b6214603e8bc06f14fb0368b911a4473ff37ab68c38337e) | [0x29ed3e15…](https://shannon-explorer.somnia.network/tx/0x29ed3e154ea2999550d4e5ee4bb1a875f744184f2a200a2d63522e1d29eebb6d) | [0xec81d433…](https://shannon-explorer.somnia.network/tx/0xec81d433334b53d1a55e7b48da8f1a55495579101d18072f3675d43a50867088) | [0xfda55d21…](https://shannon-explorer.somnia.network/tx/0xfda55d214e7c776686fda574b3eb6d1fa0b0dbc0e6eaacc6cb0f71780dd8ed63) | [0x9f6a3d6d…](https://explorer.testnet.somnia.network/tokyo/tx/0x9f6a3d6dd57b0646fbf9760782d97c5dff65af59f66f12c0c8d388adaa997b49) |
+| 18 | [0xea3e41e0…](https://explorer.testnet.somnia.network/tokyo/tx/0xea3e41e0f5e180bc50be6c133ef8a006e1509778d9618e68b6fb668e7e7e34cd) | [0xf5417c47…](https://shannon-explorer.somnia.network/tx/0xf5417c475ba2d4d5f73a91526049748eae94880c604d7a0af433088f247fc05a) | [0xbcc236b8…](https://shannon-explorer.somnia.network/tx/0xbcc236b88a2e014c95db5c14acdf19a330a431d6c9005aa1a262d531d1d150f1) | [0x9ce0ff39…](https://shannon-explorer.somnia.network/tx/0x9ce0ff3984ec03cc6b414f0617ef2692e87a6e6471a469dcb947235a4624d378) | [0x42ed327d…](https://explorer.testnet.somnia.network/tokyo/tx/0x42ed327dbbfb53d63d4003cc3398d73be8c61e1fae728500f1a67975ebe45c84) |
+| 19 | [0x824d7e56…](https://explorer.testnet.somnia.network/tokyo/tx/0x824d7e560cd459d6d8a68dbb64490154e8e08db195dae607214dd834aae21f10) | [0xe2a3760d…](https://shannon-explorer.somnia.network/tx/0xe2a3760dea9f992d1348e8b775b63ece1ed9d101de8b1d3cbae64f10f92101a0) | [0xc34aea24…](https://shannon-explorer.somnia.network/tx/0xc34aea241e43c7b8281699874d1447eac2a663dc3f4c54ca508fa2828168ce38) | [0xd7758e90…](https://shannon-explorer.somnia.network/tx/0xd7758e9036127141eedfff62827111d730f59088a3ffd53492f29922e2f6bea9) | [0x135d6518…](https://explorer.testnet.somnia.network/tokyo/tx/0x135d651830f59cd3e2c9ea9274f5938adde68a0e98deb4ed1d8b1c6caa4c04ae) |
+| 20 | [0x0180c68c…](https://explorer.testnet.somnia.network/tokyo/tx/0x0180c68cf5d8f9eefc5e400922a62e0312fefc0227eede0e99b78124ae75adde) | [0xdaf552d8…](https://shannon-explorer.somnia.network/tx/0xdaf552d8a8cb4b78e816d51df4b6770d66e438cdce1b72489742166f3663a9c8) | [0xb3609550…](https://shannon-explorer.somnia.network/tx/0xb3609550ac7acef9e2d61bdc3c6aaef19c539e12345ded70fd932012d29ade83) | [0x0208db32…](https://shannon-explorer.somnia.network/tx/0x0208db32108de2958bb42a7273f9cdc74c6a6413fe4dadc2e2f8a12e6ea23495) | [0x8a70ffe5…](https://explorer.testnet.somnia.network/tokyo/tx/0x8a70ffe570747dc782f2557cedfc22826ddda0b94912b624149cb68b6e9c28af) |
+
+#### Run v4 validators
+
+| validator | summary fetches | LLM answers | answers matching the rubric |
+|---|---|---|---|
+| `0x1Cb38b3ee632B5dCc0347dB81766606d6Aad4926` | 16 | 16 | 16 |
+| `0x05f1fE2DDF9B65576D3165E37C6A60e6c5Ba93De` | 14 | 16 | 15 |
+| `0x3E05e29029C60E000C8F01EB5AC9cEE6b242D7e0` | 15 | 16 | 15 |
+| `0x55Acbe370872c7D90F504eF169217a00c29E2A33` | 15 | 12 | 11 |
+
+### Reading run v4
+
+- **The miss is a missed BLOCK.** Row 6's line is `liquidations30d=10 trades30d=27 history=yes partial=0`, and the
+  committee answered CAUTION, 3 votes of 3.
+  - **What the gate does with it.** The gate stores that CAUTION, so guarded followers of this trader can still add
+    size until a new review says BLOCK. Of the two errors the gate can make, this is the one that leaves a follower
+    exposed.
+  - **What one review cannot tell.** Lines with 2, 4, 11, 12, 14, 15 and 135 liquidations were all BLOCKed; row 6 is
+    the only line with exactly 10. The prompt's other threshold reads "trades30d is below 10", but one review cannot
+    show whether the number mattered.
+- **Everything else matches the rubric.**
+  - every other trader with 2 or more liquidations: 7 of 7;
+  - every trader with exactly one: 4 of 4;
+  - the clean traders: 6 of 6 OK;
+  - the thin trader (4 trades): CAUTION;
+  - the high-frequency trader with `partial=1`: CAUTION.
+- **How this compares with run v3.** Run v3 scored 18 of 20 on the traders its changes were chosen on, with no missed
+  BLOCK. On fresh traders the same setup scored 19 of 20, with one missed BLOCK.
+  - The kind of error moved, from thin-history CAUTIONs rated OK to a BLOCK rated CAUTION.
+  - The sample also differs: it has 8 BLOCKs and a single thin trader, against 6 and 3.
+- **The limits of this run:**
+  - one review per trader;
+  - 20 traders;
+  - no line carried a drawdown percentage, so the 25% and 50% rules are still untested on their own.
+
+### Run v4 cost and latency
+
+- **Reviewer deposits:** 4.3073 STT for 20 reviews, 0.2154 STT each. Over the run, the reviewer went from 9.1103 to
+  4.8030 STT.
+- **Review fees:** 20 × 0.5 STT, paid to the gate, which the owner can withdraw. The gate held 12 STT after the run.
+- **Gas:**
+  - `requestReview`: 394,542 – 403,503 (first reviews of these traders write new storage);
+  - the anchor: 29,320.
+- **Latency,** from the request to the verdict landing on Hideki (block timestamps): median 11.5 s, range 8 – 16 s for
+  20 reviews. No delivery was slow.
 
 ## Run v3: the rubric as the system message, and only the keys it reads
 
@@ -544,35 +768,43 @@ Run v3 rates all three as the rubric does: steady OK, liquidated BLOCK, leader O
 
 ## What the gate holds now
 
-As read from the gate after run v3, on 2026-10-28:
+As read from the gate at block 36,612,170 (22:53:52 UTC on 2026-10-29), after run v4:
 
-- **BLOCK, 10 traders:**
-  - **Rows 2–7.** These are the rubric's six BLOCKs, refreshed by run v3 between 14:30 and 14:38 UTC.
-  - **Rows 1, 13 and 14** still hold run v2's false BLOCKs. Run v3's milder verdicts (OK, CAUTION, OK) arrived less than
-    24 hours after those BLOCKs, so the gate kept them (`BlockHeld`), as designed. A fresh review can replace them from
-    13:57:29, 14:04:43 and 14:05:11 UTC on 2026-10-29 respectively. Untouched, they expire at the same times on
-    2026-11-04.
-  - **The leader** still holds its first-run BLOCK. Run v3's OK was likewise held. A fresh review can replace that BLOCK
-    from 13:36:31 UTC on 2026-10-29. Untouched, it expires at 13:36:31 UTC on 2026-11-04.
-- **CAUTION and OK.** The other traders hold CAUTION or OK, and neither restricts anyone.
+- **BLOCK, 13 traders, all of them BLOCKs under the rubric:**
+  - run v3's rows 2–7, which expire between 14:30 and 14:38 UTC on 2026-11-04;
+  - run v4's rows 1–5, 19 and 20, which expire between 22:44 and 22:51 UTC on 2026-11-05.
+
+  A BLOCK stops blocking after 7 days unless a new BLOCK refreshes it, and a milder verdict can replace it 24 hours
+  after it landed.
+- **Run v4's row 6** holds CAUTION, the missed BLOCK above. Guarded followers of that trader are not protected.
+- **Run v3's earlier false BLOCKs are gone.** Rows 1, 13, 14 and the leader held BLOCKs from runs v1 and v2 that run
+  v3's milder verdicts could not replace inside the 24-hour hold. Fresh reviews between 17:08 and 17:09 UTC on
+  2026-10-29 (gate nonces 44–47) replaced them with OK, CAUTION, OK and OK.
+- **CAUTION and OK.** The other traders hold CAUTION or OK, and neither restricts anyone. Run v3's rows 17 and 19 hold
+  OK where the rubric says CAUTION.
 
 ## Limitations
 
 - **The Hyperlane lane is a dev lane.** Both directions run through the testnet lane, and each side's ISM has a single
   validator (the same key on both). Whoever holds that key could deliver a forged verdict, a BLOCK included. The
   committee's work is verifiable on Shannon, but the Hideki gate trusts the lane.
-- **The platform's per-response `receipt` field is 0** in every response of both runs. What the validators actually
+- **The platform's per-response `receipt` field is 0** in every response of every run. What the validators actually
   signed is the callback transactions above and the responses they carry, decoded in each run's `results.json`.
 - **LLM output depends on the prompt.** In each run, each trader was reviewed once. The three validators always agreed,
   but run-to-run stability was not tested. The answer depends on the exact prompt and line bytes, and a trader whose
   line changes can get a different answer. Twenty reviews per run is a small sample, and run v3 changed two things at once.
-- **Some rules were barely tested.** `maxDrawdownPct30d` appears for only one trader (92.2%, already BLOCK for its
-  liquidations), so the 25% and 50% drawdown thresholds were not tested on their own. No screened trader had
-  `history=none`.
-- **Run v3 is not an out-of-sample estimate.** Run v3's changes were chosen after reading run v2's errors on this
-  same sample. The prompt's words did not change, but 18 of 20 is not an out-of-sample estimate; a fresh sample would
-  be.
-- **The thin-data rule is not reliable.** Run v3 applied it to 1 of 3 thin traders. The gate does not act on CAUTION,
+- **The committee can miss a BLOCK.** In run v4 a trader with 10 liquidations got CAUTION, 3 votes of 3. The gate then
+  lets guarded followers add size to that trader until a new review says BLOCK.
+- **Some rules were barely tested.** `maxDrawdownPct30d` appears for only one trader in all four runs (92.2%, already
+  BLOCK for its liquidations), so the 25% and 50% drawdown thresholds were not tested on their own. No screened trader
+  had `history=none`. Run v4's sample has a single thin trader, because the thin pool came up short.
+- **Run v3 is not an out-of-sample estimate; run v4 is.** Run v3's changes were chosen after reading run v2's errors
+  on the same sample, so its 18 of 20 is not an out-of-sample estimate.
+  - Run v4 used 20 traders no earlier run had reviewed or screened, with every part of run v3's setup unchanged. It
+    scored 19 of 20, with one missed BLOCK.
+  - Run v4 is still a single review per trader on 20 traders, and its strata differ from runs v2 and v3.
+- **The thin-data rule is not reliable.** Run v3 applied it to 1 of 3 thin traders, and run v4 to its single thin
+  trader. The gate does not act on CAUTION,
   but the published policy is not fully applied.
 - **The rubric is public.** It is a published policy that the validators apply, not a secret model. A trader can read
   the thresholds; the value is in applying the policy where anyone can check it. Each verdict carries the hash of the
@@ -603,6 +835,13 @@ COPYBOOK_ENV=keys.env npm run eval anchor v3 <commit>  # commit + key hash on Hi
 COPYBOOK_ENV=keys.env npm run risk review <trader>     # each trader in the key, in order
 COPYBOOK_ENV=keys.env npm run risk follow <nonce>      # only if a delivery outlasted the script's wait
 npm run eval score v3                                  # eval/v3/results.json and the run v3 tables
+
+# run v4 (held out): the same reviewer and settings, nothing changed
+COPYBOOK_ENV=keys.env npm run eval:v4 select           # fresh sample + eval/v4/answer-key.json (commit it)
+COPYBOOK_ENV=keys.env npm run eval:v4 anchor <commit>  # commit + key hash on Hideki
+COPYBOOK_ENV=keys.env npm run risk review <trader>     # each trader in the key, in order
+npm run eval:v4 score                                  # eval.ts unchanged, on run v4's key -> eval/v4/results.json
+npm run eval:v4 score --reproduce-v3                   # the same wrapper on run v3's key reproduces eval/v3/results.json
 ```
 
 To check a pre-registration, hash the committed key with keccak256 and compare the result with the last 32 bytes of
@@ -612,4 +851,7 @@ the anchor transaction's input:
   (recorded in [`anchor.json`](anchor.json));
 - run v3: `git show 5aed53b:eval/v3/answer-key.json`, anchor
   [0xb6792325…](https://explorer.testnet.somnia.network/tokyo/tx/0xb67923259aa552c033eba19271020d41f206c04a44d461ef9237c3752dd40e13)
-  (recorded in [`v3/anchor.json`](v3/anchor.json)).
+  (recorded in [`v3/anchor.json`](v3/anchor.json));
+- run v4: `git show a7c42c2:eval/v4/answer-key.json`, anchor
+  [0xadd80abe…](https://explorer.testnet.somnia.network/tokyo/tx/0xadd80abe7fdd825fe6f4086d62b09c44f50d2aeb2519b0479462e0a14be06b09)
+  (recorded in [`v4/anchor.json`](v4/anchor.json)).

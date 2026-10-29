@@ -28,7 +28,7 @@ Testnet only: STT and USDso have no market value.
 | `packages/stats` | `@copybook/stats`: trader statistics from the dreamDEX indexer, for Discover and for the risk review. |
 | `e2e/` | The live end-to-end run on Hideki and the risk-module tooling. See [`e2e/README.md`](e2e/README.md). |
 | `eval/` | The AI guard's rubric, its tests and the committee's scorecard ([`eval/SCORECARD.md`](eval/SCORECARD.md)). |
-| `deployments/` | The deployed addresses. The app, the SDK and the MCP server read addresses from here and nowhere else. |
+| `deployments/` | The deployed addresses, and every wallet Copybook itself runs (`demoWallets`, with its role). The app, the SDK and the MCP server read addresses from here and nowhere else; Copybook's wallets are marked ours and never ranked. |
 
 Requirements: Node 24 (22.18 or newer for the MCP server) and npm. Foundry only for the contracts.
 

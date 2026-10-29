@@ -14,6 +14,7 @@ import {
   copyShareText,
   pageUrl,
   postLength,
+  postableName,
   thesisShareText,
   traderShareText,
   weightedLength,
@@ -134,6 +135,16 @@ describe("what a trader's and a thesis's posts say", () => {
     expect(c).toMatch(/^My copy of the thesis '東京.*…' landed in the same block as its rebalance: /);
   });
 
+  it("a cut never splits an emoji sequence or a flag", () => {
+    const family = "👨‍👩‍👧";
+    const t = thesisShareText({ id: 2n, name: `${family}🇯🇵`.repeat(40), legs: 2 });
+    expect(postLength(t)).toBeLessThanOrEqual(POST_LIMIT);
+    const cut = t.match(/^Follow the thesis '(.*)…' on Copybook/u)![1];
+    expect(cut.length).toBeGreaterThan(0);
+    // what is left is whole family-and-flag pairs, or a pair and one more family: never a part of either
+    expect(cut).toMatch(/^(?:👨‍👩‍👧🇯🇵)*(?:👨‍👩‍👧)?$/u);
+  });
+
   it("every post fits with its link at X's 23 characters", () => {
     for (const t of [
       copyShareText({ source: { kind: "Trader", trader: OTHER }, block: 999_999_999n, sameBlock: true, mine: false }),
@@ -142,6 +153,43 @@ describe("what a trader's and a thesis's posts say", () => {
       thesisShareText({ id: 1n, name: "x".repeat(48), legs: 16 }),
     ])
       fits(t);
+  });
+});
+
+describe("names X would make live", () => {
+  // anyone can register a thesis under any name: nothing in one may become a mention, a tag or a link in the sharer's post
+  const live = [
+    ["a mention", "Follow @elonmusk"],
+    ["a full-width mention", "Follow ＠someone"],
+    ["a hashtag", "BTC #toTheMoon"],
+    ["a full-width hashtag", "BTC ＃moon"],
+    ["a cashtag", "$BTC vs $ETH"],
+    ["a link", "see http://scam.example/claim"],
+    ["a link without its scheme's name", "ftp://files"],
+    ["www", "www.example"],
+    ["a bare .com", "claim at copybook-airdrop.com"],
+    ["a bare .io", "majors.io basket"],
+    ["a bare .xyz", "free.xyz"],
+    ["a bare .ai", "best.ai picks"],
+    ["a bare upper-case domain", "VISIT EXAMPLE.NET NOW"],
+  ] as const;
+
+  it.each(live)("%s gives way to the thesis id", (_, name) => {
+    expect(postableName(name)).toBeNull();
+    expect(thesisShareText({ id: 7n, name, legs: 2 })).toBe("Follow the thesis #7 on Copybook: 2 legs, opened in one transaction on @DreamDEXSomnia perps.");
+    expect(copyShareText({ source: { kind: "Theme", themeId: 7n, name }, block: 35025602n, sameBlock: true, mine: true })).toBe(
+      "My copy of thesis #7 landed in the same block as its rebalance: block #35,025,602 on Somnia's Tokyo testnet, via Copybook on @DreamDEXSomnia perps.",
+    );
+  });
+
+  it("plain names, figures with decimals included, are kept as written", () => {
+    for (const name of ["BTC vs ETH", "Majors 2.0", "ETH 3.5x long, BTC short", "L1s vs L2s", "東京 basket", "e.g. majors"]) {
+      expect(postableName(name)).toBe(name);
+      expect(thesisShareText({ id: 7n, name, legs: 2 })).toBe(`Follow the thesis '${name}' on Copybook: 2 legs, opened in one transaction on @DreamDEXSomnia perps.`);
+    }
+    expect(postableName("  BTC\n vs\tETH ")).toBe("BTC vs ETH");
+    expect(postableName("")).toBeNull();
+    expect(postableName(null)).toBeNull();
   });
 });
 

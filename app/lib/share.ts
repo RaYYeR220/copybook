@@ -43,12 +43,29 @@ export const pageUrl = (site: string, path: string) => new URL(path, site).toStr
 /** A name typed by a user, on one line. */
 const oneLine = (s: string) => s.replace(/\s+/g, " ").trim();
 
+/** What X would make live in a post: a mention or hashtag (ASCII or full-width), a cashtag, a link, a bare domain. */
+const LIVE_ENTITY = [/[@＠#＃]/, /\$\p{L}/u, /:\/\//, /www\./i, /[\p{L}\p{N}_-]\.\p{L}{2,}/u];
+
+/**
+ * A thesis name as a post may carry it, on one line; null when X would turn part of it into a mention, a hashtag, a
+ * cashtag or a link under the sharer's account. Anyone can register a thesis under any name, so the post then names
+ * it by its id instead.
+ */
+export function postableName(name: string | null | undefined): string | null {
+  const s = oneLine(name ?? "");
+  return s && !LIVE_ENTITY.some((re) => re.test(s)) ? s : null;
+}
+
+/** User-perceived characters, so a cut never splits an emoji sequence or a flag. */
+const graphemes = (s: string): string[] =>
+  typeof Intl.Segmenter === "function" ? Array.from(new Intl.Segmenter(undefined, { granularity: "grapheme" }).segment(s), (g) => g.segment) : [...s];
+
 /**
  * The text `build` makes with `name`, the name cut short (with an ellipsis) only as far as the post needs to fit
  * with its link.
  */
 function fitName(build: (name: string) => string, name: string): string {
-  let chars = [...oneLine(name)];
+  let chars = graphemes(name);
   let text = build(chars.join(""));
   while (postLength(text) > POST_LIMIT && chars.length > 1) {
     chars = chars.slice(0, -1);
@@ -112,7 +129,7 @@ export function copyShareText(c: CopyShare): string {
     if (c.sameBlock === false) return `${subject} came from a ${c.call ?? "direct"} call to the Copybook hub, in ${where}, on ${VENUE_HANDLE} perps.`;
     return `${subject} is in ${where}, via Copybook on ${VENUE_HANDLE} perps.`;
   };
-  const name = c.source?.kind === "Theme" ? c.source.name : null;
+  const name = c.source?.kind === "Theme" ? postableName(c.source.name) : null;
   return name ? fitName(build, name) : build();
 }
 
@@ -123,9 +140,9 @@ export function traderShareText(x: { trader: string; demo?: boolean; own?: boole
   return `Follow ${who} on Copybook: copies land in their block on ${VENUE_HANDLE} perps (Somnia testnet).`;
 }
 
-/** A thesis page's post; `own` when the connected wallet created the thesis. A blank name falls back to its id. */
+/** A thesis page's post; `own` when the connected wallet created the thesis. A name X would make live (or a blank one) gives way to its id. */
 export function thesisShareText(x: { id: bigint | number | string; name: string; legs: number; own?: boolean }): string {
   const build = (name: string) =>
     `Follow ${x.own ? "my thesis" : "the thesis"} ${name ? `'${name}'` : `#${x.id}`} on Copybook: ${legsText(x.legs)}, opened in one transaction on ${VENUE_HANDLE} perps.`;
-  return fitName(build, x.name);
+  return fitName(build, postableName(x.name) ?? "");
 }

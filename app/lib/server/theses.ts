@@ -50,3 +50,10 @@ export const thesisNames: () => Promise<{ id: string; name: string }[]> = unstab
 );
 
 export const isOwner = (a: Address, owner: Address) => a.toLowerCase() === owner.toLowerCase();
+
+/** Thesis ids, names and creators, for listing theses beside traders: no market reads, 15 s cache. */
+export const thesisList: () => Promise<{ id: string; name: string; creator: Address }[]> = unstable_cache(
+  async () => (await copybook.themes()).map((t) => ({ id: t.id.toString(), name: t.name, creator: t.creator })),
+  ["thesis-list"],
+  { revalidate: 15 },
+);

@@ -94,6 +94,9 @@ export default async function Discover() {
               <Button size="md" variant="quiet" href="/thesis/new" prefetch={false}>
                 Publish a thesis
               </Button>
+              <Button size="md" variant="quiet" href="/leaderboard" prefetch={false}>
+                Leaderboard
+              </Button>
             </SourceActs>
           </Panel>
         </Col>

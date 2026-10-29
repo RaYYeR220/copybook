@@ -8,6 +8,7 @@ import styles from "./app.module.css";
 
 const LINKS = [
   { href: "/app", label: "Discover" },
+  { href: "/leaderboard", label: "Leaderboard", prefetch: false },
   { href: "/me", label: "Dashboard", prefetch: false },
 ];
 

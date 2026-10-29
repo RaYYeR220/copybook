@@ -164,9 +164,9 @@ key). Deploying and the live end-to-end run need funded keys: [`e2e/README.md`](
 
 Posts about Copybook, tagging [@DreamDEXSomnia](https://x.com/DreamDEXSomnia):
 
-- <!-- X1 -->
-- <!-- X2 -->
-- <!-- X3 -->
+- [Launch: follow a trader or a thesis, and your copy lands in the same block as their trade](https://x.com/BazydloMis57623/status/2115937201766715680)
+<!-- X2 -->
+<!-- X3 -->
 
 ## What is in this repo
 

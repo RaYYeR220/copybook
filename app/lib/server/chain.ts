@@ -11,9 +11,13 @@ import { createHubLog, type LoggedEvent } from "./hubLog";
 /** The node refuses `eth_getLogs` over more than 1000 blocks; asking for exactly that avoids the SDK's halving retries. */
 const LOG_CHUNK = 1_000n;
 
+/**
+ * Hideki answers a 1000-block eth_getLogs in about a second, but from Vercel's functions a request sometimes hangs for
+ * 30 s or more while the next one answers at once: give up on a request after 8 s and try again, up to four times.
+ */
 export const publicClient = createPublicClient({
   chain: hideki,
-  transport: http(undefined, { retryCount: 2, retryDelay: 400, timeout: 20_000 }),
+  transport: http(undefined, { retryCount: 4, retryDelay: 300, timeout: 8_000 }),
 }) as PublicClient;
 
 export const copybook = createCopybook({ publicClient, deployments: config.deployments });

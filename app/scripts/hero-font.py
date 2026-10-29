@@ -1,13 +1,14 @@
 """
-Builds the hero headline's own font files: Fraunces at the exact instances the landing's H1 draws ("Follow a trader"
-at weight 560, "thesis." italic at 500, both at opsz 144 and SOFT 100), cut to printable ASCII. A few KB each, so the
-page can preload them instead of the full variable faces (about 270 KB) and still paint the headline in Fraunces.
-Every other piece of Fraunces text keeps using the full variable font.
+Builds the hero headline's own font files: Fraunces at the exact instances the landing's H1 draws ("Follow a trader /
+or a" at weight 560, "thesis." italic at 500, both at opsz 144 and SOFT 100), cut to the characters the H1 uses. A few
+KB each, so the page can preload them instead of the full variable faces (about 270 KB) and still paint the headline
+in Fraunces. Every other piece of Fraunces text keeps using the full variable font, and a character missing here falls
+back to it.
 
     pip install "fonttools[woff]"
     python app/scripts/hero-font.py        # writes app/assets/fonts/fraunces-hero-*.woff2
 
-Change the instances here when the H1's weight, style or variation settings change.
+Run it again when the H1's text, weight, style or variation settings change (components/Hero/Hero.tsx).
 """
 import io
 import re
@@ -25,8 +26,8 @@ CSS_URL = (
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
 OUT = Path(__file__).resolve().parent.parent / "assets" / "fonts"
 INSTANCES = {
-    "fraunces-hero-560.woff2": ("normal", {"wght": 560, "opsz": 144, "SOFT": 100}),
-    "fraunces-hero-italic-500.woff2": ("italic", {"wght": 500, "opsz": 144, "SOFT": 100}),
+    "fraunces-hero-560.woff2": ("normal", {"wght": 560, "opsz": 144, "SOFT": 100}, "Follow a trader or a"),
+    "fraunces-hero-italic-500.woff2": ("italic", {"wght": 500, "opsz": 144, "SOFT": 100}, "thesis."),
 }
 
 
@@ -47,14 +48,14 @@ def latin_sources() -> dict[str, str]:
 def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
     sources = latin_sources()
-    for name, (style, location) in INSTANCES.items():
+    for name, (style, location, text) in INSTANCES.items():
         font = instancer.instantiateVariableFont(TTFont(io.BytesIO(fetch(sources[style]))), location)
         opts = Options()
         opts.flavor = "woff2"
         opts.layout_features = ["*"]
         opts.name_IDs = ["*"]
         sub = Subsetter(opts)
-        sub.populate(unicodes=range(0x20, 0x7F))
+        sub.populate(text=text + " ")
         sub.subset(font)
         font.flavor = "woff2"
         font.save(OUT / name)

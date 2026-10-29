@@ -25,9 +25,9 @@ const NAV: NavLink[] = [
 
 /**
  * The headline's own Fraunces: the two exact instances the H1 draws (560, and italic 500, at opsz 144 and SOFT 100),
- * cut to printable ASCII by scripts/hero-font.py. About 25 KB together, so this page preloads them instead of the full
- * variable faces (about 270 KB, not preloaded) and the headline paints in Fraunces from its first frame. Called here
- * because next/font preloads a face only for the page or layout that calls it.
+ * cut to the headline's characters by scripts/hero-font.py (run it again when the H1 changes). A few KB, so this page
+ * preloads them instead of the full variable faces (about 270 KB, not preloaded) and the headline paints in Fraunces
+ * from its first frame. Called here because next/font preloads a face only for the page or layout that calls it.
  */
 const heroFont = localFont({
   src: [

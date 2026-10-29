@@ -1,5 +1,5 @@
 The landing headline is set in these files: Fraunces instances (weight 560, and italic 500; opsz 144, SOFT 100) cut to
-printable ASCII by app/scripts/hero-font.py. Fraunces is licensed under the SIL Open Font License 1.1, which follows.
+the headline's characters by app/scripts/hero-font.py. Fraunces is licensed under the SIL Open Font License 1.1, which follows.
 
 ================================================================
 Copyright 2018 The Fraunces Project Authors (https://github.com/undercasetype/Fraunces)

@@ -4,6 +4,7 @@ import { getAddress, isAddress, type Address } from "viem";
 import { sourceIdOf, type Leg, type TierName } from "@copybook/sdk";
 import type { TraderStats } from "@copybook/stats";
 import type { CopyView } from "../copy";
+import { parseThesisId } from "../thesisId";
 import { CARD, CopyCard, ThesisCard, TraderCard } from "./cards";
 import { ogFonts, type OgFont } from "./fonts";
 import { copyCardModel, thesisCardModel, traderCardModel, type CardNames, type FollowerFigure } from "./model";
@@ -85,8 +86,6 @@ export const traderCard = (
     { cache: CACHE_LIVE },
   );
 
-const ID_RE = /^[0-9]{1,9}$/;
-
 export const thesisCard = (
   raw: string,
   deps: CardDeps & { thesis(id: bigint): Promise<{ name: string; version: number; creator: Address; legs: Leg[]; minimum: bigint | null } | null> },
@@ -94,7 +93,7 @@ export const thesisCard = (
   cardResponse(
     async () => {
       // one card per thesis: "01" or "001" is not another address for #1
-      if (!ID_RE.test(raw) || BigInt(raw) === 0n || BigInt(raw).toString() !== raw) return null;
+      if (parseThesisId(raw) === null) return null;
       const id = BigInt(raw);
       const t = await deps.thesis(id); // throws when the registry cannot be read: a 502, not a 404
       if (!t) return null;

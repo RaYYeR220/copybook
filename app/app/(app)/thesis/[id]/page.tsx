@@ -19,6 +19,7 @@ import { config } from "@/lib/server/config";
 import { perpMarkets } from "@/lib/server/indexer";
 import { registeredPools, registryBank, registryRules } from "@/lib/server/registry";
 import { loadThesis, type Thesis } from "@/lib/server/theses";
+import { parseThesisId } from "@/lib/thesisId";
 import { ourWallet } from "@/lib/ours";
 import { decimalsOf, grossBps, legSide, netBps, pctOfBps } from "@/lib/thesis";
 import { toJsonSafe } from "@/lib/json";
@@ -27,12 +28,12 @@ import { fmtPrice18, fmtUnits, fmtUsd18 } from "@/lib/units";
 export const dynamic = "force-dynamic";
 
 type Params = { params: Promise<{ id: string }> };
-const ID_RE = /^[0-9]{1,9}$/;
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const { id } = await params;
-  if (!ID_RE.test(id) || BigInt(id) === 0n) notFound();
-  const thesis = await loadThesis(BigInt(id)).catch(() => undefined);
+  const tid = parseThesisId(id);
+  if (tid === null) notFound();
+  const thesis = await loadThesis(tid).catch(() => undefined);
   if (thesis === undefined) return { title: `Thesis #${id}` };
   if (!thesis) notFound();
   const title = `${thesis.name} · thesis #${id}`;
@@ -64,8 +65,9 @@ function legRows(thesis: Thesis, names: Record<string, { symbol: string }>) {
 
 export default async function ThesisPage({ params }: Params) {
   const raw = decodeURIComponent((await params).id);
-  if (!ID_RE.test(raw) || BigInt(raw) === 0n) notFound();
-  const id = BigInt(raw);
+  const parsed = parseThesisId(raw);
+  if (parsed === null) notFound();
+  const id = parsed;
   const [thesisR, marketsR, rulesR, bankR] = await Promise.allSettled([loadThesis(id), perpMarkets(), registryRules(), registryBank()]);
   if (thesisR.status === "rejected")
     return (
@@ -84,7 +86,8 @@ export default async function ThesisPage({ params }: Params) {
   const creatorRole = ourWallet(config.deployments, thesis.creator);
   const net = netBps(thesis.legs);
   const ledger: LedgerRow[] = [
-    { label: "Legs", value: `${thesis.legs.length} · gross ${pctOfBps(grossBps(thesis.legs))} · net ${pctOfBps(Math.abs(net))} ${net >= 0 ? "long" : "short"}` },
+    // net as the card says it: "flat" when the long and short weights cancel
+    { label: "Legs", value: `${thesis.legs.length} · gross ${pctOfBps(grossBps(thesis.legs))} · net ${net === 0 ? "flat" : `${pctOfBps(Math.abs(net))} ${net > 0 ? "long" : "short"}`}` },
     { label: "Version", value: <b>v{thesis.version}</b>, note: "each rebalance bumps it" },
   ];
   if (min) {

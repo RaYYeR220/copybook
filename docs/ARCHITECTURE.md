@@ -138,11 +138,13 @@ sequenceDiagram
   verdict and the stored one stands.
 - **One review, every hop:** [review 11](PROOF.md#one-review-end-to-end-review-11). Every review:
   [table](PROOF.md#every-review). Latency from request to verdict on Hideki: median 11 s over 19 reviews of run v3
-  ([scorecard](../eval/SCORECARD.md#cost-and-latency)).
+  ([scorecard](../eval/SCORECARD.md#cost-and-latency)) and 11.5 s over the 20 of run v4
+  ([run v4](../eval/SCORECARD.md#run-v4-cost-and-latency)).
 
 The rubric is public ([`eval/rubric.ts`](../eval/rubric.ts)) and the field the validators fetch holds only the keys
 it reads, so anyone can recompute the tier a line should get. The scorecard measures how faithfully the committee applies it
-([run v3](../eval/SCORECARD.md#result)). The lane's trust model is in [LIMITS.md](LIMITS.md).
+([run v3](../eval/SCORECARD.md#result), and on traders no earlier run had seen,
+[run v4](../eval/SCORECARD.md#run-v4-result)). The lane's trust model is in [LIMITS.md](LIMITS.md).
 
 ## Data routes
 

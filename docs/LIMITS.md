@@ -110,14 +110,18 @@ of the wallet and stays after unfollow until revoked ([revoke](PROOF.md#app-revo
 - **A verdict is a risk tier, not advice.** An LLM committee applies a published rubric to data from Copybook's own
   endpoint. The data committee attests that its members fetched the same bytes, not that the bytes are true; the
   risk line is built from the dreamDEX indexer with a 2,000-row cap (`partial=1` beyond it).
-- **The scorecard is small.** Run v3 is not an out-of-sample estimate, run-to-run stability was not tested, and the
-  thin-data rule was applied to 1 of 3 thin traders ([scorecard limitations](../eval/SCORECARD.md#limitations)).
+- **The scorecard is small.** Each run reviews 20 traders once. Run v3 is not an out-of-sample estimate; run v4, on
+  20 traders no earlier run had seen, scored 19 of 20. Run-to-run stability was not tested, and the thin-data rule was
+  applied to 1 of 3 thin traders in run v3 and to run v4's single thin trader
+  ([scorecard limitations](../eval/SCORECARD.md#limitations)).
+- **The committee can miss a BLOCK.** In run v4 a trader with 10 liquidations got CAUTION, 3 votes of 3. The gate then
+  lets guarded followers add size to that trader until a new review says BLOCK.
 - **Verdicts change.** A trader's tier is whatever the last review returned, held by the gate's 24-hour BLOCK hold and
   7-day expiry. Read the current one on the trader's page in the app, not in these docs.
 - **A BLOCK is cheaper to get than to lose.** A new BLOCK replaces a stored one at any time; a milder verdict waits out
   the hold. Each review costs 0.5 STT and a trader can be reviewed again 10 minutes after a verdict.
 - **Reviews need a funded reviewer.** The reviewer pays the committees' deposits on Shannon (0.36 STT held per review,
-  about 0.215 STT spent, in run v3). An unfunded reviewer answers with no verdict, which leaves the stored one as it
+  about 0.215 STT spent, in runs v3 and v4). An unfunded reviewer answers with no verdict, which leaves the stored one as it
   was.
 - **The guard covers trader follows only,** and refuses increases only. Exits are never gated.
 

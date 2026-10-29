@@ -76,8 +76,8 @@ basket of perps, long and short, that its creator rebalances).
    Hyperlane ([one review, end to end](docs/PROOF.md#one-review-end-to-end-review-11)).
    Under a BLOCK, guarded followers are refused new size; exits stay ungated
    ([refused](docs/PROOF.md#guard-blocked), [exit copied](docs/PROOF.md#guard-exit)). The guard is on by default and
-   each follower can turn it off ([on chain](docs/PROOF.md#app-guard-off)). How well the committee applies the rubric:
-   [scorecard](eval/SCORECARD.md#result).
+   each follower can turn it off ([on chain](docs/PROOF.md#app-guard-off)). How well the committee applies the rubric, including
+   on traders it had never seen: [scorecard](eval/SCORECARD.md#run-v4-result).
 
 A whole-book trader follow copies nothing in its own transaction: positions the trader already holds open through
 `catchUp` on the dashboard or at the trader's next move in each market ([limits](docs/LIMITS.md#copying)).

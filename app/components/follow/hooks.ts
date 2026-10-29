@@ -5,6 +5,8 @@ import { createPublicClient, http, type Address, type Hex, type PublicClient, ty
 import { useConnect, useWalletClient } from "wagmi";
 import { createCopybook, CopybookError, type Copybook, type PreflightInput, type PreflightResult } from "@copybook/sdk";
 import { IDLE, forgetTx, recallTx, rememberTx, runTx, type Sent, type TxPhase } from "@/lib/follow/tx";
+
+export { txFor } from "@/lib/follow/tx";
 import { deploymentsOf, type PublicConfig } from "@/lib/publicConfig";
 import { hideki } from "@/lib/wallet/hideki";
 

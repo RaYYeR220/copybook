@@ -28,7 +28,12 @@ describe("preflight reasons before signing", () => {
   });
 
   it("a whole-book cap below the basket, a tank below the minimum, a short wallet and an equity under the floor", () => {
-    expect(reasonView(r({ code: "TOTAL_CAP_BELOW_BASKET", field: "maxTotalNotional", required: 79_900_000_000_000_000_000n }), markets).apply).toMatchObject({ field: "maxTotalNotional", value: "80" });
+    const basket = reasonView(r({ code: "TOTAL_CAP_BELOW_BASKET", field: "maxTotalNotional", required: 79_900_000_000_000_000_000n }), markets);
+    expect(basket).toMatchObject({ needs: "The follow transaction opens $79.90 in total", apply: { field: "maxTotalNotional", value: "80" } });
+    const order = reasonView(r({ code: "TOTAL_CAP_BELOW_ONE_ORDER", field: "maxTotalNotional", pool: ETH, required: 12n * E }), markets);
+    expect(order).toMatchObject({ market: "ETH-PERP", needs: "Least whole-book cap that fits one order here: $12.00", apply: { field: "maxTotalNotional", value: "12", label: "Use $12" } });
+    // a warning (whole-book follow) carries no fix
+    expect(reasonView(r({ code: "TOTAL_CAP_BELOW_BASKET", severity: "warning", field: "maxTotalNotional", required: E }), markets).apply).toBeUndefined();
     const tank = reasonView(r({ code: "TANK_TOO_LOW", field: "tank", required: MIN_TANK }), markets);
     expect(tank).toMatchObject({ field: "tank", needs: "Least the hub takes: 0.2 STT", apply: { field: "tank", value: "0.2", label: "Use 0.2 STT" } });
     const short = reasonView(r({ code: "INSUFFICIENT_BALANCE", field: "tank", required: 5n * 10n ** 17n }), markets);

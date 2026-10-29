@@ -68,7 +68,9 @@ export function reasonView(r: PreflightReason, markets: Record<string, MarketMet
     case "CAP_BELOW_ONE_ORDER":
       return { ...v, needs: `Least cap that fits one order here: ${fmtUsd18(r.required, "up")}`, apply: { field: "maxNotional", value: ceilDollars(r.required), label: `Use $${ceilDollars(r.required)}` } };
     case "TOTAL_CAP_BELOW_BASKET":
-      return { ...v, needs: `The basket opens at ${fmtUsd18(r.required, "up")} in total`, apply: { field: "maxTotalNotional", value: ceilDollars(r.required), label: `Use $${ceilDollars(r.required)}` } };
+      return { ...v, needs: `The follow transaction opens ${fmtUsd18(r.required, "up")} in total`, apply: { field: "maxTotalNotional", value: ceilDollars(r.required), label: `Use $${ceilDollars(r.required)}` } };
+    case "TOTAL_CAP_BELOW_ONE_ORDER":
+      return { ...v, needs: `Least whole-book cap that fits one order here: ${fmtUsd18(r.required, "up")}`, apply: { field: "maxTotalNotional", value: ceilDollars(r.required), label: `Use $${ceilDollars(r.required)}` } };
     case "TANK_TOO_LOW":
       return { ...v, needs: `Least the hub takes: ${fmtStt(r.required)}`, apply: { field: "tank", value: (Number(r.required) / 1e18).toString(), label: `Use ${fmtStt(r.required)}` } };
     case "INSUFFICIENT_BALANCE":

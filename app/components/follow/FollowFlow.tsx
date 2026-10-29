@@ -99,6 +99,21 @@ export function FollowFlow({ pub, source: raw, markets, renderedAt }: Props) {
   const [tankInput, setTankInput] = useState(DEFAULT_TANK);
   const tx = useTx(who, reader.publicClient, refetch);
 
+  // the follower's own open positions: a follow resizes any of them in a market it manages
+  const mineQ = useQuery({
+    queryKey: ["mine", who],
+    queryFn: async () => {
+      const r = await fetch(`/api/positions/${who}`, { cache: "no-store" });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const rows = fromJsonSafe<{ positions: { pool: Address; market: string | null; side: "long" | "short"; size: bigint; decimals: number | null }[] }>(await r.json()).positions;
+      return rows.map((p) => ({ pool: getAddress(p.pool), market: p.market, side: p.side, size: p.size, decimals: p.decimals }));
+    },
+    enabled: !!who,
+    staleTime: 15_000,
+    retry: 1,
+  });
+  const mine = mineQ.data ?? (mineQ.isError ? null : undefined);
+
   const view = deriveFlow({
     kind: source.kind,
     sourceId,
@@ -156,6 +171,13 @@ export function FollowFlow({ pub, source: raw, markets, renderedAt }: Props) {
   if (view.review === "fresh") notes.review = "verdict fresh";
 
   const at = view.steps.findIndex((s) => s.id === view.step);
+
+  // a new step moves focus to its heading, so keyboard and screen-reader users land on it (not on first render)
+  const shownStep = useRef<string | null>(null);
+  useEffect(() => {
+    if (shownStep.current !== null && shownStep.current !== view.step) document.getElementById("step-h")?.focus();
+    shownStep.current = view.step;
+  }, [view.step]);
   const title = source.kind === "Trader" ? shortHex(source.trader) : source.name;
 
   return (
@@ -196,7 +218,7 @@ export function FollowFlow({ pub, source: raw, markets, renderedAt }: Props) {
       </Col>
 
       <Col>
-        <Panel id="step-h" title={STEP_LABEL[view.step]} aside={<Kick>{at >= 0 ? `step ${at + 1} of ${view.steps.length}` : ""}</Kick>} order={2} d={0.03}>
+        <Panel id="step-h" focusTitle title={STEP_LABEL[view.step]} aside={<Kick>{at >= 0 ? `step ${at + 1} of ${view.steps.length}` : ""}</Kick>} order={2} d={0.03}>
           <StepBody
             view={view}
             source={source}
@@ -216,8 +238,10 @@ export function FollowFlow({ pub, source: raw, markets, renderedAt }: Props) {
             setTankInput={setTankInput}
             tank={tank}
             preflight={preflight}
+            preflightKey={preflightKey}
             apply={apply}
             markets={markets}
+            mine={mine}
             guardOn={guardOn}
             refetch={refetch}
             now={now}

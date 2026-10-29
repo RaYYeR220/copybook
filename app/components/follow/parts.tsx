@@ -45,8 +45,9 @@ export function ReasonList({
   onApply?: (field: FormField | "tank", value: string) => void;
   label: string;
 }) {
-  if (reasons.length === 0) return null;
   return (
+    <div aria-live="polite">
+      {reasons.length > 0 && (
     <ul className={styles.reasons} aria-label={label}>
       {reasons.map((r) => {
         const v = reasonView(r, markets, recommendedAllocation);
@@ -74,6 +75,8 @@ export function ReasonList({
         );
       })}
     </ul>
+      )}
+    </div>
   );
 }
 
@@ -194,11 +197,13 @@ export function Field({
           {help}
         </p>
       )}
-      {error && (
-        <p id={errId} className={styles.fieldErr}>
-          {error}
-        </p>
-      )}
+      <div aria-live="polite">
+        {error && (
+          <p id={errId} className={styles.fieldErr}>
+            {error}
+          </p>
+        )}
+      </div>
     </div>
   );
 }

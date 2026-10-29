@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Address, Hex } from "viem";
 import { CopybookError } from "@copybook/sdk";
 import { defaultPolicyForm, errorFor, parseAmount18, parseFixed, parsePolicyForm, type PolicyFormValues } from "@/lib/follow/policyForm";
-import { PENDING_MAX_AGE_S, forgetTx, recallTx, rememberTx, runTx, txErrorText, type TxPhase } from "@/lib/follow/tx";
+import { IDLE, PENDING_MAX_AGE_S, forgetTx, recallTx, rememberTx, runTx, txErrorText, txFor, type TxPhase } from "@/lib/follow/tx";
 
 const E = 10n ** 18n;
 const BTC = "0x4181dd08E73BbCdd1Ba3E615A18f6abD941b94C0" as Address;
@@ -137,5 +137,18 @@ describe("editing a policy on chain", () => {
     expect(parsePolicyForm("Trader", v).policy).toEqual(trader);
     const theme = { scaleBps: 0, allocation: 80n * E, maxNotional: 100n * E, maxTotalNotional: 300n * E, bandBps: 50, equityFloor: 0n };
     expect(parsePolicyForm("Theme", policyToForm("Theme", theme)).policy).toEqual(theme);
+  });
+});
+
+describe("which transaction a control shows", () => {
+  const pending: TxPhase = { phase: "pending", action: "follow", hash: HASH };
+  it("a live transaction belongs to its own action only", () => {
+    expect(txFor({ tx: pending, recalled: false }, ["follow"])).toBe(pending);
+    expect(txFor({ tx: pending, recalled: false }, ["approve"])).toBe(IDLE);
+    expect(txFor({ tx: IDLE, recalled: false }, ["follow"])).toBe(IDLE);
+  });
+  it("one recalled after a reload shows only where the page asks for it, whatever its action", () => {
+    expect(txFor({ tx: pending, recalled: true }, ["follow"])).toBe(IDLE);
+    expect(txFor({ tx: pending, recalled: true }, ["review"], true)).toBe(pending);
   });
 });

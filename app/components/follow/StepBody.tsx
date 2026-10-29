@@ -14,14 +14,14 @@ import { txUrl } from "@/lib/explorer";
 import type { ChainReads, FlowView, LocalChoices, ReadsState } from "@/lib/follow/flow";
 import type { FormField, ParsedPolicy, PolicyFormValues } from "@/lib/follow/policyForm";
 import { blocks, reasonsFor } from "@/lib/follow/reasons";
-import { IDLE } from "@/lib/follow/tx";
+import { takeovers, type HeldPosition, type Takeover } from "@/lib/follow/takeover";
 import { fmtInt, shortHex } from "@/lib/format";
 import type { PublicConfig } from "@/lib/publicConfig";
 import type { MarketMeta } from "@/lib/tape";
-import { fmtStt, fmtUsd18 } from "@/lib/units";
+import { fmtStt, fmtUnits, fmtUsd18 } from "@/lib/units";
 import { hideki } from "@/lib/wallet/hideki";
 import type { FollowSource } from "./FollowFlow";
-import type { PreflightState, useReader, useTx } from "./hooks";
+import { txFor, type PreflightState, type useReader, type useTx } from "./hooks";
 import { Acts, Block, Call, Field, Hint, Lead, Notes, ReasonList, Segmented, TxLine } from "./parts";
 import { PolicyFields } from "./PolicyFields";
 import styles from "./Flow.module.css";
@@ -45,14 +45,71 @@ export interface StepBodyProps {
   setTankInput: (v: string) => void;
   tank: bigint | null;
   preflight: PreflightState;
+  /** The inputs the current preflight answer must be for. */
+  preflightKey: string;
   apply: (field: FormField | "tank", value: string) => void;
   markets: Record<string, MarketMeta>;
+  /** The follower's own open positions (indexer): undefined while reading, null when it did not answer. */
+  mine: HeldPosition[] | null | undefined;
   guardOn: boolean;
   refetch: () => void;
   now: number;
 }
 
 const usd = (x: bigint) => fmtUsd18(x);
+/** Below this much STT left after the tank, the follow transaction's own gas may not be covered. */
+const GAS_HEADROOM = 10n ** 16n;
+
+const held = (p: HeldPosition) => `${p.side} ${p.decimals !== null ? fmtUnits(p.size, p.decimals) : `${p.size} units`}`;
+
+function takeoverText(t: Takeover, kind: FollowSource["kind"]): string {
+  const what = `you hold ${held(t.position)}`;
+  if (t.when === "now")
+    return kind === "Theme"
+      ? `${what}. The follow transaction resizes it to this leg's target from your allocation, short legs included.`
+      : `${what}. The follow transaction resizes it to the trader's size here times your scale, inside your caps, and closes it if they are flat here.`;
+  if (t.when === "next-move")
+    return `${what}, and the trader holds this market now. At their next move here, or when you run catchUp, it is resized to theirs times your scale, inside your caps.`;
+  return `${what}. If the trader trades this market while you follow, it is resized to theirs times your scale, and closed when they go flat.`;
+}
+
+/**
+ * Positions the follower already holds in markets this follow would manage: the hub syncs a market to the source's
+ * size whoever opened the position there, so each one is named with when it happens.
+ */
+function Takeovers({ source, mine, form, parsed, markets }: StepBodyProps) {
+  if (mine === undefined) return <p className={styles.checking}>Reading your open positions from the dreamDEX indexer…</p>;
+  if (mine === null)
+    return (
+      <p className={styles.checking}>
+        Your open positions could not be read from the dreamDEX indexer. Any position you hold in a market this follow manages is resized to the source&apos;s size, or closed.
+      </p>
+    );
+  const list = takeovers(
+    source.kind === "Theme"
+      ? { kind: "Theme", legs: source.legs }
+      : { kind: "Trader", allowAll: form.allowAll, joinPools: parsed.joinPools, traderHeld: source.held },
+    mine,
+  );
+  if (list.length === 0)
+    return (
+      <p className={styles.checking}>
+        {mine.length === 0 ? "You hold no open perp position, so nothing of yours is taken over." : "None of your open positions is in a market this follow manages."}
+      </p>
+    );
+  return (
+    <Block title="Positions you already hold">
+      <Notes>
+        {list.map((t) => (
+          <li key={t.position.pool} data-takeover={t.when}>
+            <b>{t.position.market ?? markets[t.position.pool.toLowerCase()]?.symbol ?? shortHex(t.position.pool)}</b>: {takeoverText(t, source.kind)}
+          </li>
+        ))}
+      </Notes>
+      <p className={styles.help}>A wallet of its own for each source keeps what you trade by hand out of the follow.</p>
+    </Block>
+  );
+}
 const pct = (bps: number) => `${(bps / 100).toFixed(2).replace(/\.?0+$/, "")}%`;
 const scaleText = (bps: number) => `${(bps / 10_000).toString()}×`;
 
@@ -205,7 +262,7 @@ export function StepBody(props: StepBodyProps) {
 
 function ApproveStep({ reader, writer, tx }: StepBodyProps) {
   const d = reader.deployments;
-  const mine = tx.tx.phase !== "idle" && "action" in tx.tx && tx.tx.action === "approve" ? tx.tx : IDLE;
+  const mine = txFor(tx, ["approve"], true);
   return (
     <div className={styles.body}>
       <Lead>
@@ -270,10 +327,10 @@ function ThesisMinimum({ props }: { props: StepBodyProps }) {
 }
 
 function PolicyStep(props: StepBodyProps) {
-  const { source, form, setForm, parsed, preflight, apply, markets, setLocal, local, data, guardOn } = props;
+  const { source, form, setForm, parsed, preflight, preflightKey, apply, markets, setLocal, local, data, guardOn } = props;
   const result = lastResult(preflight);
   const shown = result ? reasonsFor("policy", result.reasons) : [];
-  const ready = preflight.status === "ready" && !!parsed.policy && !blocks("policy", preflight.result.reasons);
+  const ready = preflight.status === "ready" && preflight.key === preflightKey && !!parsed.policy && !blocks("policy", preflight.result.reasons);
   const recommended = result?.themeMinimum?.recommendedAllocation ?? (source.kind === "Theme" ? source.minimum?.recommended : undefined);
   return (
     <div className={styles.body}>
@@ -315,6 +372,7 @@ function PolicyStep(props: StepBodyProps) {
       {source.kind === "Trader" && form.allowAll && source.held === null && (
         <p className={styles.checking}>The dreamDEX indexer did not list the trader&apos;s open markets, so the cap is checked only in the markets you pick (none with the whole book).</p>
       )}
+      <Takeovers {...props} />
       <ReasonList reasons={shown} markets={markets} recommendedAllocation={recommended} onApply={apply} label="What the check found" />
       <Checking preflight={preflight} />
       <Acts>
@@ -330,7 +388,7 @@ function PolicyStep(props: StepBodyProps) {
 
 function GuardStep({ reader, writer, tx, local, setLocal }: StepBodyProps) {
   const want = local.guardWanted ?? true;
-  const mine = tx.tx.phase !== "idle" && "action" in tx.tx && tx.tx.action === "guard" ? tx.tx : IDLE;
+  const mine = txFor(tx, ["guard"], true);
   return (
     <div className={styles.body}>
       <Lead>
@@ -355,16 +413,16 @@ function GuardStep({ reader, writer, tx, local, setLocal }: StepBodyProps) {
 }
 
 function TankStep(props: StepBodyProps) {
-  const { tankInput, setTankInput, tank, preflight, data, markets, apply, setLocal, parsed } = props;
+  const { tankInput, setTankInput, tank, preflight, preflightKey, data, markets, apply, setLocal, parsed } = props;
   const result = lastResult(preflight);
   const shown = result ? reasonsFor("tank", result.reasons).filter((r) => r.field === "tank" || r.severity === "error") : [];
   const err = tank === null ? "Type the tank in STT, like 0.5." : undefined;
-  const ready = preflight.status === "ready" && tank !== null && !!parsed.policy && !blocks("tank", preflight.result.reasons);
+  const ready = preflight.status === "ready" && preflight.key === preflightKey && tank !== null && !!parsed.policy && !blocks("tank", preflight.result.reasons);
   return (
     <div className={styles.body}>
       <Lead>
-        The follow sends STT into this wallet&apos;s gas tank on the hub. The validators&apos; handler pays for each run from the hub, and every run that reaches this wallet charges its tank
-        back (a TankCharged event), whether it copied or refused.
+        The follow sends STT into this wallet&apos;s gas tank on the hub. The validators&apos; handler pays for each run from the hub, and every run that reaches this wallet is billed
+        back to its tank: a run that copies or refuses logs the charge as a TankCharged event, a run with nothing to do is billed without one.
       </Lead>
       <Block>
         <div className={styles.fields}>
@@ -389,8 +447,13 @@ function TankStep(props: StepBodyProps) {
           Below <b>{fmtStt(MIN_TANK_FOR_INCREASE)}</b> every increase is refused as Tank empty; exits still run.
         </li>
         <li>While following, the tank keeps at least {fmtStt(MIN_TANK)}. Top it up or take out what is above that from your dashboard; after you unfollow, all of it comes out.</li>
-        <li>How many runs it covers depends on the gas each run uses. Your dashboard estimates it from your own charges once there are some.</li>
+        <li>How many runs it covers depends on the gas each run uses. Your dashboard estimates it from this follow&apos;s own charges once there are some.</li>
       </Notes>
+      {data && tank !== null && data.balance >= tank && data.balance - tank < GAS_HEADROOM && (
+        <p className={styles.checking} role="status">
+          This leaves {fmtStt(data.balance - tank)} in the wallet, which may not cover the follow transaction&apos;s gas. A smaller tank, or more STT in the wallet, avoids a failed send.
+        </p>
+      )}
       <ReasonList reasons={shown} markets={markets} onApply={apply} label="What the check found" />
       <Checking preflight={preflight} />
       <Acts>
@@ -406,12 +469,12 @@ function TankStep(props: StepBodyProps) {
 }
 
 function FollowStep(props: StepBodyProps) {
-  const { source, parsed, tank, preflight, markets, apply, writer, tx, setLocal, guardOn, reader, form } = props;
+  const { source, parsed, tank, preflight, preflightKey, markets, apply, writer, tx, setLocal, guardOn, reader, form } = props;
   const result = lastResult(preflight);
   const shown = result ? reasonsFor("follow", result.reasons) : [];
   const policy = parsed.policy;
-  const ready = preflight.status === "ready" && !!policy && tank !== null && !blocks("follow", preflight.result.reasons);
-  const mine = tx.tx.phase !== "idle" && "action" in tx.tx && tx.tx.action === "follow" ? tx.tx : IDLE;
+  const ready = preflight.status === "ready" && preflight.key === preflightKey && !!policy && tank !== null && !blocks("follow", preflight.result.reasons);
+  const mine = txFor(tx, ["follow"], true);
   const marketText =
     source.kind === "Trader"
       ? form.allowAll
@@ -461,6 +524,7 @@ function FollowStep(props: StepBodyProps) {
           {tank !== null && <> · value {fmtStt(tank)}</>}
         </Call>
       )}
+      <Takeovers {...props} />
       <ReasonList reasons={shown} markets={markets} onApply={apply} label="What the check found" />
       <Checking preflight={preflight} />
       <Acts>

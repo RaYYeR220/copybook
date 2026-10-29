@@ -16,6 +16,16 @@ export type TxPhase =
 
 export const IDLE: TxPhase = { phase: "idle" };
 
+/**
+ * The page's transaction if it belongs to one of `actions`. A transaction recalled after a reload belongs to no
+ * button any more: pass `recalled` where the page shows it (the current step), and it shows there only.
+ */
+export function txFor(t: { tx: TxPhase; recalled: boolean }, actions: readonly string[], recalled = false): TxPhase {
+  if (t.tx.phase === "idle") return IDLE;
+  if (t.recalled) return recalled ? t.tx : IDLE;
+  return actions.includes(t.tx.action) ? t.tx : IDLE;
+}
+
 /** What a write returns: the SDK's `{ hash, wait() }`. */
 export interface Sent {
   hash: Hex;

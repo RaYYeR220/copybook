@@ -22,17 +22,19 @@ interface PanelProps {
   /** Entrance delay, seconds. */
   d?: number;
   className?: string;
+  /** The heading can take focus from script (tabIndex -1), for a panel whose content changes in place. */
+  focusTitle?: boolean;
   children: ReactNode;
 }
 
 /** A square panel on a hairline, with an optional header: display H2 left, mono kicker right. */
-export function Panel({ id, title, aside, order, d = 0, className, children }: PanelProps) {
+export function Panel({ id, title, aside, order, d = 0, className, focusTitle = false, children }: PanelProps) {
   const style = { ...delay(d), ...(order ? { "--order": order } : {}) } as CSSProperties;
   return (
     <section className={[styles.panel, "rise", className].filter(Boolean).join(" ")} style={style} aria-labelledby={id}>
       {title && (
         <div className={styles.ph}>
-          <h2 id={id} className={styles.h2}>
+          <h2 id={id} className={styles.h2} tabIndex={focusTitle ? -1 : undefined}>
             {title}
           </h2>
           {aside}

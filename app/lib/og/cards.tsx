@@ -1,7 +1,7 @@
 import type { CSSProperties, ReactNode } from "react";
 import type { CopyCardModel, ThesisCardModel, TraderCardModel } from "./model";
 
-/** Night tokens (tokens-h1): gold is the one accent; gains and losses are never coloured. */
+/** The night palette (the same values as app/globals.css): gold is the one accent; gains and losses are never coloured. */
 const C = {
   night0: "#0c0b09",
   night1: "#15130f",

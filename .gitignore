@@ -12,8 +12,4 @@ lcov.info
 .next/
 dist/
 .vercel/
-ui-prototypes/
-mockups/
-design-ref/
-variants/
 *.tsbuildinfo

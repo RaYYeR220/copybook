@@ -30,6 +30,8 @@ live("live Hideki2 (read-only)", () => {
   it("finds USDso as the margin bank's collateral and reads a wallet's spot balance and allowance", async () => {
     const token = await cb.marginToken();
     expect(await publicClient.readContract({ address: token, abi: parseAbi(["function symbol() view returns (string)"]), functionName: "symbol" })).toBe("USDso");
+    // the app reads and types every USDso amount with 18 decimals
+    expect(await publicClient.readContract({ address: token, abi: parseAbi(["function decimals() view returns (uint8)"]), functionName: "decimals" })).toBe(18);
     const f = await cb.marginFunding(nobody);
     expect(f.token).toBe(token);
     expect(f.allowance).toBe(0n);

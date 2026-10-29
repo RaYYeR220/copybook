@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Address, Hex } from "viem";
 import { CopybookError } from "@copybook/sdk";
 import { defaultPolicyForm, errorFor, parseAmount18, parseFixed, parsePolicyForm, type PolicyFormValues } from "@/lib/follow/policyForm";
-import { IDLE, PENDING_MAX_AGE_S, forgetTx, recallTx, rememberTx, runTx, txErrorText, txFor, type TxPhase } from "@/lib/follow/tx";
+import { IDLE, PENDING_MAX_AGE_S, forgetTx, recallTx, refocus, rememberTx, runTx, txErrorText, txFor, type TxPhase } from "@/lib/follow/tx";
 
 const E = 10n ** 18n;
 const BTC = "0x4181dd08E73BbCdd1Ba3E615A18f6abD941b94C0" as Address;
@@ -161,5 +161,32 @@ describe("which transaction a control shows", () => {
   it("one recalled after a reload shows only where the page asks for it, whatever its action", () => {
     expect(txFor({ tx: pending, recalled: true }, ["follow"])).toBe(IDLE);
     expect(txFor({ tx: pending, recalled: true }, ["review"], true)).toBe(pending);
+  });
+});
+
+describe("refocus after a transaction", () => {
+  const button = (over: { isConnected?: boolean; disabled?: boolean } = {}) => {
+    const b = { isConnected: true, disabled: false, focused: 0, focus() { b.focused++; }, ...over };
+    return b;
+  };
+  const body = { tag: "body" };
+
+  it("puts focus back on the button that sent it once the page dropped it on the body", () => {
+    const b = button();
+    expect(refocus({ activeElement: body, body }, b)).toBe(true);
+    expect(b.focused).toBe(1);
+  });
+
+  it("leaves focus where the page put it on purpose, and never on a button that is gone or still disabled", () => {
+    const heading = { tag: "h2" };
+    for (const [doc, b] of [
+      [{ activeElement: heading, body }, button()],
+      [{ activeElement: body, body }, button({ isConnected: false })],
+      [{ activeElement: body, body }, button({ disabled: true })],
+    ] as const) {
+      expect(refocus(doc, b)).toBe(false);
+      expect(b.focused).toBe(0);
+    }
+    expect(refocus({ activeElement: body, body }, null)).toBe(false);
   });
 });

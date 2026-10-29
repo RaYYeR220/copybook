@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPublicClient, http, type Address, type Hex, type PublicClient, type WalletClient } from "viem";
 import { useConnect, useWalletClient } from "wagmi";
 import { createCopybook, CopybookError, type Copybook, type PreflightInput, type PreflightResult } from "@copybook/sdk";
-import { IDLE, forgetTx, recallTx, rememberTx, runTx, type Sent, type TxPhase } from "@/lib/follow/tx";
+import { IDLE, forgetTx, recallTx, refocus, rememberTx, runTx, type Sent, type TxPhase } from "@/lib/follow/tx";
 
 export { txFor } from "@/lib/follow/tx";
 import { deploymentsOf, type PublicConfig } from "@/lib/publicConfig";
@@ -97,6 +97,7 @@ export function useTx(address: Address | undefined, publicClient: PublicClient, 
   const run = useCallback(
     async (action: string, send: () => Promise<Sent>): Promise<TxPhase> => {
       const who = address;
+      const trigger = typeof document === "undefined" ? null : (document.activeElement as HTMLButtonElement | null);
       setRecalled(false);
       const out = await runTx(
         action,
@@ -106,6 +107,8 @@ export function useTx(address: Address | undefined, publicClient: PublicClient, 
       );
       if (who) forgetTx(session(), who, scope);
       if (out.phase === "confirmed" || (out.phase === "failed" && out.hash)) landed.current();
+      // after React has re-enabled the button (or moved focus to a new step on purpose)
+      setTimeout(() => refocus(document, trigger), 60);
       return out;
     },
     [address, scope],

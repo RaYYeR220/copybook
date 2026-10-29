@@ -21,6 +21,9 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         <div className={`tex ${styles.pools}`} aria-hidden="true" />
         <div className="tex dots" aria-hidden="true" />
         <div className={styles.frame} aria-hidden="true" />
+        <a className="skip" href="#main">
+          Skip to content
+        </a>
         <AppBar links={LINKS} />
         {children}
         <div className={`tex grain grain-night ${styles.grain}`} aria-hidden="true" />

@@ -116,3 +116,25 @@ export function forgetTx(store: Store | undefined, address: string, scope?: stri
     /* nothing to do */
   }
 }
+
+/** What `refocus` needs from the page: where focus is now, and the body it falls back to. */
+export interface FocusDoc {
+  activeElement: unknown;
+  body: unknown;
+}
+export interface Focusable {
+  isConnected: boolean;
+  disabled?: boolean;
+  focus(): void;
+}
+
+/**
+ * A button disabled while its transaction runs loses focus to the page body. Once the transaction settles, focus goes
+ * back to the control that sent it, unless the page has put focus somewhere on purpose (a new step's heading).
+ */
+export function refocus(doc: FocusDoc, trigger: Focusable | null): boolean {
+  if (!trigger || !trigger.isConnected || trigger.disabled) return false;
+  if (doc.activeElement !== doc.body && doc.activeElement !== null) return false;
+  trigger.focus();
+  return true;
+}

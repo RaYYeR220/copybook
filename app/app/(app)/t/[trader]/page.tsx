@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { getAddress, isAddress, type Address } from "viem";
 import { sourceIdOf } from "@copybook/sdk";
@@ -7,7 +8,6 @@ import { FollowerStep } from "@/components/app/FollowerStep";
 import { GuardPanel } from "@/components/app/Guard";
 import { HubFeedProvider } from "@/components/app/HubFeed";
 import { FeedStatusLine, TapeRows, type TapeNames } from "@/components/app/LiveTape";
-import { NotFoundSource } from "@/components/app/NotFoundSource";
 import { AppMain, Col, Colophon, Kick, Panel, PanelNote } from "@/components/app/Panel";
 import { Positions, PositionsLoading } from "@/components/app/Positions";
 import { SourceActs, SourceLine, SourceTitle, SourceTop } from "@/components/app/SourceHead";
@@ -26,7 +26,7 @@ const parse = (raw: string): Address | null => (raw.length === 42 && isAddress(r
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const a = parse((await params).trader);
-  if (!a) return { title: "Not an address", robots: { index: false } };
+  if (!a) notFound();
   const title = `Trader ${shortHex(a)}`;
   const description = `30-day record, open positions, AI guard verdict and copies of ${a} on dreamDEX perps.`;
   const image = { url: `/og/trader/${a}`, width: 1200, height: 630, alt: `Trader ${shortHex(a)} on Copybook: 30-day record, the validators' verdict and followers` };
@@ -36,12 +36,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
 export default async function TraderPage({ params }: Params) {
   const raw = decodeURIComponent((await params).trader);
   const trader = parse(raw);
-  if (!trader)
-    return (
-      <NotFoundSource kick="Trader" title="Not an address">
-        “{raw.slice(0, 80)}” is not a wallet address. Trader pages live at /t/ followed by a 0x address of 40 hex characters; pick one from Discover.
-      </NotFoundSource>
-    );
+  if (!trader) notFound();
 
   const demo = trader === config.demoLeader;
   const [verdict, pending, fee, markets] = await Promise.allSettled([copybook.verdictOf(trader), copybook.reviewPendingOf(trader), copybook.reviewFee(), perpMarkets()]);

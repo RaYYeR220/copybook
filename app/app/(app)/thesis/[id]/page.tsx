@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import { minOrderQty, sourceIdOf } from "@copybook/sdk";
 import { Button } from "@/components/Button";
 import { Ledger, type LedgerRow } from "@/components/Ledger";
@@ -14,7 +15,6 @@ import t from "@/components/app/Table.module.css";
 import { safeUri } from "@/lib/builder/basket";
 import { addressUrl } from "@/lib/explorer";
 import { shortHex } from "@/lib/format";
-import { copybook } from "@/lib/server/chain";
 import { config } from "@/lib/server/config";
 import { perpMarkets } from "@/lib/server/indexer";
 import { registeredPools, registryBank, registryRules } from "@/lib/server/registry";
@@ -30,11 +30,10 @@ const ID_RE = /^[0-9]{1,9}$/;
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const { id } = await params;
-  // the page answers a bad or missing id with a note rather than a 404 status: keep those notes out of search indexes
-  if (!ID_RE.test(id) || BigInt(id) === 0n) return { title: "Not a thesis", robots: { index: false } };
+  if (!ID_RE.test(id) || BigInt(id) === 0n) notFound();
   const thesis = await loadThesis(BigInt(id)).catch(() => undefined);
   if (thesis === undefined) return { title: `Thesis #${id}` };
-  if (!thesis) return { title: `No thesis #${id}`, robots: { index: false } };
+  if (!thesis) notFound();
   const title = `${thesis.name} · thesis #${id}`;
   const description = `The legs, version and minimum allocation of thesis #${id} on dreamDEX perps.`;
   const image = { url: `/og/thesis/${id}`, width: 1200, height: 630, alt: `${thesis.name}: thesis #${id} on Copybook, its legs and the least allocation that opens them` };
@@ -64,14 +63,9 @@ function legRows(thesis: Thesis, names: Record<string, { symbol: string }>) {
 
 export default async function ThesisPage({ params }: Params) {
   const raw = decodeURIComponent((await params).id);
-  if (!ID_RE.test(raw) || BigInt(raw) === 0n)
-    return (
-      <NotFoundSource kick="Thesis" title="Not a thesis id">
-        “{raw.slice(0, 80)}” is not a thesis id. Theses are numbered from 1 in the order they were published; pick one from Discover.
-      </NotFoundSource>
-    );
+  if (!ID_RE.test(raw) || BigInt(raw) === 0n) notFound();
   const id = BigInt(raw);
-  const [thesisR, marketsR, countR, rulesR, bankR] = await Promise.allSettled([loadThesis(id), perpMarkets(), copybook.themeCount(), registryRules(), registryBank()]);
+  const [thesisR, marketsR, rulesR, bankR] = await Promise.allSettled([loadThesis(id), perpMarkets(), registryRules(), registryBank()]);
   if (thesisR.status === "rejected")
     return (
       <NotFoundSource kick={`Thesis #${id}`} title="Registry unreadable">
@@ -79,12 +73,7 @@ export default async function ThesisPage({ params }: Params) {
       </NotFoundSource>
     );
   const thesis = thesisR.value;
-  if (!thesis)
-    return (
-      <NotFoundSource kick={`Thesis #${id}`} title={`No thesis #${id}`}>
-        The ThemeRegistry holds {countR.status === "fulfilled" ? `${countR.value} thes${countR.value === 1n ? "is" : "es"}` : "fewer theses than that"}. Pick one from Discover.
-      </NotFoundSource>
-    );
+  if (!thesis) notFound();
 
   const markets = marketsR.status === "fulfilled" ? marketsR.value : {};
   const registered = await registeredPools(Object.keys(markets)).catch(() => ({}) as Record<string, boolean>);

@@ -12,6 +12,8 @@ const HUB = "0xdF73BBbB6517B712BBeD9bfAe6253A5E1FCDE154";
 const AGENT = "0x1111111111111111111111111111111111111111";
 const TRADER = "0x2222222222222222222222222222222222222222";
 const POOL = "0x3333333333333333333333333333333333333333";
+const DEMO = "0x7d736A88978e94E60494Ff91C49Ba838EDfb1932";
+const COPIER = "0x4444444444444444444444444444444444444444";
 const E18 = 10n ** 18n;
 
 const okPre: PreflightResult = {
@@ -27,7 +29,16 @@ const tx = (hash: string, events: unknown[] = []) => ({ hash, wait: vi.fn(async 
 
 function fakeDeps(over: { agent?: boolean; pre?: PreflightResult; copybook?: Record<string, unknown> } = {}) {
   const copybook = {
-    deployments: { chainId: 50383, hub: HUB, themes: "0xbcA03A20eaf337b7bb35DBD76512Af5BC61f6c79", gate: "0xEe54000000000000000000000000000000000001", operatorRegistry: "0x6B2FbfeD328FF5F20C0BE7D3C3437613aFFE8D3a", deployBlock: 100n },
+    deployments: {
+      chainId: 50383,
+      hub: HUB,
+      engine: "0xE37F735b8E43e63E56f7E550e732Ab808257D56A",
+      themes: "0xbcA03A20eaf337b7bb35DBD76512Af5BC61f6c79",
+      gate: "0xEe54000000000000000000000000000000000001",
+      operatorRegistry: "0x6B2FbfeD328FF5F20C0BE7D3C3437613aFFE8D3a",
+      deployBlock: 100n,
+      demoWallets: [{ address: DEMO, role: "demo follower" }],
+    },
     ctx: { publicClient: { getBlockNumber: vi.fn(async () => 1_000_000n) } },
     preflightFollow: vi.fn(async () => over.pre ?? okPre),
     encode: { follow: vi.fn(() => "0xdeadbeef") },
@@ -90,13 +101,32 @@ const call = async (deps: Deps, name: string, args: Record<string, unknown> = {}
 const policyArgs = { maxNotionalUsdso: "50", tankStt: "0.5" };
 
 describe("read tools", () => {
-  it("list_top_traders passes n, window and exclusions, and surfaces skipped/shortfall", async () => {
+  it("list_top_traders ranks with the app's options, leaves out our wallets, and surfaces skipped/shortfall", async () => {
     const { deps, stats } = fakeDeps();
     const { body } = await call(deps, "list_top_traders", { n: 5, windowDays: 14 });
-    expect(stats.topTraders).toHaveBeenCalledWith(5, 14, { exclude: [HUB, AGENT] });
+    const [n, window, opts] = stats.topTraders.mock.calls[0] as unknown as [number, number, Record<string, unknown> & { exclude: string[] }];
+    expect([n, window]).toEqual([8, 14]);
+    expect(opts).toMatchObject({ minTrades: 20, minActiveDays: 5, maxLiquidations: 1, maxRows: 2000, candidateLimit: 20 });
+    expect(opts.exclude).toEqual(expect.arrayContaining([HUB, DEMO, AGENT]));
     expect(body.traders[0]).toMatchObject({ rank: 1, trader: TRADER, summary: "trades30d=40" });
     expect(body.candidateShortfall).toBe(true);
     expect(body.skipped).toHaveLength(1);
+  });
+
+  it("list_top_traders drops a wallet that follows through the hub now, and renumbers", async () => {
+    const { deps, stats, copybook } = fakeDeps();
+    stats.topTraders.mockResolvedValue({
+      traders: [
+        { rank: 1, trader: COPIER, realizedPnl30d: 99, riskAdjusted: 1, stats: { windowDays: 30 } },
+        { rank: 2, trader: TRADER, realizedPnl30d: 12.5, riskAdjusted: 2, stats: { windowDays: 30 } },
+      ],
+      skipped: [],
+      candidateShortfall: false,
+    } as never);
+    copybook.followOf.mockImplementation((async (a: string) => (a === COPIER ? { kind: "Trader" } : null)) as never);
+    const { body } = await call(deps, "list_top_traders", { n: 5 });
+    expect(body.traders.map((t: { rank: number; trader: string }) => [t.rank, t.trader])).toEqual([[1, TRADER]]);
+    expect(body.leftOutAsCopyWallets).toEqual([COPIER]);
   });
 
   it("get_trader_stats returns stats with the summary and rejects a bad address", async () => {

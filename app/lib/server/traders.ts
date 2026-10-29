@@ -1,23 +1,12 @@
 import type { Address } from "viem";
-import type { RankOptions, RankedTrader, SkippedTrader, TopTradersResult, TraderStats } from "@copybook/stats";
+import { RANK_OPTIONS, type RankOptions, type RankedTrader, type SkippedTrader, type TopTradersResult, type TraderStats } from "@copybook/stats";
 
 export const WINDOW_DAYS = 30;
 export const TOP_N = 10;
 /** Extra places asked for, so dropping copy wallets after the ranking still leaves TOP_N when it can. */
 const SLACK = 3;
-/**
- * The indexer is read one request at a time; this budget keeps a cold ranking well inside a 60 s function
- * (about 40 s measured against the live indexer). Rows past 2000 per trader mark it truncated, and truncated
- * histories are dropped from the ranking, as `topTraders` documents.
- */
-export const RANK_OPTIONS = {
-  candidateLimit: 20,
-  delayMs: 40,
-  maxRows: 2_000,
-  minTrades: 20,
-  minActiveDays: 5,
-  maxLiquidations: 1,
-} as const satisfies RankOptions;
+/** The ranking's options, shared with the MCP server (see RANK_OPTIONS in @copybook/stats). */
+export { RANK_OPTIONS };
 
 /** The filters a ranked trader passed, as the page states them. */
 export const RANK_RULES = {

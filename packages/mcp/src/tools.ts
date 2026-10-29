@@ -11,11 +11,15 @@ import {
   type SourceKindName,
 } from "@copybook/sdk";
 import type { Address } from "viem";
+import { RANK_OPTIONS } from "@copybook/stats";
 import { z, type ZodRawShape } from "zod";
 import { presentPreflight } from "./present.ts";
 import { Refusal, type Deps, type ToolDef } from "./types.ts";
 import { redact } from "./redact.ts";
 import { InputError, addressField, fmt, parseAddress, parseDecimal, sttField, usdsoField } from "./units.ts";
+
+/** Extra places asked for, so dropping copy wallets after the ranking still leaves n when it can (as the app does). */
+const RANK_SLACK = 3;
 
 const TESTNET = "Copybook runs on the Somnia Hideki2 testnet (chain 50383); amounts are testnet tokens with no market value.";
 
@@ -257,6 +261,7 @@ export function buildTools(deps: Deps): ToolDef[] {
         title: "List top traders",
         description:
           "Ranks real dreamDEX perp traders by realized PnL over a window, from the indexer, with each trader's stats and the risk summary line the on-chain reviewer sees. " +
+          "Uses the app's ranking filters (at least 20 trades on 5 days, at most 1 liquidation) and leaves out Copybook's own wallets and every wallet that follows a source through the hub now (copy wallets). " +
           "Ranking is by raw PnL, so it favours size and variance; drawdown and leverage are estimates; read the stats before following anyone. The list can be shorter than n (see skipped and candidateShortfall). " +
           "Slow: it reads the indexer one request at a time, so a call can take a minute. " +
           TESTNET,
@@ -266,12 +271,19 @@ export function buildTools(deps: Deps): ToolDef[] {
         },
       },
       async ({ n, windowDays }) => {
-        const exclude = [copybook.deployments.hub, ...(deps.exclude ?? []), ...(deps.agent ? [deps.agent] : [])];
-        const r = await stats.topTraders(n, windowDays, { exclude });
+        const d = copybook.deployments;
+        // ours: the contracts and every wallet Copybook runs; the agent itself
+        const exclude = [d.hub, d.engine, d.themes, d.gate, ...d.demoWallets.map((w) => w.address), ...(deps.exclude ?? []), ...(deps.agent ? [deps.agent] : [])];
+        const r = await stats.topTraders(n + RANK_SLACK, windowDays, { ...RANK_OPTIONS, candidateLimit: Math.max(RANK_OPTIONS.candidateLimit, n + RANK_SLACK), exclude });
+        // a wallet that follows a source through the hub now copies someone: not a trader to list
+        const following = await Promise.all(r.traders.map((t) => copybook.followOf(t.trader as Address).then((f) => f !== null, () => false)));
+        const copyWallets = r.traders.filter((_, i) => following[i]).map((t) => t.trader);
+        const kept = r.traders.filter((_, i) => !following[i]).slice(0, n);
         return {
           windowDays,
-          traders: r.traders.map((t) => ({
-            rank: t.rank,
+          ...(copyWallets.length ? { leftOutAsCopyWallets: copyWallets } : {}),
+          traders: kept.map((t, i) => ({
+            rank: i + 1,
             trader: t.trader,
             realizedPnlUsdso: t.realizedPnl30d,
             pnlPerUnitDrawdown: t.riskAdjusted,

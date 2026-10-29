@@ -47,7 +47,7 @@ Read (always on):
 
 | Tool | What it does |
 | --- | --- |
-| `list_top_traders {n?, windowDays?}` | Real traders ranked by realized PnL, with stats and the reviewer's summary line. Slow (sequential indexer reads). |
+| `list_top_traders {n?, windowDays?}` | Real traders ranked by realized PnL with the app's filters, with stats and the reviewer's summary line; Copybook's own wallets and wallets that follow through the hub now are left out. Slow (sequential indexer reads). |
 | `get_trader_stats {trader, windowDays?}` | Trades, active days, realized PnL, liquidations, drawdown, leverage; unknowns are null. |
 | `get_verdict {trader}` | RiskGate tier (None / Ok / Caution / Block), review time, whether a Block hold is active, pending review, review fee. |
 | `list_theses {}` | Every thesis with legs and version. |

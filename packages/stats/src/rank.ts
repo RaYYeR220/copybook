@@ -27,6 +27,20 @@ export interface RankOptions extends StatsOptions {
   candidatePages?: number;
 }
 
+/**
+ * The options Copybook ranks with, in the app and the MCP server alike. The indexer is read one request at a time;
+ * this budget keeps a cold ranking well inside a 60 s function (about 40 s measured against the live indexer). Rows
+ * past 2000 per trader mark it truncated, and truncated histories are dropped from the ranking.
+ */
+export const RANK_OPTIONS = {
+  candidateLimit: 20,
+  delayMs: 40,
+  maxRows: 2_000,
+  minTrades: 20,
+  minActiveDays: 5,
+  maxLiquidations: 1,
+} as const satisfies RankOptions;
+
 export interface SkippedTrader {
   account: Address;
   reason: string;

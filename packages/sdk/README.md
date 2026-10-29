@@ -29,6 +29,7 @@ Writes (each returns `{ hash, wait() }`): `approveOperator`, `follow`, `unfollow
 Notes:
 
 - Writes check the wallet's chain first and estimate gas on the node before asking for a signature, so a call that would revert fails with the contract's reason (`CopybookError.revert`). Somnia's estimate runs low for handler-heavy calls, so the SDK sends 1.5x.
+- The `walletClient` can be a browser wallet (it signs in the wallet) or a viem client with a local key, as a script or an agent holds one (the SDK signs and sends the raw transaction).
 - `Copied.limitPrice` is the limit price of the order that moved the position, not the fill price.
 - `preflightFollow` uses the venue's own market parameters (mark, lot, minimum quantity) at call time. Marks move, so show `themeMinimum().recommendedAllocation` (10% headroom) rather than the exact minimum.
 - The venue's operator registry is read from `operatorRegistry` in `deployments/hideki.json` (falling back to the Hideki2 address).

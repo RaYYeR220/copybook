@@ -22,7 +22,7 @@ export function FundsHelp() {
       <p className={styles.lead}>
         No USDso on spot in this wallet. Message{" "}
         <a className="lnk" href={FUNDS_X_URL} target="_blank" rel="noopener noreferrer">
-          {FUNDS_X_HANDLE}
+          {FUNDS_X_HANDLE} ↗
         </a>{" "}
         on X with your Hideki address and we send STT + USDso.
       </p>
@@ -75,6 +75,8 @@ export function MoveUsdso({ spot, allowance, initial, bank, writer, tx, id }: Pr
     else void tx.run("depositMargin", () => writer().depositMargin(a));
   };
   const covered = allowance !== null && allowance > 0n;
+  const approveState = check.ok ? (check.next === "approve" ? "current" : "done") : "todo";
+  const depositState = check.ok && check.next === "deposit" ? "current" : "todo";
   return (
     <div className={styles.move} data-move={check.ok ? check.next : "invalid"}>
       <div className={styles.fields}>
@@ -97,12 +99,13 @@ export function MoveUsdso({ spot, allowance, initial, bank, writer, tx, id }: Pr
         />
       </div>
       <ol className={styles.moveSteps} aria-label="The two transactions">
-        <li data-state={check.ok ? (check.next === "approve" ? "current" : "done") : "todo"}>
+        <li data-state={approveState} aria-current={approveState === "current" ? "step" : undefined}>
           <span>
-            <b>Approve</b> dreamDEX&apos;s margin bank to pull {amount} from this wallet{check.ok && check.next === "deposit" ? ": in place" : ""}
+            <b>Approve</b> dreamDEX&apos;s margin bank to pull {amount} from this wallet{approveState === "done" ? ": in place" : ""}
+            {approveState === "done" && <span className="sr-only">, done</span>}
           </span>
         </li>
-        <li data-state={check.ok && check.next === "deposit" ? "current" : "todo"}>
+        <li data-state={depositState} aria-current={depositState === "current" ? "step" : undefined}>
           <span>
             <b>Deposit</b> {amount} into this wallet&apos;s perps account: equity rises by it
           </span>

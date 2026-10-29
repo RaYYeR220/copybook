@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Figtree, Fragment_Mono, Fraunces } from "next/font/google";
 import type { ReactNode } from "react";
+import { siteUrl } from "@/lib/siteUrl";
 import "./globals.css";
 
 /** Display: Fraunces, variable, with the SOFT axis (100 at dusk, 0 at night). */
@@ -29,15 +30,17 @@ const fragmentMono = Fragment_Mono({
   fallback: ["ui-monospace", "SFMono-Regular", "Consolas", "monospace"],
 });
 
-/**
- * Absolute base for metadata URLs (share cards, canonical links): NEXT_PUBLIC_SITE_URL when set; on a Vercel preview
- * the preview's own URL, so its cards come from the code it runs; otherwise the production URL.
- */
-const vercelHost = process.env.VERCEL_ENV === "preview" ? process.env.VERCEL_URL : process.env.VERCEL_PROJECT_PRODUCTION_URL;
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? (vercelHost ? `https://${vercelHost}` : "http://localhost:3000");
 
 export const metadata: Metadata = {
-  metadataBase: new URL(siteUrl),
+  // each variable read by name, so Next inlines NEXT_PUBLIC_SITE_URL at build time
+  metadataBase: new URL(
+    siteUrl({
+      NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL,
+      VERCEL_ENV: process.env.VERCEL_ENV,
+      VERCEL_URL: process.env.VERCEL_URL,
+      VERCEL_PROJECT_PRODUCTION_URL: process.env.VERCEL_PROJECT_PRODUCTION_URL,
+    }),
+  ),
   title: { default: "Copybook", template: "%s · Copybook" },
   description:
     "Follow a trader or a thesis on dreamDEX perps. Somnia validators run your copy in your own account, in the same block as the move.",

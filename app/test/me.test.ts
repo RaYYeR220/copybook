@@ -2,8 +2,9 @@ import { describe, expect, it } from "vitest";
 import { encodeFunctionData, getAddress, type Address, type Hex } from "viem";
 import { MIN_TANK, hubAbi, type CopybookEvent, type FollowerIssue, type FollowerStatus, type Market } from "@copybook/sdk";
 import { MAIN_REASONS, currentFollowEvent, followTerms, lastRefusals, openDeferral, refusalCounts, tankStats } from "@/lib/me/activity";
-import { bookSummary, catchUpPools, clampToCap, legSettled, split, themeBook, traderBook, traderInStep, traderPools, unrealized, type PoolRead } from "@/lib/me/book";
+import { bookSummary, catchUpOffer, clampToCap, gateIncreases, type GateState, legSettled, split, themeBook, traderBook, traderInStep, traderPools, unrealized, type PoolRead } from "@/lib/me/book";
 import { callText, dashboardBanners, offerOnOpen, withdrawable } from "@/lib/me/issues";
+import { takeovers, type HeldPosition } from "@/lib/follow/takeover";
 import { fmtUsdSigned18 } from "@/lib/units";
 
 const E = 10n ** 18n;
@@ -80,14 +81,65 @@ describe("book vs theirs: trader follows", () => {
     expect(rows.map((r) => r.state)).toEqual(["in-step", "flat"]);
   });
 
+  const open: GateState = { paused: false, equityFloor: 0n, equity: 30n * E, maxTotalNotional: 0n, tank: E, blocked: false, synced: [BTC, ETH] };
+
   it("offers catchUp only for markets never tried or refused for a passing reason", () => {
-    const rows = traderBook({ scaleBps: 10_000, maxNotional: 1_000n * E }, [
-      { pool: BTC, market: btc, yours: pos(0n), theirs: pos(50_000n) },
-      { pool: ETH, market: eth, yours: pos(0n), theirs: pos(10n ** 16n) },
-    ], { [ETH.toLowerCase()]: { reason: "RiskGate", block: 1n } });
-    expect(catchUpPools(rows)).toEqual([BTC]);
+    const rows = gateIncreases(
+      traderBook({ scaleBps: 10_000, maxNotional: 1_000n * E }, [
+        { pool: BTC, market: btc, yours: pos(0n), theirs: pos(50_000n) },
+        { pool: ETH, market: eth, yours: pos(0n), theirs: pos(10n ** 16n) },
+      ], { [ETH.toLowerCase()]: { reason: "RiskGate", block: 1n } }),
+      open,
+    );
+    expect(catchUpOffer(rows)).toEqual({ pools: [BTC], reducing: [], growing: [BTC] });
     const band = traderBook({ scaleBps: 10_000, maxNotional: 1_000n * E }, [{ pool: ETH, market: eth, yours: pos(0n), theirs: pos(10n ** 16n) }], { [ETH.toLowerCase()]: { reason: "BandUnfilled", block: 1n } });
-    expect(catchUpPools(band)).toEqual([ETH]);
+    expect(catchUpOffer(gateIncreases(band, open)).pools).toEqual([ETH]);
+  });
+
+  it("the demo state: guard on and a fresh BLOCK on the leader holding BTC offers no catchUp for the increase", () => {
+    // the leader holds 0.0005 BTC, the follower is flat there: the only move is an increase, which the guard refuses
+    const rows = gateIncreases(traderBook({ scaleBps: 10_000, maxNotional: 100n * E }, [{ pool: BTC, market: btc, yours: pos(0n), theirs: pos(50_000n) }]), { ...open, blocked: true });
+    expect(rows[0]).toMatchObject({ state: "out", gate: "RiskGate", moves: { reduce: false, increase: true } });
+    expect(catchUpOffer(rows).pools).toEqual([]);
+    expect(dashboardBanners({ status: status(), catchUp: catchUpOffer(rows), refusalsRead: true, names }).some((b) => b.code === "OUT_OF_STEP")).toBe(false);
+  });
+
+  it("a market whose catchUp only reduces is still offered under a BLOCK and an empty tank: exits are never gated", () => {
+    // the leader went flat, the follower still holds 0.0005 BTC
+    const rows = gateIncreases(traderBook({ scaleBps: 10_000, maxNotional: 100n * E }, [{ pool: BTC, market: btc, yours: pos(50_000n), theirs: pos(0n) }]), { ...open, blocked: true, tank: 0n });
+    expect(rows[0]).toMatchObject({ state: "out", moves: { reduce: true, increase: false } });
+    expect(rows[0]!.gate).toBeUndefined();
+    const offer = catchUpOffer(rows);
+    expect(offer).toEqual({ pools: [BTC], reducing: [BTC], growing: [] });
+    const b = dashboardBanners({ status: status(), catchUp: offer, refusalsRead: true, names }).find((x) => x.code === "OUT_OF_STEP")!;
+    expect(b.message).toContain("reduces BTC-PERP toward the trader's size (an exit: never gated)");
+    expect(b.message).not.toContain("brings");
+    expect(b.call?.text).toBe("hub.catchUp(0x7d73…1932, [BTC-PERP])");
+  });
+
+  it("drops an increase the total cap, the tank, the equity floor or a stop would refuse, in the gate's order", () => {
+    const base = traderBook({ scaleBps: 10_000, maxNotional: 1_000n * E }, [
+      // already holds 0.001 BTC ($80) in a synced market
+      { pool: BTC, market: btc, yours: pos(100_000n), theirs: pos(100_000n) },
+      // ETH: flat, the trader holds 0.01 ETH ($24)
+      { pool: ETH, market: eth, yours: pos(0n), theirs: pos(10n ** 16n) },
+    ]);
+    // $80 + $24 > $100
+    expect(gateIncreases(base, { ...open, maxTotalNotional: 100n * E })[1]!.gate).toBe("TotalCap");
+    expect(gateIncreases(base, { ...open, maxTotalNotional: 110n * E })[1]!.gate).toBeUndefined();
+    // BTC is not synced: the total-cap gate does not count it
+    expect(gateIncreases(base, { ...open, maxTotalNotional: 100n * E, synced: [ETH] })[1]!.gate).toBeUndefined();
+    expect(gateIncreases(base, { ...open, tank: 10n ** 16n })[1]!.gate).toBe("TankEmpty");
+    expect(gateIncreases(base, { ...open, equityFloor: 40n * E })[1]!.gate).toBe("EquityFloor");
+    expect(gateIncreases(base, { ...open, paused: true })[1]!.gate).toBe("Paused");
+    // a market in step has no move to gate
+    expect(gateIncreases(base, { ...open, paused: true })[0]!.gate).toBeUndefined();
+  });
+
+  it("a flip whose increase is refused is offered for its reduction only", () => {
+    const rows = gateIncreases(traderBook({ scaleBps: 10_000, maxNotional: 100n * E }, [{ pool: BTC, market: btc, yours: pos(-50_000n), theirs: pos(50_000n) }]), { ...open, blocked: true });
+    expect(rows[0]!.moves).toMatchObject({ reduce: true, increase: true });
+    expect(catchUpOffer(rows)).toEqual({ pools: [BTC], reducing: [BTC], growing: [] });
   });
 
   it("covers synced markets plus the list, or the held markets for a whole-book follow; only synced when the terms are unknown", () => {
@@ -165,11 +217,14 @@ describe("the follower's own events", () => {
     expect(openDeferral([d], 70n)).toBeUndefined();
   });
 
-  it("estimates runs left only from real charges", () => {
-    expect(tankStats([], E)).toEqual({ runs: 0, total: 0n });
-    const charges = [14_176_200_000_000_000n, 11_115_138_000_000_000n, 11_722_956_000_000_000n].map((amount, i) => ev({ name: "TankCharged", follower: ME, amount }, BigInt(i)));
-    const s = tankStats(charges, 984_545_946_000_000_000n);
+  it("estimates runs left only from the current follow's real charges", () => {
+    expect(tankStats([], E, 0n)).toEqual({ runs: 0, total: 0n });
+    const charges = [14_176_200_000_000_000n, 11_115_138_000_000_000n, 11_722_956_000_000_000n, 99n * E].map((amount, i) => ev({ name: "TankCharged", follower: ME, amount }, BigInt(10 - i)));
+    // the last one (block 7) belongs to an earlier follow
+    const s = tankStats(charges, 984_545_946_000_000_000n, 8n);
     expect(s).toMatchObject({ runs: 3, total: 37_014_294_000_000_000n, average: 12_338_098_000_000_000n, left: 79n });
+    // without the follow's block there is no estimate
+    expect(tankStats(charges, E, undefined)).toEqual({ runs: 0, total: 0n });
   });
 
   it("reads the market list from the follow transaction's calldata", () => {
@@ -224,16 +279,20 @@ describe("dashboard banners: each stuck state with the exact call that clears it
   });
 
   it("a deferral that left markets out of step: catchUp(you, [those markets]), named", () => {
-    const b = dashboardBanners({ status: status(), catchUp: [BTC], deferredAt: 35_900_123n, names });
+    const offer = { pools: [BTC], reducing: [], growing: [BTC] };
+    // not before the follower's refusals are read in full
+    expect(dashboardBanners({ status: status(), catchUp: offer, deferredAt: 35_900_123n, names }).some((x) => x.code === "OUT_OF_STEP")).toBe(false);
+    const b = dashboardBanners({ status: status(), catchUp: offer, refusalsRead: true, deferredAt: 35_900_123n, names });
     expect(b[0]).toMatchObject({ code: "OUT_OF_STEP", severity: "warning" });
     expect(b[0]!.message).toContain("deferred this follow at block #35,900,123");
     expect(b[0]!.call?.text).toBe("hub.catchUp(0x7d73…1932, [BTC-PERP])");
     expect(b[0]!.call?.args).toEqual([ME, [BTC]]);
+    expect(b[0]!.message).toContain("brings BTC-PERP up to the trader's size inside your band and caps");
     // latched exits already say catchUp(you, []), which syncs every market: no second banner
-    const latched = dashboardBanners({ status: status({}, [{ code: "EXITS_PENDING", severity: "error", message: "m", action: { method: "catchUp", args: [ME, []] } }]), catchUp: [BTC] });
+    const latched = dashboardBanners({ status: status({}, [{ code: "EXITS_PENDING", severity: "error", message: "m", action: { method: "catchUp", args: [ME, []] } }]), catchUp: offer, refusalsRead: true });
     expect(latched.map((x) => x.code)).toEqual(["EXITS_PENDING"]);
     // a stopped follow is not caught up
-    expect(dashboardBanners({ status: status({ follow: { ...status().follow!, paused: true } }), catchUp: [BTC] }).some((x) => x.code === "OUT_OF_STEP")).toBe(false);
+    expect(dashboardBanners({ status: status({ follow: { ...status().follow!, paused: true } }), catchUp: offer, refusalsRead: true }).some((x) => x.code === "OUT_OF_STEP")).toBe(false);
   });
 
   it("a missing global grant is info with the grant as its call", () => {
@@ -276,3 +335,23 @@ describe("signed dollars", () => {
 });
 
 void (0 as unknown as Address);
+
+describe("positions the follower already holds", () => {
+  const mine: HeldPosition[] = [
+    { pool: BTC, side: "long", size: 30_000n, decimals: 8, market: "BTC-PERP" },
+    { pool: ETH, side: "short", size: 10n ** 16n, decimals: 18, market: "ETH-PERP" },
+  ];
+  it("a market list or a thesis leg is synced in the follow transaction", () => {
+    expect(takeovers({ kind: "Trader", allowAll: false, joinPools: [BTC] }, mine)).toEqual([{ position: mine[0], when: "now" }]);
+    expect(takeovers({ kind: "Theme", legs: [{ pool: ETH, weightBps: -3_000 }] }, mine)).toEqual([{ position: mine[1], when: "now" }]);
+  });
+  it("a whole-book follow takes over a market at the trader's next move there, or if they ever trade it", () => {
+    expect(takeovers({ kind: "Trader", allowAll: true, traderHeld: [ETH] }, mine).map((t) => [t.position.market, t.when])).toEqual([
+      ["ETH-PERP", "next-move"],
+      ["BTC-PERP", "if-traded"],
+    ]);
+    // the trader's markets unknown: every held market counts as at risk
+    expect(takeovers({ kind: "Trader", allowAll: true, traderHeld: null }, mine).every((t) => t.when === "if-traded")).toBe(true);
+    expect(takeovers({ kind: "Trader", allowAll: true, traderHeld: [] }, [])).toEqual([]);
+  });
+});

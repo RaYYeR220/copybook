@@ -22,6 +22,8 @@ interface Props {
   names: Record<string, MarketMeta>;
   sourceLabel: string;
   loading: boolean;
+  /** The follower's refusals are read in full; until then a never-tried market says so. */
+  refusalsRead: boolean;
   error?: string;
 }
 
@@ -35,7 +37,7 @@ function size(x: bigint | null | undefined, m: Market | null | undefined, meta: 
   return `${x > 0n ? "long" : "short"} ${dec !== undefined ? fmtUnits(abs, dec) : `${abs} units`}`;
 }
 
-function State({ r }: { r: BookRow }) {
+function State({ r, refusalsRead }: { r: BookRow; refusalsRead: boolean }) {
   if (r.state === "in-step")
     return (
       <span className={styles.st}>
@@ -61,14 +63,18 @@ function State({ r }: { r: BookRow }) {
           ? `${REASON_LABEL[why.reason === "None" ? "VenueRejected" : why.reason]} at #${fmtInt(why.block)}`
           : why?.kind === "drift"
             ? `${(why.bps / 100).toFixed(1)}% off target`
-            : "not copied yet"}
+            : !refusalsRead
+              ? "reading refusals…"
+              : r.gate
+                ? `held back · ${REASON_LABEL[r.gate === "None" ? "VenueRejected" : r.gate]}`
+                : "not synced yet"}
       </em>
     </span>
   );
 }
 
 /** Your book against the source's, per market, from the chain; the sums are unrealized at today's marks. */
-export function BookTable({ kind, rows, markets, names, sourceLabel, loading, error }: Props) {
+export function BookTable({ kind, rows, markets, names, sourceLabel, loading, refusalsRead, error }: Props) {
   if (!rows && loading) return <DataState kind="loading" title="Reading both books from the margin bank…">Every market the follow covers: your position, the source&apos;s, and each pool&apos;s mark.</DataState>;
   if (!rows)
     return (
@@ -153,7 +159,7 @@ export function BookTable({ kind, rows, markets, names, sourceLabel, loading, er
                   )}
                 </td>
                 <td className={t.full}>
-                  <State r={r} />
+                  <State r={r} refusalsRead={refusalsRead} />
                 </td>
               </tr>
             );

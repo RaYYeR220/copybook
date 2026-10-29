@@ -1,5 +1,5 @@
 import type { Address } from "viem";
-import { THEME_DRIFT_BPS, scaledSize, simulateLeg, tradableQty, type Leg, type Market, type Policy, type ReasonName } from "@copybook/sdk";
+import { MIN_TANK_FOR_INCREASE, THEME_DRIFT_BPS, notionalOf, scaledSize, simulateLeg, tradableQty, type Leg, type Market, type Policy, type ReasonName } from "@copybook/sdk";
 
 /**
  * Your book against the source's, market by market, from the chain: the margin bank's positions, each pool's mark
@@ -45,6 +45,10 @@ export interface BookRow {
   pnl?: bigint;
   /** Trader follows: the trader's unrealized PnL at the mark, times your scale. */
   theirsPnlScaled?: bigint;
+  /** Trader follows: what the next sync of this market would send, half by half, and the market's numbers it needs. */
+  moves?: { reduce: boolean; increase: boolean; yoursNotional: bigint; afterIncreaseNotional: bigint };
+  /** Trader follows, set by `gateIncreases`: the gate that would refuse this market's increase right now. */
+  gate?: ReasonName;
 }
 
 const abs = (x: bigint) => (x < 0n ? -x : x);
@@ -86,6 +90,21 @@ export function traderInStep(yours: bigint, scaled: bigint, clamped: bigint, m: 
   return tradableQty(exit, m) === 0n && tradableQty(entry, m) === 0n;
 }
 
+/**
+ * What a sync of one trader market would send: the exit half reduces toward theirs × scale (never gated), the
+ * increase half grows toward the clamped target in whole orders (gated). Mirrors CopyEngine's increase sizing, so
+ * the notional after the increase is the one the total-cap gate checks.
+ */
+export function traderMoves(yours: bigint, scaled: bigint, clamped: bigint, m: Pick<Market, "lot" | "minQty" | "mark" | "oneBase">) {
+  const reduce = tradableQty(split(yours, scaled).reduce, m) > 0n;
+  const have = abs(yours);
+  const want = abs(clamped);
+  const cross = yours !== 0n && clamped !== 0n && yours > 0n !== clamped > 0n;
+  const qty = cross ? tradableQty(want + have, m) : want > have ? tradableQty(want - have, m) : 0n;
+  const after = cross ? (qty > have ? qty - have : 0n) : have + qty;
+  return { reduce, increase: qty > 0n, yoursNotional: notionalOf(yours, m), afterIncreaseNotional: notionalOf(after, m) };
+}
+
 /** `CopyEngine._settled`: a thesis leg the hub leaves alone. */
 export function legSettled(size: bigint, target: bigint, m: Pick<Market, "lot" | "minQty">): boolean {
   if (size === target) return true;
@@ -124,7 +143,7 @@ export function traderBook(policy: Pick<Policy, "scaleBps" | "maxNotional">, poo
     const yours = p.yours.size;
     const pnl = unrealized(p.yours, m);
     const theirsPnlScaled = (unrealized(p.theirs!, m) * BigInt(policy.scaleBps)) / 10_000n;
-    const row: BookRow = { ...base, target: clamped, capped, pnl, theirsPnlScaled };
+    const row: BookRow = { ...base, target: clamped, capped, pnl, theirsPnlScaled, moves: traderMoves(yours, scaled, clamped, m) };
     if (scaled === 0n && yours === 0n) return { ...row, state: "flat" };
     if (traderInStep(yours, scaled, clamped, m)) return { ...row, state: "in-step" };
     return { ...row, state: "out", why: outWhy(p.pool, refusals) };
@@ -181,13 +200,66 @@ export function bookSummary(rows: readonly BookRow[]): BookSummary {
   return { known, inStep, pnl, theirsPnlScaled: theirs, partial: known < rows.length };
 }
 
+/** What the increase gates read, as the chain holds them now (CopyEngine._gate, in its order). */
+export interface GateState {
+  paused: boolean;
+  equityFloor: bigint;
+  /** null when the margin bank did not answer: the gate then refuses. */
+  equity: bigint | null;
+  maxTotalNotional: bigint;
+  tank: bigint;
+  /** The trader's verdict is a BLOCK inside its TTL and this wallet's guard is on (RiskGate.allowIncrease). */
+  blocked: boolean;
+  /** The hub's synced markets for this follower: the total-cap gate sums those. */
+  synced: readonly Address[];
+}
+
 /**
- * Markets a catchUp would move toward the source and that nothing on the follow's side refuses outright: never
- * tried (deferred, or allowAll waiting for the trader's next move) or refused for a passing reason (band, venue).
+ * Marks each trader row whose increase a gate would refuse now, in CopyEngine._gate's order: paused, equity
+ * floor, total cap (the other synced positions at mark plus this market after the increase), tank, AI guard.
  */
-export function catchUpPools(rows: readonly BookRow[]): Address[] {
+export function gateIncreases(rows: readonly BookRow[], g: GateState): BookRow[] {
+  const synced = new Set(g.synced.map((a) => a.toLowerCase()));
+  return rows.map((r) => {
+    if (!r.moves?.increase) return r;
+    let gate: ReasonName | undefined;
+    if (g.paused) gate = "Paused";
+    else if (g.equityFloor > 0n && (g.equity === null || g.equity < g.equityFloor)) gate = g.equity === null ? "VenueRejected" : "EquityFloor";
+    else if (g.maxTotalNotional > 0n) {
+      const others = rows.reduce((s, o) => (o.pool !== r.pool && synced.has(o.pool.toLowerCase()) && o.moves ? s + o.moves.yoursNotional : s), 0n);
+      if (others + r.moves.afterIncreaseNotional > g.maxTotalNotional) gate = "TotalCap";
+    }
+    if (!gate && g.tank < MIN_TANK_FOR_INCREASE) gate = "TankEmpty";
+    if (!gate && g.blocked) gate = "RiskGate";
+    return gate ? { ...r, gate } : r;
+  });
+}
+
+export interface CatchUpOffer {
+  pools: Address[];
+  /** Markets where catchUp only reduces (exits are never gated). */
+  reducing: Address[];
+  /** Markets where catchUp would grow the position, and no gate refuses it now. */
+  growing: Address[];
+}
+
+/**
+ * Markets a catchUp would actually move now: out of step, never tried or refused for a passing reason (band,
+ * venue), and either reducing (never gated) or growing with every gate open. A market whose only move is an
+ * increase a gate refuses is left out, so the dashboard never offers a call the chain would refuse.
+ */
+export function catchUpOffer(rows: readonly BookRow[]): CatchUpOffer {
   const passing = new Set<ReasonName>(["BandUnfilled", "VenueRejected"]);
-  return rows.filter((r) => r.state === "out" && (r.why?.kind === "not-copied" || (r.why?.kind === "refused" && passing.has(r.why.reason)))).map((r) => r.pool);
+  const out: CatchUpOffer = { pools: [], reducing: [], growing: [] };
+  for (const r of rows) {
+    if (r.state !== "out" || !r.moves) continue;
+    if (!(r.why?.kind === "not-copied" || (r.why?.kind === "refused" && passing.has(r.why.reason)))) continue;
+    const grows = r.moves.increase && !r.gate;
+    if (!grows && !r.moves.reduce) continue;
+    out.pools.push(r.pool);
+    (grows ? out.growing : out.reducing).push(r.pool);
+  }
+  return out;
 }
 
 /**

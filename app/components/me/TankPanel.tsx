@@ -5,9 +5,8 @@ import { MIN_TANK, MIN_TANK_FOR_INCREASE, type Copybook } from "@copybook/sdk";
 import { Button } from "@/components/Button";
 import { PanelNote } from "@/components/app/Panel";
 import { TxLine } from "@/components/follow/parts";
-import type { useTx } from "@/components/follow/hooks";
+import { txFor, type useTx } from "@/components/follow/hooks";
 import { parseTank } from "@/lib/follow/policyForm";
-import { IDLE } from "@/lib/follow/tx";
 import type { TankStats } from "@/lib/me/activity";
 import { withdrawable } from "@/lib/me/issues";
 import { fmtStt, fmtUnits } from "@/lib/units";
@@ -56,12 +55,29 @@ export const dialFull = (tank: bigint) => {
 };
 
 /** The tank: what it holds, what the handler has charged it per run, and top-up and withdraw. */
-export function TankPanel({ tank, stats, following, writer, tx, balance }: { tank: bigint; stats: TankStats; following: boolean; writer: () => Copybook; tx: ReturnType<typeof useTx>; balance?: bigint }) {
+export function TankPanel({
+  tank,
+  stats,
+  sinceKnown,
+  following,
+  writer,
+  tx,
+  balance,
+}: {
+  tank: bigint;
+  stats: TankStats;
+  /** The current follow's block is known, so its charges can be told from earlier follows'. */
+  sinceKnown: boolean;
+  following: boolean;
+  writer: () => Copybook;
+  tx: ReturnType<typeof useTx>;
+  balance?: bigint;
+}) {
   const [mode, setMode] = useState<"fund" | "withdraw" | null>(null);
   const [amount, setAmount] = useState("0.2");
   const free = withdrawable(tank, following);
   const wei = parseTank(amount);
-  const mine = tx.tx.phase !== "idle" && "action" in tx.tx && (tx.tx.action === "fundTank" || tx.tx.action === "withdrawTank") ? tx.tx : IDLE;
+  const mine = txFor(tx, ["fundTank", "withdrawTank"]);
   const problem =
     wei === null || wei === 0n
       ? "Type an amount in STT, like 0.2."
@@ -86,12 +102,18 @@ export function TankPanel({ tank, stats, following, writer, tx, balance }: { tan
           <p className={styles.gs}>
             {stats.average !== undefined && stats.left !== undefined ? (
               <>
-                ≈ {stats.left.toString()} runs left
+                ≈ {stats.left.toString()} more runs that copy or refuse
                 <br />
-                <span>at your average charge, {fmtStt(stats.average)}, over {stats.runs} run{stats.runs === 1 ? "" : "s"}</span>
+                <span>
+                  at this follow&apos;s average for those, {fmtStt(stats.average)}, over {stats.runs} run{stats.runs === 1 ? "" : "s"}
+                </span>
               </>
             ) : (
-              <span>No charge in the events this page has read, so there is no per-run figure to estimate from.</span>
+              <span>
+                {sinceKnown
+                  ? "No run of this follow has copied or refused yet, so there is no per-run figure to estimate from."
+                  : "This follow's charges are still being read, so there is no per-run figure yet."}
+              </span>
             )}
           </p>
           <p className={styles.gs}>
@@ -135,8 +157,9 @@ export function TankPanel({ tank, stats, following, writer, tx, balance }: { tan
         <TxLine tx={mine} recalled={tx.recalled} />
       </div>
       <PanelNote>
-        Each handler run that reaches this wallet charges the tank for its gas (TankCharged), copied or refused. Below {fmtStt(MIN_TANK_FOR_INCREASE)} every increase is refused; exits
-        still run. The dashed mark on the dial is the 0.2 STT a following wallet keeps.
+        Every handler run that reaches this wallet is billed to the tank. A run that copies or refuses logs its charge (TankCharged); a run with nothing to do is billed
+        without an event, so the tank lasts somewhat less than the estimate. Below {fmtStt(MIN_TANK_FOR_INCREASE)} every increase is refused; exits still run. The dashed mark on
+        the dial is the 0.2 STT a following wallet keeps.
       </PanelNote>
     </>
   );

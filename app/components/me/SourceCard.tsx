@@ -9,10 +9,9 @@ import { Gold, Ledger, type LedgerRow } from "@/components/Ledger";
 import { SourceLine, SourceTitle, SourceTop } from "@/components/app/SourceHead";
 import { Call, ReasonList, Segmented, TxLine } from "@/components/follow/parts";
 import { PolicyFields } from "@/components/follow/PolicyFields";
-import { usePreflight, type useReader, type useTx } from "@/components/follow/hooks";
+import { txFor, usePreflight, type useReader, type useTx } from "@/components/follow/hooks";
 import { parsePolicyForm, policyToForm, type FormField } from "@/lib/follow/policyForm";
 import { blocks, reasonsFor } from "@/lib/follow/reasons";
-import { IDLE } from "@/lib/follow/tx";
 import { addressUrl } from "@/lib/explorer";
 import { fmtInt, shortHex } from "@/lib/format";
 import type { MarketMeta } from "@/lib/tape";
@@ -29,8 +28,10 @@ interface Props {
   versions?: { thesis: number; synced: number };
   /** Block of the Followed event, when the feed has it. */
   since?: bigint;
-  /** null: unknown (not a plain follow call); [] whole book. */
+  /** null: unknown; [] whole book. */
   joinPools: Address[] | null | undefined;
+  /** Why the market list is unknown. */
+  termsNote?: "reading" | "not-found" | "not-plain" | "unread";
   held: Address[];
   guardOn: boolean;
   approved?: boolean;
@@ -58,7 +59,11 @@ export function SourceCard(p: Props) {
       : p.joinPools === undefined
         ? "reading the follow from the history…"
         : p.joinPools === null
-          ? "unknown: the follow transaction was not found"
+          ? p.termsNote === "not-plain"
+            ? "unknown: not a plain follow call"
+            : p.termsNote === "unread"
+              ? "unknown: the follow transaction did not load"
+              : "unknown: the follow transaction was not found"
           : p.joinPools.length === 0
             ? "whole book"
             : p.joinPools.map((x) => (markets[x.toLowerCase()] ? `${markets[x.toLowerCase()]!.symbol}-PERP` : shortHex(x))).join(", ");
@@ -127,9 +132,9 @@ export function SourceCard(p: Props) {
           Unfollow
         </Button>
       </div>
-      {p.tx.tx.phase !== "idle" && "action" in p.tx.tx && p.tx.tx.action === "resume" && (
+      {txFor(p.tx, ["resume"]).phase !== "idle" && (
         <div className={styles.drawer}>
-          <TxLine tx={p.tx.tx} recalled={p.tx.recalled} />
+          <TxLine tx={txFor(p.tx, ["resume"])} />
         </div>
       )}
       {p.drawer === "unfollow" && <UnfollowDrawer {...p} />}
@@ -140,7 +145,7 @@ export function SourceCard(p: Props) {
 
 function UnfollowDrawer({ writer, tx, follow }: Props) {
   const [flatten, setFlatten] = useState(true);
-  const mine = tx.tx.phase !== "idle" && "action" in tx.tx && tx.tx.action === "unfollow" ? tx.tx : IDLE;
+  const mine = txFor(tx, ["unfollow"]);
   return (
     <div className={styles.drawer} role="group" aria-label="Unfollow">
       <Segmented
@@ -196,7 +201,8 @@ function PolicyDrawer({ follow, who, joinPools, held, markets, reader, writer, t
         source,
         policy: parsed.policy,
         joinPools: joinPools ?? [],
-        ...(follow.kind === "Trader" && (joinPools?.length ?? 0) === 0 ? { checkPools: held } : {}),
+        // the open markets are checked only for a whole-book follow known to be one
+        ...(follow.kind === "Trader" && joinPools && joinPools.length === 0 ? { checkPools: held } : {}),
         tank: MIN_TANK,
         ...(follow.kind === "Trader" ? { guardOn } : {}),
       }
@@ -204,9 +210,11 @@ function PolicyDrawer({ follow, who, joinPools, held, markets, reader, writer, t
   const key = input ? JSON.stringify(input, (_k, v) => (typeof v === "bigint" ? v.toString() : v)) : "";
   const pre = usePreflight(reader.copybook, input, key);
   const result = pre.status === "ready" ? pre.result : pre.status === "checking" || pre.status === "error" ? pre.last : undefined;
-  const shown = result ? reasonsFor("policy", result.reasons).filter((r) => r.code !== "ALLOW_ALL_MIRRORS_OPEN_BOOK") : [];
-  const ready = pre.status === "ready" && !!parsed.policy && !blocks("policy", pre.result.reasons);
-  const mine = tx.tx.phase !== "idle" && "action" in tx.tx && tx.tx.action === "updatePolicy" ? tx.tx : IDLE;
+  // a pause on new follows does not stop an existing follow's policy change
+  const relevant = result ? result.reasons.filter((r) => r.code !== "FOLLOWS_PAUSED") : [];
+  const shown = reasonsFor("policy", relevant).filter((r) => r.code !== "ALLOW_ALL_MIRRORS_OPEN_BOOK");
+  const ready = pre.status === "ready" && pre.key === key && !!parsed.policy && !blocks("policy", relevant);
+  const mine = txFor(tx, ["updatePolicy"]);
   const apply = (f: FormField | "tank", v: string) => f !== "tank" && f !== "markets" && setForm((x) => ({ ...x, [f]: v }));
   return (
     <div className={styles.drawer} role="group" aria-label="Edit policy">

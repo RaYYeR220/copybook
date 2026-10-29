@@ -15,12 +15,11 @@ import { AppMain, Col, Colophon, Kick, Panel, PanelNote } from "@/components/app
 import { SourceActs, SourceLead, SourceLedger, SourceTitle, SourceTop } from "@/components/app/SourceHead";
 import { DataState } from "@/components/app/State";
 import { Call, TxLine } from "@/components/follow/parts";
-import { useReader, useTx, useWalletInstalled, useWriter } from "@/components/follow/hooks";
-import { IDLE } from "@/lib/follow/tx";
+import { txFor, useReader, useTx, useWalletInstalled, useWriter } from "@/components/follow/hooks";
 import { fmtInt, shortHex } from "@/lib/format";
 import { fromJsonSafe } from "@/lib/json";
 import { currentFollowEvent, followTerms, lastRefusals, openDeferral, refusalCounts, tankStats } from "@/lib/me/activity";
-import { catchUpPools, themeBook, traderBook, traderPools } from "@/lib/me/book";
+import { catchUpOffer, gateIncreases, themeBook, traderBook, traderPools } from "@/lib/me/book";
 import { dashboardBanners, offerOnOpen, withdrawable } from "@/lib/me/issues";
 import { readMe, readPools, type MeReads } from "@/lib/me/read";
 import type { PublicConfig } from "@/lib/publicConfig";
@@ -186,6 +185,7 @@ function Following({ who, data, names, markets, traders, pub, reader, writer, tx
   // the market list, from the follow transaction itself
   const terms = useQuery({
     queryKey: ["terms", followTx],
+    // null: the transaction is there but is not a plain follow call (sent through a contract)
     queryFn: async () => followTerms((await reader.publicClient.getTransaction({ hash: followTx! })).input),
     enabled: !!trader && !!followTx,
     staleTime: Infinity,
@@ -203,6 +203,18 @@ function Following({ who, data, names, markets, traders, pub, reader, writer, tx
         feed.loaded && feed.complete
         ? null
         : undefined;
+  const termsNote: "reading" | "not-found" | "not-plain" | "unread" | undefined =
+    !trader || (joinPools !== null && joinPools !== undefined)
+      ? undefined
+      : joinPools === undefined
+        ? "reading"
+        : !followTx
+          ? "not-found"
+          : terms.isError
+            ? "unread"
+            : "not-plain";
+  // a refusal still unread could make a market look never tried: nothing is offered until the history is whole
+  const refusalsRead = feed.loaded && feed.complete;
 
   const held = useQuery({
     queryKey: ["held", trader],
@@ -236,16 +248,28 @@ function Following({ who, data, names, markets, traders, pub, reader, writer, tx
 
   const refusalsByPool = useMemo(() => lastRefusals(feed.events, since ?? 0n), [feed.events, since]);
 
+  const blocked = !!data.verdict?.blocking && st.guardOn;
   const rows = useMemo(() => {
     if (!book.data) return undefined;
-    return follow.kind === "Trader" ? traderBook(follow.policy, book.data, refusalsByPool) : themeBook(follow.policy, st.theme?.legs ?? [], book.data, refusalsByPool);
-  }, [book.data, follow.kind, follow.policy, st.theme, refusalsByPool]);
+    if (follow.kind === "Theme") return themeBook(follow.policy, st.theme?.legs ?? [], book.data, refusalsByPool);
+    // the gates an increase meets now, read from the chain: a market whose only move they refuse is not offered
+    return gateIncreases(traderBook(follow.policy, book.data, refusalsByPool), {
+      paused: follow.paused,
+      equityFloor: follow.policy.equityFloor,
+      equity: data.equity,
+      maxTotalNotional: follow.policy.maxTotalNotional,
+      tank: st.tank,
+      blocked,
+      synced: st.synced,
+    });
+  }, [book.data, follow.kind, follow.policy, follow.paused, st.theme, st.tank, st.synced, data.equity, blocked, refusalsByPool]);
   const marketsRead = useMemo(() => Object.fromEntries((book.data ?? []).map((p) => [lc(p.pool), p.market])) as Record<string, Market | null>, [book.data]);
 
   const marketName = (a: string) => (markets[lc(a)] ? `${markets[lc(a)]!.symbol}-PERP` : undefined);
   const banners = dashboardBanners({
     status: st,
-    catchUp: trader && rows ? catchUpPools(rows) : [],
+    catchUp: trader && rows ? catchUpOffer(rows) : undefined,
+    refusalsRead,
     deferredAt: openDeferral(feed.events, since ?? 0n),
     approved: data.approved,
     names: marketName,
@@ -253,13 +277,14 @@ function Following({ who, data, names, markets, traders, pub, reader, writer, tx
   const offer = offerOnOpen(banners);
   const counts = refusalCounts(feed.events, since ?? 0n);
   const totalRefusals = counts.reduce((s, c) => s + c.n, 0);
-  const stats = tankStats(feed.events, st.tank);
+  const stats = tankStats(feed.events, st.tank, since);
   const inStep = rows ? { n: rows.filter((r) => r.state === "in-step" || r.state === "flat").length, of: rows.length } : undefined;
   const name = follow.kind === "Trader" ? (traders[lc(trader!)] ? `${traders[lc(trader!)]}` : shortHex(trader!)) : (st.theme?.name ?? `Thesis #${follow.themeId}`);
   const sourceLabel = follow.kind === "Trader" ? `trader ${shortHex(trader!)}` : `thesis ${name}`;
 
   return (
     <AppMain label={`Dashboard: following ${sourceLabel}`}>
+      <Recalled tx={tx} />
       <Banners banners={banners} offer={offer} writer={writer} tx={tx} onFixPolicy={() => setDrawer("policy")} />
       <Col>
         <Panel id="src-h" order={1} d={0.03}>
@@ -270,6 +295,7 @@ function Following({ who, data, names, markets, traders, pub, reader, writer, tx
             versions={st.theme && st.themeSync ? { thesis: st.theme.version, synced: st.themeSync.syncedVersion } : undefined}
             since={since}
             joinPools={joinPools}
+            termsNote={termsNote}
             held={held.data ?? []}
             guardOn={st.guardOn}
             approved={data.approved}
@@ -289,7 +315,7 @@ function Following({ who, data, names, markets, traders, pub, reader, writer, tx
           <GuardCard kind={follow.kind} trader={trader} verdict={data.verdict} guardOn={st.guardOn} pub={pub} now={now} writer={writer} tx={tx} />
         </Panel>
         <Panel id="gas-h" title="Gas tank" aside={<Kick>Pays for every run</Kick>} order={5} d={0.12}>
-          <TankPanel tank={st.tank} stats={stats} following writer={writer} tx={tx} balance={data.balance} />
+          <TankPanel tank={st.tank} stats={stats} sinceKnown={since !== undefined} following writer={writer} tx={tx} balance={data.balance} />
         </Panel>
       </Col>
       <Col>
@@ -301,6 +327,7 @@ function Following({ who, data, names, markets, traders, pub, reader, writer, tx
             names={markets}
             sourceLabel={sourceLabel}
             loading={book.isLoading}
+            refusalsRead={refusalsRead}
             error={book.error instanceof Error ? book.error.message : undefined}
           />
           {trader && held.isError && <PanelNote>The dreamDEX indexer did not list the trader&apos;s open markets, so only the markets the hub has traded for you are shown.</PanelNote>}
@@ -322,7 +349,7 @@ function Following({ who, data, names, markets, traders, pub, reader, writer, tx
 function NotFollowing({ who, data, names, reader, writer, tx }: { who: Address; data: MeReads; names: TapeNames; reader: ReturnType<typeof useReader>; writer: ReturnType<typeof useWriter>; tx: ReturnType<typeof useTx> }) {
   const st = data.status;
   const free = withdrawable(st.tank, false);
-  const mine = tx.tx.phase !== "idle" && "action" in tx.tx && (tx.tx.action === "withdrawTank" || tx.tx.action === "revoke") ? tx.tx : IDLE;
+  const mine = txFor(tx, ["withdrawTank", "revoke"]);
   const rows: LedgerRow[] = [
     { label: "Gas tank", value: <b>{fmtStt(st.tank)}</b>, note: st.tank > 0n ? "left from an earlier follow: all of it can come out" : undefined },
     { label: "Operator grant", value: data.approved === undefined ? "unread" : data.approved ? "global" : "none", note: data.approved ? "it outlives a follow until you revoke it" : undefined },
@@ -331,6 +358,7 @@ function NotFollowing({ who, data, names, reader, writer, tx }: { who: Address; 
   ];
   return (
     <AppMain label="Dashboard: not following">
+      <Recalled tx={tx} />
       <Col>
         <Panel id="src-h" order={1}>
           <SourceTop kick="Dashboard" step="not following" quiet />
@@ -380,5 +408,16 @@ function NotFollowing({ who, data, names, reader, writer, tx }: { who: Address; 
         </Colophon>
       </Col>
     </AppMain>
+  );
+}
+
+/** A transaction this wallet sent before the page loaded, until it lands: shown once, above everything. */
+function Recalled({ tx }: { tx: ReturnType<typeof useTx> }) {
+  const t = txFor(tx, [], true);
+  if (t.phase === "idle") return null;
+  return (
+    <div className={styles.recalled}>
+      <TxLine tx={t} recalled />
+    </div>
   );
 }

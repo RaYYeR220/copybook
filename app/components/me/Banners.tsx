@@ -3,7 +3,7 @@
 import type { Copybook } from "@copybook/sdk";
 import { Button } from "@/components/Button";
 import { TxLine } from "@/components/follow/parts";
-import type { useTx } from "@/components/follow/hooks";
+import { txFor, type useTx } from "@/components/follow/hooks";
 import { IDLE } from "@/lib/follow/tx";
 import type { Banner, Call } from "@/lib/me/issues";
 import styles from "./Me.module.css";
@@ -54,7 +54,7 @@ export function Banners({
       {banners.map((b) => {
         const offered = b === offer;
         const action = b.call ? `banner:${b.code}` : "";
-        const mine = b.call && tx.tx.phase !== "idle" && "action" in tx.tx && tx.tx.action === action ? tx.tx : IDLE;
+        const mine = b.call ? txFor(tx, [action]) : IDLE;
         return (
           <div key={b.code} className={`${styles.banner} ${styles[b.severity]} ${offered ? styles.offer : ""}`} data-issue={b.code} role={b.severity === "error" ? "alert" : undefined}>
             <span className={styles.bmark} aria-hidden="true" />

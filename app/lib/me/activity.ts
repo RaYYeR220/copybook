@@ -60,7 +60,7 @@ export function openDeferral(events: readonly Ev[], since: bigint): bigint | und
 }
 
 export interface TankStats {
-  /** TankCharged events the feed holds for this wallet. */
+  /** TankCharged events of the current follow (since its Followed block). */
   runs: number;
   total: bigint;
   /** Mean charge per run; undefined without any run. */
@@ -69,12 +69,18 @@ export interface TankStats {
   left?: bigint;
 }
 
-/** What the handler has charged this wallet's tank, per run, and how many more runs the tank covers at that mean. */
-export function tankStats(events: readonly Ev[], tank: bigint): TankStats {
+/**
+ * What the handler has charged this wallet's tank for the current follow, per run that copied or refused (those
+ * log TankCharged; a run that finds nothing to do is billed without one), and how many such runs the tank covers
+ * at that mean. Without the follow's block (`since` undefined) nothing is estimated: older follows' charges are
+ * other sources and other gas.
+ */
+export function tankStats(events: readonly Ev[], tank: bigint, since: bigint | undefined): TankStats {
   let runs = 0;
   let total = 0n;
+  if (since === undefined) return { runs, total };
   for (const e of events)
-    if (e.name === "TankCharged") {
+    if (e.name === "TankCharged" && (e.log.blockNumber ?? 0n) >= since) {
       runs++;
       total += e.amount;
     }

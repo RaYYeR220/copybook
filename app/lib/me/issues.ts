@@ -2,6 +2,7 @@ import type { Address } from "viem";
 import { MIN_TANK, type FollowerStatus } from "@copybook/sdk";
 import { fmtInt, shortHex } from "../format";
 import { fmtStt } from "../units";
+import type { CatchUpOffer } from "./book";
 
 /**
  * The dashboard's banners: every stuck state the chain shows for this follow, each with the exact call that clears
@@ -68,8 +69,13 @@ const ORDER = { error: 0, warning: 1, info: 2 } as const;
 
 export interface BannerInput {
   status: FollowerStatus;
-  /** Trader follows: markets a catchUp would bring to the trader's size (see `catchUpPools`). */
-  catchUp?: readonly Address[];
+  /** Trader follows: the markets a catchUp would actually move now (see `catchUpOffer`). */
+  catchUp?: CatchUpOffer;
+  /**
+   * The follower's refusals have been read in full (history complete). Until then no catchUp is offered: a market
+   * could look never tried when its refusal is still unread.
+   */
+  refusalsRead?: boolean;
   /** The newest unanswered Deferred since the follow began. */
   deferredAt?: bigint;
   /** The global operator grant; undefined when unread. */
@@ -78,7 +84,9 @@ export interface BannerInput {
   names?: (a: string) => string | undefined;
 }
 
-export function dashboardBanners({ status, catchUp = [], deferredAt, approved, names }: BannerInput): Banner[] {
+const plural = (n: number, one: string, many: string) => (n === 1 ? one : many);
+
+export function dashboardBanners({ status, catchUp, refusalsRead = false, deferredAt, approved, names }: BannerInput): Banner[] {
   const out: Banner[] = [];
   const follow = status.follow;
   if (!follow) return out;
@@ -92,16 +100,23 @@ export function dashboardBanners({ status, catchUp = [], deferredAt, approved, n
     out.push(b);
   }
   const latched = status.issues.some((i) => i.code === "EXITS_PENDING" || i.code === "STOP_CLOSES_PENDING");
-  if (follow.kind === "Trader" && !follow.paused && !latched && catchUp.length > 0) {
-    const list = catchUp.map((p) => names?.(p) ?? shortHex(p)).join(", ");
+  if (follow.kind === "Trader" && !follow.paused && !latched && refusalsRead && catchUp && catchUp.pools.length > 0) {
+    const name = (p: Address) => names?.(p) ?? shortHex(p);
+    const all = catchUp.pools.map(name).join(", ");
+    const cause =
+      deferredAt !== undefined
+        ? `The handler deferred this follow at block #${fmtInt(deferredAt)} (its group ran out of gas), so ${all} ${plural(catchUp.pools.length, "is", "are")} out of step with the trader.`
+        : `${all} ${plural(catchUp.pools.length, "is", "are")} out of step with the trader; the hub moves ${plural(catchUp.pools.length, "it", "them")} at the trader's next move there.`;
+    const does: string[] = [];
+    if (catchUp.reducing.length)
+      does.push(`reduces ${catchUp.reducing.map(name).join(", ")} toward the trader's size (an exit: never gated)`);
+    if (catchUp.growing.length)
+      does.push(`brings ${catchUp.growing.map(name).join(", ")} up to the trader's size inside your band and caps (a fill outside the band is refused as Band)`);
     out.push({
       code: "OUT_OF_STEP",
       severity: "warning",
-      message:
-        deferredAt !== undefined
-          ? `The handler deferred this follow at block #${fmtInt(deferredAt)} (its group ran out of gas), so ${list} ${catchUp.length === 1 ? "is" : "are"} out of step with the trader. catchUp brings ${catchUp.length === 1 ? "it" : "them"} to the trader's size now, on your gas.`
-          : `${list} ${catchUp.length === 1 ? "is" : "are"} out of step with the trader and no gate refused ${catchUp.length === 1 ? "it" : "them"} for good: the hub acts at the trader's next move there, or now with catchUp, on your gas. Band and caps apply as usual.`,
-      call: makeCall("catchUp", [status.follower, [...catchUp]], undefined, names),
+      message: `${cause} catchUp does it now, on your gas: it ${does.join(", and ")}.`,
+      call: makeCall("catchUp", [status.follower, [...catchUp.pools]], undefined, names),
     });
   }
   if (approved === false) {

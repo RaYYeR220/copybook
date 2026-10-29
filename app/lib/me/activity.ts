@@ -59,6 +59,39 @@ export function openDeferral(events: readonly Ev[], since: bigint): bigint | und
   return at;
 }
 
+/** A GroupDeferred that reached this wallet's seat. */
+export interface GroupDeferral {
+  block: bigint;
+  group: number;
+  /** The first seat the handler did not reach. */
+  fromIndex: number;
+}
+
+/**
+ * The newest GroupDeferred of this wallet's group since a block that may have skipped it and that no later copy or
+ * refusal of this wallet answered. The hub emits it when a delivery's gas runs short: seats `fromIndex` onward, as
+ * the group stood then, were not synced. The node keeps no past state, so the seat is today's (an unfollow moves the
+ * group's last member into the leaver's seat): a seat at or past `fromIndex` counts.
+ */
+export function openGroupDeferral(
+  sourceEvents: readonly Ev[],
+  ownEvents: readonly Ev[],
+  sourceId: Hex,
+  seat: { group: number; index: number },
+  since: bigint,
+): GroupDeferral | undefined {
+  let at: GroupDeferral | undefined;
+  for (const e of chain(sourceEvents)) {
+    const b = e.log.blockNumber!;
+    if (b < since || e.name !== "GroupDeferred" || lc(e.sourceId) !== lc(sourceId) || e.group !== seat.group) continue;
+    if (Number(e.fromIndex) <= seat.index) at = { block: b, group: e.group, fromIndex: Number(e.fromIndex) };
+  }
+  if (!at) return undefined;
+  const found = at;
+  const answered = ownEvents.some((e) => (e.name === "Copied" || e.name === "Refused") && (e.log.blockNumber ?? 0n) > found.block);
+  return answered ? undefined : found;
+}
+
 export interface TankStats {
   /** TankCharged events of the current follow (since its Followed block). */
   runs: number;

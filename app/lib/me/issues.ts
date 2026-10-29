@@ -23,7 +23,7 @@ export interface Call {
   label: string;
 }
 
-export type BannerCode = FollowerStatus["issues"][number]["code"] | "OUT_OF_STEP" | "NO_GRANT";
+export type BannerCode = FollowerStatus["issues"][number]["code"] | "OUT_OF_STEP" | "GROUP_DEFERRED" | "NO_GRANT";
 
 export interface Banner {
   code: BannerCode;
@@ -76,8 +76,10 @@ export interface BannerInput {
    * could look never tried when its refusal is still unread.
    */
   refusalsRead?: boolean;
-  /** The newest unanswered Deferred since the follow began. */
+  /** The newest unanswered Deferred since the follow began: this wallet's own share ran out of gas. */
   deferredAt?: bigint;
+  /** The newest unanswered GroupDeferred that reached this wallet's seat: the delivery's gas ran short before it. */
+  groupDeferred?: { block: bigint; group: number; fromIndex: number };
   /** The global operator grant; undefined when unread. */
   approved?: boolean;
   /** pool → market name for the call text. */
@@ -86,7 +88,11 @@ export interface BannerInput {
 
 const plural = (n: number, one: string, many: string) => (n === 1 ? one : many);
 
-export function dashboardBanners({ status, catchUp, refusalsRead = false, deferredAt, approved, names }: BannerInput): Banner[] {
+/** Why a GroupDeferred left this wallet out: the delivery's gas, not this wallet's own share. */
+const groupCause = (g: { block: bigint; group: number; fromIndex: number }) =>
+  `At block #${fmtInt(g.block)} the gas of one delivery to this source ran short before this wallet's seat (group ${g.group}, from seat ${g.fromIndex} on), and the handler stopped there`;
+
+export function dashboardBanners({ status, catchUp, refusalsRead = false, deferredAt, groupDeferred, approved, names }: BannerInput): Banner[] {
   const out: Banner[] = [];
   const follow = status.follow;
   if (!follow) return out;
@@ -103,10 +109,14 @@ export function dashboardBanners({ status, catchUp, refusalsRead = false, deferr
   if (follow.kind === "Trader" && !follow.paused && !latched && refusalsRead && catchUp && catchUp.pools.length > 0) {
     const name = (p: Address) => names?.(p) ?? shortHex(p);
     const all = catchUp.pools.map(name).join(", ");
-    const cause =
-      deferredAt !== undefined
-        ? `The handler deferred this follow at block #${fmtInt(deferredAt)} (its group ran out of gas), so ${all} ${plural(catchUp.pools.length, "is", "are")} out of step with the trader.`
-        : `${all} ${plural(catchUp.pools.length, "is", "are")} out of step with the trader; the hub moves ${plural(catchUp.pools.length, "it", "them")} at the trader's next move there.`;
+    const is = plural(catchUp.pools.length, "is", "are");
+    // the newer of the two deferrals says why
+    const own = deferredAt !== undefined && (!groupDeferred || deferredAt >= groupDeferred.block);
+    const cause = own
+      ? `At block #${fmtInt(deferredAt!)} the handler ran out of gas on this wallet's own share of a delivery and deferred it, so ${all} ${is} out of step with the trader.`
+      : groupDeferred
+        ? `${groupCause(groupDeferred)}, so ${all} ${is} out of step with the trader.`
+        : `${all} ${is} out of step with the trader; the hub moves ${plural(catchUp.pools.length, "it", "them")} at the trader's next move there.`;
     const does: string[] = [];
     if (catchUp.reducing.length)
       does.push(`reduces ${catchUp.reducing.map(name).join(", ")} toward the trader's size (an exit: never gated)`);
@@ -117,6 +127,15 @@ export function dashboardBanners({ status, catchUp, refusalsRead = false, deferr
       severity: "warning",
       message: `${cause} catchUp does it now, on your gas: it ${does.join(", and ")}.`,
       call: makeCall("catchUp", [status.follower, [...catchUp.pools]], undefined, names),
+    });
+  }
+  // a thesis book the handler did not reach: catchUp syncs every leg, unless a banner already offers it
+  if (follow.kind === "Theme" && groupDeferred && !follow.paused && !out.some((b) => b.call?.method === "catchUp")) {
+    out.push({
+      code: "GROUP_DEFERRED",
+      severity: "warning",
+      message: `${groupCause(groupDeferred)}, so this book may not match the thesis. catchUp syncs every leg now, on your gas.`,
+      call: makeCall("catchUp", [status.follower, []], undefined, names),
     });
   }
   if (approved === false) {

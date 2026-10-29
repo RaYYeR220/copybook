@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getAddress, type Address } from "viem";
 import { useAccount } from "wagmi";
-import { eventKey, type Market } from "@copybook/sdk";
+import { eventKey, type CopybookEvent, type Market } from "@copybook/sdk";
 import { Button } from "@/components/Button";
 import { ConnectButton } from "@/components/ConnectButton";
 import { Ledger, type LedgerRow } from "@/components/Ledger";
@@ -18,7 +18,7 @@ import { Call, TxLine } from "@/components/follow/parts";
 import { txFor, useReader, useTx, useWalletInstalled, useWriter } from "@/components/follow/hooks";
 import { fmtInt, shortHex } from "@/lib/format";
 import { fromJsonSafe } from "@/lib/json";
-import { currentFollowEvent, followTerms, lastRefusals, openDeferral, refusalCounts, tankStats } from "@/lib/me/activity";
+import { currentFollowEvent, followTerms, lastRefusals, openDeferral, openGroupDeferral, refusalCounts, tankStats } from "@/lib/me/activity";
 import { catchUpOffer, gateIncreases, themeBook, traderBook, traderPools } from "@/lib/me/book";
 import { ourWalletLabels } from "@/lib/ours";
 import { dashboardBanners, offerOnOpen, withdrawable } from "@/lib/me/issues";
@@ -187,6 +187,23 @@ function Following({ who, data, names, markets, traders, pub, reader, writer, tx
   const since = followEv?.log.blockNumber;
   const followTx = followEv?.log.transactionHash;
 
+  // GroupDeferred names a group, not a follower: read this wallet's seat and its source's events since the follow
+  const seat = useQuery({ queryKey: ["seat", who, follow.sourceId], queryFn: () => reader.copybook.seatOf(who), staleTime: 60_000, retry: 1 });
+  const groupLog = useQuery({
+    queryKey: ["source-log", follow.sourceId, since?.toString()],
+    queryFn: async () => {
+      const r = await fetch(`/api/history?source=${follow.sourceId}&fromBlock=${since}&limit=500`, { cache: "no-store" });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return fromJsonSafe<{ events: CopybookEvent[] }>(await r.json()).events.filter((e) => e.name === "GroupDeferred");
+    },
+    enabled: since !== undefined,
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+    retry: 1,
+  });
+  const groupDeferred =
+    seat.data && groupLog.data && since !== undefined ? openGroupDeferral(groupLog.data, feed.events, follow.sourceId, seat.data, since) : undefined;
+
   // the market list, from the follow transaction itself
   const terms = useQuery({
     queryKey: ["terms", followTx],
@@ -276,6 +293,7 @@ function Following({ who, data, names, markets, traders, pub, reader, writer, tx
     catchUp: trader && rows ? catchUpOffer(rows) : undefined,
     refusalsRead,
     deferredAt: openDeferral(feed.events, since ?? 0n),
+    groupDeferred,
     approved: data.approved,
     names: marketName,
   });

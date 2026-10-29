@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { encodeFunctionData, getAddress, type Address, type Hex } from "viem";
 import { MIN_TANK, hubAbi, type CopybookEvent, type FollowerIssue, type FollowerStatus, type Market } from "@copybook/sdk";
-import { MAIN_REASONS, currentFollowEvent, followTerms, lastRefusals, openDeferral, refusalCounts, tankStats } from "@/lib/me/activity";
+import { MAIN_REASONS, currentFollowEvent, followTerms, lastRefusals, openDeferral, openGroupDeferral, refusalCounts, tankStats } from "@/lib/me/activity";
 import { bookSummary, catchUpOffer, clampToCap, gateIncreases, type GateState, legSettled, split, themeBook, traderBook, traderInStep, traderPools, unrealized, type PoolRead } from "@/lib/me/book";
 import { callText, dashboardBanners, offerOnOpen, withdrawable } from "@/lib/me/issues";
 import { takeovers, type HeldPosition } from "@/lib/follow/takeover";
@@ -321,7 +321,7 @@ describe("dashboard banners: each stuck state with the exact call that clears it
     expect(dashboardBanners({ status: status(), catchUp: offer, deferredAt: 35_900_123n, names }).some((x) => x.code === "OUT_OF_STEP")).toBe(false);
     const b = dashboardBanners({ status: status(), catchUp: offer, refusalsRead: true, deferredAt: 35_900_123n, names });
     expect(b[0]).toMatchObject({ code: "OUT_OF_STEP", severity: "warning" });
-    expect(b[0]!.message).toContain("deferred this follow at block #35,900,123");
+    expect(b[0]!.message).toContain("At block #35,900,123 the handler ran out of gas on this wallet's own share of a delivery");
     expect(b[0]!.call?.text).toBe("hub.catchUp(0x7d73…1932, [BTC-PERP])");
     expect(b[0]!.call?.args).toEqual([ME, [BTC]]);
     expect(b[0]!.message).toContain("brings BTC-PERP up to the trader's size inside your band and caps");
@@ -330,6 +330,35 @@ describe("dashboard banners: each stuck state with the exact call that clears it
     expect(latched.map((x) => x.code)).toEqual(["EXITS_PENDING"]);
     // a stopped follow is not caught up
     expect(dashboardBanners({ status: status({ follow: { ...status().follow!, paused: true } }), catchUp: offer, refusalsRead: true }).some((x) => x.code === "OUT_OF_STEP")).toBe(false);
+  });
+
+  it("a GroupDeferred that reached this wallet's seat names the delivery's gas, not the wallet's own share", () => {
+    const offer = { pools: [BTC], reducing: [], growing: [BTC] };
+    const g = { block: 35_910_000n, group: 0, fromIndex: 1 };
+    const b = dashboardBanners({ status: status(), catchUp: offer, refusalsRead: true, groupDeferred: g, names });
+    expect(b[0]!.message).toContain("At block #35,910,000 the gas of one delivery to this source ran short before this wallet's seat (group 0, from seat 1 on)");
+    // the newer of two deferrals says why
+    expect(dashboardBanners({ status: status(), catchUp: offer, refusalsRead: true, groupDeferred: g, deferredAt: 35_920_000n, names })[0]!.message).toContain("own share");
+    // a thesis follow gets its own banner with catchUp(you, []), unless one already offers catchUp
+    const theme = status({ follow: { ...status().follow!, kind: "Theme", themeId: 1n, trader: undefined } });
+    const t = dashboardBanners({ status: theme, groupDeferred: g });
+    expect(t.map((x) => x.code)).toEqual(["GROUP_DEFERRED"]);
+    expect(t[0]!.call?.text).toBe("hub.catchUp(0x7d73…1932, [])");
+    const behind = status({ follow: theme.follow }, [{ code: "THEME_BEHIND", severity: "warning", message: "m", action: { method: "catchUp", args: [ME, []] } }]);
+    expect(dashboardBanners({ status: behind, groupDeferred: g }).map((x) => x.code)).toEqual(["THEME_BEHIND"]);
+  });
+
+  it("finds an unanswered GroupDeferred of this wallet's group that reached its seat", () => {
+    const SID = `0x${"ab".repeat(32)}` as const;
+    const ev = (name: string, block: bigint, extra: Record<string, unknown> = {}) => ({ name, ...extra, log: { blockNumber: block } }) as never;
+    const source = [ev("GroupDeferred", 100n, { sourceId: SID, group: 0, fromIndex: 2n }), ev("GroupDeferred", 120n, { sourceId: SID, group: 1, fromIndex: 0n })];
+    expect(openGroupDeferral(source, [], SID, { group: 0, index: 3 }, 50n)).toEqual({ block: 100n, group: 0, fromIndex: 2 });
+    // a seat before fromIndex was reached; another group's deferral is not ours; one before the follow does not count
+    expect(openGroupDeferral(source, [], SID, { group: 0, index: 1 }, 50n)).toBeUndefined();
+    expect(openGroupDeferral(source, [], SID, { group: 2, index: 0 }, 50n)).toBeUndefined();
+    expect(openGroupDeferral(source, [], SID, { group: 0, index: 3 }, 101n)).toBeUndefined();
+    // a later copy of this wallet answered it
+    expect(openGroupDeferral(source, [ev("Copied", 130n)], SID, { group: 0, index: 3 }, 50n)).toBeUndefined();
   });
 
   it("a missing global grant is info with the grant as its call", () => {

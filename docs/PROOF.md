@@ -1,8 +1,8 @@
 # Proof ledger
 
-Every transaction Copybook's documents cite, read back from the chain. `npm run proof` (in `e2e/`) wrote this file at **Hideki block 36,233,501** and **Shannon block 527,022,644**, 2026-10-29 12:22 UTC.
+Every transaction Copybook's documents cite, read back from the chain. `npm run proof` (in `e2e/`) wrote this file at **Hideki block 36,407,680** and **Shannon block 527,196,847**, 2026-10-29 17:12 UTC.
 
-**340 transactions checked: 340 verified, 0 failed, 0 unverified.** 23 of 23 same-block pairs check out. 8 of 8 contracts check out.
+**360 transactions checked: 360 verified, 0 failed, 0 unverified.** 23 of 23 same-block pairs check out. 8 of 8 contracts check out.
 
 Testnet only: Hideki (chain 50383; its explorer is the Tokyo explorer) and Shannon (chain 50312) are Somnia testnets, and STT and USDso have no market value. A wallet shown with a role (demo leader, demo follower, …) is one of Copybook's own (`demoWallets` in `deployments/hideki.json`); the traders in the review table are dreamDEX traders the AI guard reviewed.
 
@@ -74,7 +74,7 @@ Setup for the residue pairs:
 
 ## Refusals on chain
 
-A refused copy is recorded too: the handler writes `Refused(follower, source, market, reason, venueError)` in the block of the move it refused, and the follower's position stays where it was. Exits are never refused.
+A refused copy is recorded too: the handler writes `Refused(follower, source, market, reason, venueError)` in the block of the move it refused, and the follower's position stays where it was. Exits are never gated: no cap, tank, pause or AI verdict holds back a close. A close the book cannot fill inside the exit band is recorded as `BandUnfilled` (or `VenueRejected`) and syncs at the next move or a `catchUp` ([LIMITS.md](LIMITS.md#copying)).
 
 | Run | The move | Block | Move · position | Copy · position | What the copy did | Check |
 |---|---|---|---|---|---|---|
@@ -151,7 +151,7 @@ The end-to-end run against the current hub (`npm run live`), 2026-10-28.
 
 ## AI guard
 
-A review is requested on Hideki, crosses to the `RiskReviewer` on Shannon over Hyperlane, where one committee of validators fetches the trader's 30-day line and another classifies it OK, CAUTION or BLOCK; the verdict crosses back to the `RiskGate` on Hideki. The hub asks the gate only before an increase, and only for a follower whose guard is on.
+A review is requested on Hideki, crosses to the `RiskReviewer` on Shannon over Hyperlane, where one committee of validators fetches the trader's 30-day line and another classifies it OK, CAUTION or BLOCK; the verdict crosses back to the `RiskGate` on Hideki. The hub asks the gate before every increase and never before an exit; the gate refuses only a follower whose guard is on, and only while the trader's BLOCK stands.
 
 ### One review, end to end (review 11)
 
@@ -192,9 +192,9 @@ Each input is the commit that holds the answer key followed by the key file's ke
 | <a id="anchor-v2"></a>run v2: the answer key's commit (6b1b074) and the key file's keccak256, written on chain | [0x1f70dc46…cd31](https://explorer.testnet.somnia.network/tokyo/tx/0x1f70dc46bfee488d482591cffb54200795ed332b903678dfa77c85359a4dcd31) | 35,426,023 · #1 | owner 0x5397…4632 | data `0x6b1b0743…4767` as recorded, sent to itself · before all 20 review requests of the run (reviews 4–23, the first at block 35,426,610) | ✓ |
 | <a id="anchor-v3"></a>run v3: the answer key's commit (5aed53b) and the key file's keccak256, written on chain | [0xb6792325…0e13](https://explorer.testnet.somnia.network/tokyo/tx/0xb67923259aa552c033eba19271020d41f206c04a44d461ef9237c3752dd40e13) | 35,446,065 · #5 | owner 0x5397…4632 | data `0x5aed53bf…902f` as recorded, sent to itself · before all 20 review requests of the run (reviews 24–43, the first at block 35,446,272) | ✓ |
 
-### Every review (43)
+### Every review (47)
 
-The committee's tier is read from `VerdictTallied` on Shannon, and what the gate did from `VerdictReceived` or `BlockHeld` on Hideki. Runs, prompts and scoring: `eval/SCORECARD.md`.
+<a id="every-review"></a>The committee's tier is read from `VerdictTallied` on Shannon, and what the gate did from `VerdictReceived` or `BlockHeld` on Hideki. Runs, prompts and scoring: `eval/SCORECARD.md`.
 
 | Review | Trader | Committee | Gate | Request | To Shannon | Data | Verdict | To Hideki | Check |
 |---|---|---|---|---|---|---|---|---|---|
@@ -241,6 +241,10 @@ The committee's tier is read from `VerdictTallied` on Shannon, and what the gate
 | <a id="review-41"></a>41 | [0xb9c0…37F3](https://explorer.testnet.somnia.network/tokyo/address/0xb9c0424B350be6Bb438eE3fdda981212d42037F3) | Caution (0/3/0 of 3) | Caution stored | [0x7746a737…2cc9](https://explorer.testnet.somnia.network/tokyo/tx/0x7746a7378cc5d3b2a093c7c884cb0d82c802e444dd8e4202afe3f5c3aa872cc9) | [0x4cc0da46…c318](https://shannon-explorer.somnia.network/tx/0x4cc0da46b3068594235d5ca8c04be1bc240182b21381e9ef1f04d03750ccc318) | [0x241939ff…dd75](https://shannon-explorer.somnia.network/tx/0x241939ff615533fd4c46d948210b272513bf7561ba4adc98956fe4f26c35dd75) | [0x8a260f5c…c7de](https://shannon-explorer.somnia.network/tx/0x8a260f5c6be9f0182c51462b40401abbcf161a3dde69f40b87068bf47820c7de) | [0x7e446e90…e804](https://explorer.testnet.somnia.network/tokyo/tx/0x7e446e907b8907bb04ef2c1fd166d1984e7a2126c837d2a81634fcbd07bbe804) | ✓ |
 | <a id="review-42"></a>42 | [0x10ea…2E90](https://explorer.testnet.somnia.network/tokyo/address/0x10eae18964db8EE7981B51fd93b3B163e8dF2E90) | Ok (3/0/0 of 3) | Ok stored | [0x56a19d94…a414](https://explorer.testnet.somnia.network/tokyo/tx/0x56a19d94918ea5527cbf4962eb6a56a2a0f64de40c3b5cda24f60d187357a414) | [0x34f0f09d…89b8](https://shannon-explorer.somnia.network/tx/0x34f0f09d93c5edf215daa4dcfee8206d94df7c30ec71b962e8a780a4fc1989b8) | [0x6dcc6129…b660](https://shannon-explorer.somnia.network/tx/0x6dcc6129ee10184e8689d12a111e6ab7602d26323099babffc69bad722f4b660) | [0xbadee804…25ba](https://shannon-explorer.somnia.network/tx/0xbadee804b8193e2d735039aa289f4412d3dd84bddc52ddd00c7eadb0c3e225ba) | [0xe4000df4…4e8f](https://explorer.testnet.somnia.network/tokyo/tx/0xe4000df4d7440e8fb2ccde67cfb013a70a3779061211ea4f8af31c9b107b4e8f) | ✓ |
 | <a id="review-43"></a>43 | [0xA1d0…7b5d](https://explorer.testnet.somnia.network/tokyo/address/0xA1d0CB85c869e534Fe1e0c22af3b238301157b5d) | Ok (3/0/0 of 3) | Ok, earlier Block held | [0xae7bd792…79cb](https://explorer.testnet.somnia.network/tokyo/tx/0xae7bd79212d9d2541c372ef348e0ac63e61998f35b36e3ae19eaa963cf2d79cb) | [0xd0fb5831…b797](https://shannon-explorer.somnia.network/tx/0xd0fb5831837fdd82efa69872ba0e672ff988625eaa62b4f626cc9dc68515b797) | [0x63478464…edb2](https://shannon-explorer.somnia.network/tx/0x63478464150fbe3d921c68606f174dee00a5eb56c50c86876d3ff82f96c7edb2) | [0x39933fa4…67ff](https://shannon-explorer.somnia.network/tx/0x39933fa48b30060e2f19a3d502a282914bbca7f3fd5a21041fb5095415e767ff) | [0x1525f30c…06c3](https://explorer.testnet.somnia.network/tokyo/tx/0x1525f30c37a7dc72a33897ef0071bd149ef326f6ae0b0832ae7279d87e5906c3) | ✓ |
+| <a id="review-44"></a>44 | [0xA1d0…7b5d](https://explorer.testnet.somnia.network/tokyo/address/0xA1d0CB85c869e534Fe1e0c22af3b238301157b5d) | Ok (3/0/0 of 3) | Ok stored | [0x7d42b704…2436](https://explorer.testnet.somnia.network/tokyo/tx/0x7d42b7046d9e136812789ea2669a49668816307529352fed12702b79c4482436) | [0x9cc2d7d7…9b19](https://shannon-explorer.somnia.network/tx/0x9cc2d7d71fc6b619d6a5e2463ea53eb5bce1523198f759e68ee7eff43a4f9b19) | [0x64b8ab3b…54d9](https://shannon-explorer.somnia.network/tx/0x64b8ab3b5e8d600510c474643194f186cc0e71295bd7569b12c958f3696e54d9) | [0x5bc922c4…0a5d](https://shannon-explorer.somnia.network/tx/0x5bc922c4b4691408b8e5c4daf0a15cc9feae808b70b102cfb12c7dc051f80a5d) | [0x81642fbf…ddcd](https://explorer.testnet.somnia.network/tokyo/tx/0x81642fbf2cbe24fbd881c9913e1679d89486e80f7b2621a4c47c6de8fd08ddcd) | ✓ |
+| <a id="review-45"></a>45 | [0xfc2F…7fd2](https://explorer.testnet.somnia.network/tokyo/address/0xfc2Fb08CCCF87BFC472cded8E7eBEF588fCF7fd2) | Ok (3/0/0 of 3) | Ok stored | [0xfd2adb5c…a7ff](https://explorer.testnet.somnia.network/tokyo/tx/0xfd2adb5c352433e6cceae7a0ec58bd9900dd071dc11a4d532aee00491a1da7ff) | [0xc3a02f7b…dd2a](https://shannon-explorer.somnia.network/tx/0xc3a02f7bdbef11ea905b59963776eb4b8e0f5493dfec405e09c6f58f3babdd2a) | [0xf72d7719…8bf8](https://shannon-explorer.somnia.network/tx/0xf72d7719f716eb6d3c00aadeafd71f0539bc308de47452eccf87d6d6d3718bf8) | [0x741bc754…a33a](https://shannon-explorer.somnia.network/tx/0x741bc754915d74cc6017eb12d21cbf9ef7bde6d4a6678bd381eb51e91dd4a33a) | [0x4438c177…9e08](https://explorer.testnet.somnia.network/tokyo/tx/0x4438c17717e1ce581ce1d7f9df13b2ce11afe66fe74081f3d85192674b369e08) | ✓ |
+| <a id="review-46"></a>46 | [0x0a72…8Ff4](https://explorer.testnet.somnia.network/tokyo/address/0x0a72b2e45fB68a8Ff4B0945Ee8104cb5a97D8Ff4) | Caution (0/3/0 of 3) | Caution stored | [0xc909c312…f90b](https://explorer.testnet.somnia.network/tokyo/tx/0xc909c312699be5d422dba04182feeb65776a028fb07e3a189b0e6cd69ac3f90b) | [0x69739fb4…9016](https://shannon-explorer.somnia.network/tx/0x69739fb4f5f95cef1cd221d898d0c4fe3ca83987c55f40da8bf7f6e34cab9016) | [0x37c9c1c6…6099](https://shannon-explorer.somnia.network/tx/0x37c9c1c6f4318fba943de88e2a3fe3bd6b3d7d95e1aa68daec3e984a9f3b6099) | [0xe78eb923…4b0c](https://shannon-explorer.somnia.network/tx/0xe78eb92362b5dc4e713c617e3e09b80bc320cd07eaac5a235b78528433204b0c) | [0x3cb2b56c…bf6c](https://explorer.testnet.somnia.network/tokyo/tx/0x3cb2b56c1daf92123f9939366d5a1ed16f38d82fa3bfa7d873420c2d9badbf6c) | ✓ |
+| <a id="review-47"></a>47 | [0x20A0…bA88](https://explorer.testnet.somnia.network/tokyo/address/0x20A0d517f1b60fd3041B49d7B97b529964c7bA88) | Ok (3/0/0 of 3) | Ok stored | [0xce32530a…f09c](https://explorer.testnet.somnia.network/tokyo/tx/0xce32530ae77ce8f2a1af47c6d4446d4cd886a59c86a070c854691f86e6eff09c) | [0xc16e0b85…ef7f](https://shannon-explorer.somnia.network/tx/0xc16e0b858e39c8509965e9a02d1f3c727ddd5c5333c4617fd54163803019ef7f) | [0xa522e1b8…d329](https://shannon-explorer.somnia.network/tx/0xa522e1b853cc8834c52e1614e1fb77af5a40d0078d70db5691cab3661385d329) | [0x56ed9c55…eeee](https://shannon-explorer.somnia.network/tx/0x56ed9c55ea989e4d38068029b2032f9c2319d14278544f1ae88cead16d3eeeee) | [0xfcaecfe8…3416](https://explorer.testnet.somnia.network/tokyo/tx/0xfcaecfe8d163a32ccbbe4acc7ecb6cfbd4180c0abaf7600ab9748d9920ff3416) | ✓ |
 
 ## MCP agent
 
@@ -290,7 +294,7 @@ Every transaction the landing page shows (`app/content/proof.ts`), checked at th
 
 ## Every other transaction
 
-Everything else recorded in `deployments/*.json`, the app run's funding and cleanup, and transaction links in the docs. Another 451 rows re-check transactions shown above against what `deployments/*.json` recorded for them; all verified.
+Everything else recorded in `deployments/*.json`, the app run's funding and cleanup, and transaction links in the docs. Another 491 rows re-check transactions shown above against what `deployments/*.json` recorded for them; all verified.
 
 <details><summary>27 transactions</summary>
 

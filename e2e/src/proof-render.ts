@@ -347,7 +347,7 @@ export function renderProof(input: ProofInput): string {
   if (sectionRows("refusals").length) {
     out.push("## Refusals on chain", "");
     out.push(
-      "A refused copy is recorded too: the handler writes `Refused(follower, source, market, reason, venueError)` in the block of the move it refused, and the follower's position stays where it was. Exits are never refused.",
+      "A refused copy is recorded too: the handler writes `Refused(follower, source, market, reason, venueError)` in the block of the move it refused, and the follower's position stays where it was. Exits are never gated: no cap, tank, pause or AI verdict holds back a close. A close the book cannot fill inside the exit band is recorded as `BandUnfilled` (or `VenueRejected`) and syncs at the next move or a `catchUp` ([LIMITS.md](LIMITS.md#copying)).",
       "",
     );
     pairTable([...pairsIn("refusals"), ...pairsAlsoIn("refusals")], "refusals");
@@ -391,7 +391,7 @@ export function renderProof(input: ProofInput): string {
   if (guardRows.length || reviews.length || sectionRows("anchors").length) {
     out.push("## AI guard", "");
     out.push(
-      "A review is requested on Hideki, crosses to the `RiskReviewer` on Shannon over Hyperlane, where one committee of validators fetches the trader's 30-day line and another classifies it OK, CAUTION or BLOCK; the verdict crosses back to the `RiskGate` on Hideki. The hub asks the gate only before an increase, and only for a follower whose guard is on.",
+      "A review is requested on Hideki, crosses to the `RiskReviewer` on Shannon over Hyperlane, where one committee of validators fetches the trader's 30-day line and another classifies it OK, CAUTION or BLOCK; the verdict crosses back to the `RiskGate` on Hideki. The hub asks the gate before every increase and never before an exit; the gate refuses only a follower whose guard is on, and only while the trader's BLOCK stands.",
       "",
     );
     if (example) {
@@ -419,7 +419,7 @@ export function renderProof(input: ProofInput): string {
     if (reviews.length) {
       out.push(`### Every review (${reviews.length})`, "");
       out.push(
-        "The committee's tier is read from `VerdictTallied` on Shannon, and what the gate did from `VerdictReceived` or `BlockHeld` on Hideki. Runs, prompts and scoring: `eval/SCORECARD.md`.",
+        '<a id="every-review"></a>The committee\'s tier is read from `VerdictTallied` on Shannon, and what the gate did from `VerdictReceived` or `BlockHeld` on Hideki. Runs, prompts and scoring: `eval/SCORECARD.md`.',
         "",
         "| Review | Trader | Committee | Gate | Request | To Shannon | Data | Verdict | To Hideki | Check |",
         "|---|---|---|---|---|---|---|---|---|---|",

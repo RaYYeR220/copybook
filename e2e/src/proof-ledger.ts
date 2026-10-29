@@ -622,11 +622,13 @@ function citingFiles(): string[] {
   return files;
 }
 
-export function buildRows(sources: Sources): LedgerRow[] {
+/** The sources' rows and contract deployments; with `sweep`, also everything the repo's files record or link. */
+export function buildRows(sources: Sources, sweep = true): LedgerRow[] {
   const rows: LedgerRow[] = [...sources.rows];
   for (const c of sources.contracts)
     if (c.deployTx)
       rows.push({ id: `deploy-${c.id}`, section: "contracts", chain: c.chain, hash: c.deployTx, label: `deploy ${c.name}`, run: "deploy", expect: c.expect });
+  if (!sweep) return rows;
   for (const [key, t] of Object.entries(hidekiDeployment.txs as Record<string, { hash: Hex; block: number; gasUsed: number }>))
     rows.push({ id: `hideki-json-${key}`, section: "other", chain: "hideki", hash: t.hash, label: `deployments/hideki.json: ${key}`, source: "deployments/hideki.json", expect: { block: t.block, gasUsed: t.gasUsed } });
   (riskDeployment.txs as { chain: ChainName; step: string; label: string; hash: Hex; block: number; gasUsed: number; status: string; from: string; to: string; contractAddress?: string }[]).forEach((t, i) =>
@@ -820,23 +822,55 @@ async function readBack(address: string): Promise<{ verified?: boolean; note: st
   }
 }
 
-async function main() {
-  const sources = readJson<Sources>("e2e/proof/sources.json");
-  const clients: Record<ChainName, RpcClient> = { hideki: httpRpc(CHAINS.hideki.rpc), shannon: httpRpc(CHAINS.shannon.rpc) };
-  const o = { attempts: 5, delayMs: 1500 };
+export interface RunOptions {
+  /** Defaults to the public RPCs in CHAINS. */
+  clients?: Record<ChainName, RpcClient>;
+  /** Defaults to e2e/proof/sources.json. */
+  sources?: Sources;
+  /** Also check deployments/*.json, the reviews, the eval anchors, the landing and the docs' links (default true). */
+  sweep?: boolean;
+  /** Where PROOF.md goes (default docs/PROOF.md). It is written only when everything verifies, unless `writeAnyway`. */
+  out?: string;
+  writeAnyway?: boolean;
+  /** The claims map to check against the new PROOF.md (default docs/CLAIMS.md); null skips it. */
+  claims?: string | null;
+  retry?: { attempts: number; delayMs: number; notFoundRetries?: number };
+  log?: (line: string) => void;
+}
+
+/** The whole ledger run. Returns the exit code: 0 all verified, 1 something failed, 2 the RPC kept failing. */
+export async function runLedger(options: RunOptions = {}): Promise<number> {
+  const log = options.log ?? ((line: string) => console.log(line));
+  const sources = options.sources ?? readJson<Sources>("e2e/proof/sources.json");
+  const sweep = options.sweep ?? true;
+  const clients: Record<ChainName, RpcClient> = options.clients ?? {
+    hideki: httpRpc(CHAINS.hideki.rpc),
+    shannon: httpRpc(CHAINS.shannon.rpc),
+  };
+  const o = { attempts: options.retry?.attempts ?? 5, delayMs: options.retry?.delayMs ?? 1500 };
   const heads = {} as Record<ChainName, number>;
   for (const chain of Object.keys(CHAINS) as ChainName[]) {
-    const id = Number(await call<Hex>(clients[chain], "eth_chainId", [], o));
-    if (id !== CHAINS[chain].id) throw new Error(`${CHAINS[chain].rpc} is chain ${id}, not ${chain} (${CHAINS[chain].id})`);
-    heads[chain] = Number(await call<Hex>(clients[chain], "eth_blockNumber", [], o));
+    let id: number;
+    try {
+      id = Number(await call<Hex>(clients[chain], "eth_chainId", [], o));
+      heads[chain] = Number(await call<Hex>(clients[chain], "eth_blockNumber", [], o));
+    } catch (e) {
+      if (!(e instanceof RpcUnavailable)) throw e;
+      log(`UNVERIFIED: ${CHAINS[chain].name}'s RPC (${CHAINS[chain].rpc}) did not answer: ${e.message}. Nothing was checked; ${relative(process.cwd(), options.out ?? resolve(ROOT, "docs/PROOF.md"))} is unchanged.`);
+      return 2;
+    }
+    if (id !== CHAINS[chain].id) {
+      log(`FAILED: ${CHAINS[chain].rpc} is chain ${id}, not ${chain} (${CHAINS[chain].id}). Nothing was checked.`);
+      return 1;
+    }
   }
   const generatedAt = new Date().toISOString();
-  console.log(`proof ledger at Hideki block ${heads.hideki}, Shannon block ${heads.shannon} (${generatedAt})`);
+  log(`proof ledger at Hideki block ${heads.hideki}, Shannon block ${heads.shannon} (${generatedAt})`);
 
-  const rows = buildRows(sources);
+  const rows = buildRows(sources, sweep);
   const cache = new Map<string, Promise<Fetched>>();
   const limit = { hideki: limiter(6), shannon: limiter(6) };
-  const opts: VerifyOptions = { cache };
+  const opts: VerifyOptions = { cache, ...(options.retry ?? {}) };
   const checked: CheckedRow[] = await Promise.all(
     rows.map(async (row) => ({ ...row, result: await limit[row.chain](() => verifyTx(clients[row.chain], row, opts)) })),
   );
@@ -844,7 +878,7 @@ async function main() {
   for (const row of checked)
     if (row.result.outcome === "failed" && row.result.reason?.startsWith("not found")) {
       const other: ChainName = row.chain === "hideki" ? "shannon" : "hideki";
-      const there = await fetchFacts(clients[other], other, row.hash, { attempts: 3, notFoundRetries: 0 });
+      const there = await fetchFacts(clients[other], other, row.hash, { attempts: Math.min(o.attempts, 3), delayMs: o.delayMs, notFoundRetries: 0 });
       if (there.kind === "found") row.result.reason += `; it is on ${other} (chain ${CHAINS[other].id}): wrong network`;
     }
   const byId = new Map(checked.map((r) => [r.id, r]));
@@ -917,7 +951,7 @@ async function main() {
   }
 
   const reviews: ReviewResult[] = [];
-  for (const r of riskDeployment.reviews as Review[]) {
+  for (const r of sweep ? (riskDeployment.reviews as Review[]) : []) {
     const rs = checked.filter((x) => x.section === "reviews" && x.review === r.nonce);
     const tally = rs.find((x) => x.id.endsWith("-verdict"))?.result.facts?.events.find((e) => e.name === "VerdictTallied");
     const gate = rs.find((x) => x.id.endsWith("-toHideki"))?.result.facts?.events.find((e) => e.name === "VerdictReceived" || e.name === "BlockHeld");
@@ -948,9 +982,8 @@ async function main() {
     context: { runs: sources.runs, markets: sources.markets, wallets, hub: HUB, exampleNonce: sources.guard.exampleNonce },
   };
   const { renderProof } = await import("./proof-render.ts");
-  const out = resolve(ROOT, "docs/PROOF.md");
-  mkdirSync(dirname(out), { recursive: true });
-  writeFileSync(out, renderProof(input));
+  const out = options.out ?? resolve(ROOT, "docs/PROOF.md");
+  const md = renderProof(input);
 
   const txOutcome = new Map<string, Outcome>();
   for (const r of checked) {
@@ -959,26 +992,42 @@ async function main() {
   }
   const all = [...txOutcome.values(), ...pairs.map((p) => p.outcome), ...contracts.map((c) => c.outcome), ...gas.map((g) => g.outcome)];
   const count = (o: Outcome) => [...txOutcome.values()].filter((x) => x === o).length;
-  console.log(`${txOutcome.size} transactions (${checked.length} rows): ${count("verified")} verified, ${count("failed")} failed, ${count("unverified")} unverified`);
-  console.log(`${pairs.length} same-block pairs, ${contracts.length} contracts, ${gas.length} gas rows`);
-  for (const r of checked) if (r.result.outcome !== "verified") console.log(`  ${r.result.outcome.toUpperCase()} ${r.id} ${r.chain} ${r.hash}: ${r.result.reason}`);
-  for (const p of pairs) if (p.reasons.length) console.log(`  FAILED pair ${p.id}: ${p.reasons.join("; ")}`);
-  for (const c of contracts) if (c.outcome !== "verified") console.log(`  ${c.outcome.toUpperCase()} contract ${c.id}: ${c.reasons.join("; ")}`);
-  for (const g of gas) if (g.outcome !== "verified") console.log(`  ${g.outcome.toUpperCase()} gas ${g.label}: ${g.reason}`);
-  console.log(`wrote ${relative(process.cwd(), out)}`);
-  const claimsPath = resolve(ROOT, "docs/CLAIMS.md");
-  const claimProblems = existsSync(claimsPath)
-    ? checkClaims(readFileSync(claimsPath, "utf8"), (rel) => (existsSync(resolve(ROOT, rel)) ? readFileSync(resolve(ROOT, rel), "utf8") : undefined))
-    : [];
-  for (const p of claimProblems) console.log(`  FAILED docs/CLAIMS.md ${p}`);
-  if (existsSync(claimsPath)) console.log(`docs/CLAIMS.md: ${claimProblems.length ? `${claimProblems.length} broken references` : "every link and test it cites exists"}`);
-  if (claimProblems.length) all.push("failed");
-  process.exitCode = all.includes("failed") ? 1 : all.includes("unverified") ? 2 : 0;
+  log(`${txOutcome.size} transactions (${checked.length} rows): ${count("verified")} verified, ${count("failed")} failed, ${count("unverified")} unverified`);
+  log(`${pairs.length} same-block pairs, ${contracts.length} contracts, ${gas.length} gas rows`);
+  for (const r of checked) if (r.result.outcome !== "verified") log(`  ${r.result.outcome.toUpperCase()} ${r.id} ${r.chain} ${r.hash}: ${r.result.reason}`);
+  for (const p of pairs) if (p.reasons.length) log(`  FAILED pair ${p.id}: ${p.reasons.join("; ")}`);
+  for (const c of contracts) if (c.outcome !== "verified") log(`  ${c.outcome.toUpperCase()} contract ${c.id}: ${c.reasons.join("; ")}`);
+  for (const g of gas) if (g.outcome !== "verified") log(`  ${g.outcome.toUpperCase()} gas ${g.label}: ${g.reason}`);
+
+  // the claims map is checked against the PROOF.md just rendered, not the one on disk
+  const claimsPath = options.claims === undefined ? resolve(ROOT, "docs/CLAIMS.md") : options.claims;
+  if (claimsPath && existsSync(claimsPath)) {
+    const read = (rel: string) =>
+      rel === "docs/PROOF.md" ? md : existsSync(resolve(ROOT, rel)) ? readFileSync(resolve(ROOT, rel), "utf8") : undefined;
+    const problems = checkClaims(readFileSync(claimsPath, "utf8"), read);
+    for (const p of problems) log(`  FAILED docs/CLAIMS.md ${p}`);
+    log(`docs/CLAIMS.md: ${problems.length ? `${problems.length} broken references` : "every link and test it cites exists"}`);
+    if (problems.length) all.push("failed");
+  }
+  const code = all.includes("failed") ? 1 : all.includes("unverified") ? 2 : 0;
+  if (code === 0 || options.writeAnyway) {
+    mkdirSync(dirname(out), { recursive: true });
+    writeFileSync(out, md);
+    log(`wrote ${relative(process.cwd(), out)}${code ? ` (exit ${code}: written because of --write-anyway)` : ""}`);
+  } else {
+    log(`${relative(process.cwd(), out)} not written (exit ${code}); pass --write-anyway to write it with the failures marked`);
+  }
+  return code;
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
-  main().catch((e) => {
-    console.error(e);
-    process.exitCode = 1;
-  });
+  runLedger({ writeAnyway: process.argv.includes("--write-anyway") }).then(
+    (code) => {
+      process.exitCode = code;
+    },
+    (e) => {
+      console.error(e);
+      process.exitCode = 1;
+    },
+  );
 }

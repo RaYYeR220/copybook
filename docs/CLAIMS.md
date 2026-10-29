@@ -11,7 +11,7 @@ shown. Evidence is of three kinds:
 
 All test suites passed in a run on 2026-10-29: `forge test` 257 tests; `npm test -w @copybook/app` 317;
 `-w @copybook/sdk` 88 (plus 4 live ones, skipped without `COPYBOOK_LIVE=1`); `-w @copybook/mcp` 56;
-`-w @copybook/stats` 35; `npm run eval:test` (in `e2e/`) 8; `npm test` (in `e2e/`, the ledger) 12.
+`-w @copybook/stats` 35; `npm run eval:test` (in `e2e/`) 8; `npm test` (in `e2e/`, the ledger) 21 (plus 1 live one with `COPYBOOK_LIVE=1`, also passing).
 
 ## Same-block copying
 

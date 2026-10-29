@@ -2,7 +2,10 @@
 // RPC answers). COPYBOOK_LIVE=1 adds the same checks against the live RPC.
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync } from "node:fs";
+import { createServer, type Server } from "node:http";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   CHAINS,
   checkPair,
@@ -10,8 +13,10 @@ import {
   checkPreRegistration,
   headingAnchors,
   httpRpc,
+  runLedger,
   verifyTx,
   type Expect,
+  type Sources,
   type RpcClient,
   type Verification,
 } from "../src/proof-ledger.ts";
@@ -33,6 +38,8 @@ const COPY = "0x9b950e40fe79338890174ef0e9d4ed7cc2bf5733e6d1df04b049f74b916e9e3c
 /** Someone else's transaction that reverted on Hideki (block 36,202,007). */
 const REVERTED = "0x70c8cc6135858aa478a953435999b875dcdada2a07e102ded84fbf7062b455bd" as const;
 const MISSING = `0x${"ab".repeat(32)}` as const;
+/** The hub's handler refusing the follower's 1000PEPE increase: no fill inside its 5 bps band (block 35,025,975). */
+const REFUSAL = "0xc97ecbd7710b42ac60f5321333cd95a6a3fb369c38c9ebe8986751840bdcffcb" as const;
 
 const moveExpect: Expect = { block: 35977607, index: 4, from: LEADER, to: BTC, method: "placeOrder", gasUsed: 1770144 };
 const copyExpect: Expect = {
@@ -56,6 +63,8 @@ function fixtureRpc(failures = 0): RpcClient & { calls: number } {
       rpc.calls++;
       if (rpc.calls <= failures) throw new Error("RPC Request failed");
       const hash = String((params ?? [])[0]).toLowerCase();
+      if (method === "eth_chainId") return "0xc4cf"; // 50383
+      if (method === "eth_blockNumber") return "0x2280000";
       if (method === "eth_getTransactionByHash") return fx.txs[hash] ?? null;
       if (method === "eth_getTransactionReceipt") return fx.receipts[hash] ?? null;
       throw new Error(`unexpected ${method}`);
@@ -115,6 +124,15 @@ describe("verifyTx", () => {
     assert.match(size.reason!, /no Copied with toSize=1/);
     const forbidden = await verifyTx(fixtureRpc(), spec(COPY, { noEvents: ["Copied"] }), fast);
     assert.match(forbidden.reason!, /emits Copied/);
+  });
+
+  it("reads a refusal's reason from the hub's Refused event, and fails a wrong one", async () => {
+    const band = { name: "Refused", args: { pool: "0xfA9B9e50CC1745113d57893991aF200a74c86B6f", reason: "BandUnfilled", venueError: "0xc04ad919" } };
+    const ok = await verifyTx(fixtureRpc(), spec(REFUSAL, { block: 35025975, index: 5, from: HUB, events: [band], noEvents: ["Copied"] }), fast);
+    assert.equal(ok.outcome, "verified", ok.reason);
+    const wrong = await verifyTx(fixtureRpc(), spec(REFUSAL, { events: [{ name: "Refused", args: { reason: "TotalCap" } }] }), fast);
+    assert.equal(wrong.outcome, "failed");
+    assert.match(wrong.reason!, /no Refused with reason=TotalCap/);
   });
 
   it("flags a reverted transaction", async () => {
@@ -208,6 +226,125 @@ describe("checkClaims", () => {
       "names app/lib/gone.ts, which does not exist",
       "cites app/test/tape.test.ts::a copy someone sent, which is not a test there", // a test's title in full, not a piece of it
     ]);
+  });
+});
+
+describe("runLedger (the CLI's exit code)", () => {
+  const shannon: RpcClient = {
+    async request({ method }) {
+      if (method === "eth_chainId") return "0xc488"; // 50312
+      if (method === "eth_blockNumber") return "0x1f6a0000";
+      throw new Error(`unexpected ${method}`);
+    },
+  };
+  const sources = (move: Expect): Sources => ({
+    about: "",
+    runs: {},
+    markets: {},
+    contracts: [],
+    gas: [],
+    guard: { exampleNonce: 0 },
+    rows: [
+      { id: "m", section: "same-block", pair: "p", role: "move", chain: "hideki", hash: MOVE, label: "move", expect: move },
+      { id: "c", section: "same-block", pair: "p", role: "copy", chain: "hideki", hash: COPY, label: "copy", expect: copyExpect },
+    ],
+  });
+  const run = async (hideki: RpcClient, move: Expect, writeAnyway = false) => {
+    const out = join(mkdtempSync(join(tmpdir(), "proof-")), "PROOF.md");
+    const lines: string[] = [];
+    const code = await runLedger({
+      clients: { hideki, shannon },
+      sources: sources(move),
+      sweep: false,
+      claims: null,
+      out,
+      writeAnyway,
+      retry: { attempts: 2, delayMs: 0, notFoundRetries: 0 },
+      log: (l) => lines.push(l),
+    });
+    return { code, out, lines, written: existsSync(out) };
+  };
+  /** Answers the chain id and head, and fails every transaction read. */
+  const txReadsFail: RpcClient = {
+    async request({ method }) {
+      if (method === "eth_chainId") return "0xc4cf";
+      if (method === "eth_blockNumber") return "0x2280000";
+      throw new Error("RPC Request failed");
+    },
+  };
+
+  it("exits 0 and writes PROOF.md when every row verifies", async () => {
+    const r = await run(fixtureRpc(), moveExpect);
+    assert.equal(r.code, 0);
+    assert.equal(r.written, true);
+    assert.match(readFileSync(r.out, "utf8"), /2 transactions checked: 2 verified, 0 failed, 0 unverified/);
+  });
+
+  it("exits 1 on a failed row and leaves PROOF.md alone unless asked to write it anyway", async () => {
+    const r = await run(fixtureRpc(), { ...moveExpect, block: 1 });
+    assert.equal(r.code, 1);
+    assert.equal(r.written, false);
+    assert.ok(r.lines.some((l) => /not written \(exit 1\)/.test(l)));
+    const anyway = await run(fixtureRpc(), { ...moveExpect, block: 1 }, true);
+    assert.equal(anyway.code, 1);
+    assert.match(readFileSync(anyway.out, "utf8"), /\*\*FAILED\*\*: block 35977607, expected 1/);
+  });
+
+  it("exits 2 when the RPC keeps failing on the transactions, and writes nothing", async () => {
+    const r = await run(txReadsFail, moveExpect);
+    assert.equal(r.code, 2);
+    assert.equal(r.written, false);
+  });
+
+  it("exits 2, not 1, when the RPC does not answer the chain id or head before anything is checked", async () => {
+    const down: RpcClient = { request: async () => Promise.reject(new Error("HTTP 503 from eth_chainId")) };
+    const r = await run(down, moveExpect);
+    assert.equal(r.code, 2);
+    assert.equal(r.written, false);
+    assert.ok(r.lines.some((l) => /^UNVERIFIED: Hideki's RPC/.test(l)));
+  });
+
+  it("exits 1 when the RPC is another chain", async () => {
+    const wrong: RpcClient = { request: async ({ method }) => (method === "eth_chainId" ? "0x1" : "0x10") };
+    const r = await run(wrong, moveExpect);
+    assert.equal(r.code, 1);
+    assert.ok(r.lines.some((l) => /is chain 1, not hideki \(50383\)/.test(l)));
+  });
+});
+
+describe("httpRpc", () => {
+  /** A local JSON-RPC endpoint that answers with `status` and `body`. */
+  const serve = (status: number, body: string) =>
+    new Promise<{ url: string; server: Server }>((ok) => {
+      const server = createServer((req, res) => {
+        req.resume();
+        req.on("end", () => {
+          res.writeHead(status, { "content-type": "application/json" });
+          res.end(body);
+        });
+      }).listen(0, "127.0.0.1", () => {
+        const addr = server.address();
+        ok({ url: `http://127.0.0.1:${typeof addr === "object" && addr ? addr.port : 0}`, server });
+      });
+    });
+
+  it("throws on a non-200 answer and on a JSON-RPC error, and returns null for a null result", async () => {
+    const down = await serve(503, "Service Unavailable");
+    const rpcError = await serve(200, JSON.stringify({ jsonrpc: "2.0", id: 1, error: { code: -32000, message: "header not found" } }));
+    const empty = await serve(200, JSON.stringify({ jsonrpc: "2.0", id: 1, result: null }));
+    try {
+      await assert.rejects(httpRpc(down.url).request({ method: "eth_getTransactionByHash", params: [MOVE] }), /HTTP 503 from eth_getTransactionByHash/);
+      await assert.rejects(httpRpc(rpcError.url).request({ method: "eth_blockNumber" }), /eth_blockNumber: -32000 header not found/);
+      assert.equal(await httpRpc(empty.url).request({ method: "eth_getTransactionByHash", params: [MOVE] }), null);
+      // through verifyTx: a node answering 503 leaves the row unverified; a node without the transaction fails it
+      const flaky = await verifyTx(httpRpc(down.url), spec(MOVE), fast);
+      assert.equal(flaky.outcome, "unverified");
+      assert.match(flaky.reason!, /RPC: eth_getTransactionByHash failed 3 times: HTTP 503/);
+      const missing = await verifyTx(httpRpc(empty.url), spec(MOVE), fast);
+      assert.equal(missing.outcome, "failed");
+    } finally {
+      for (const x of [down, rpcError, empty]) x.server.close();
+    }
   });
 });
 

@@ -184,6 +184,14 @@ function makeDescribe(ctx: ProofContext) {
 const posOf = (r: CheckedRow) => (r.result.facts ? `${int(r.result.facts.block)} · #${r.result.facts.index}` : r.result.block !== undefined ? int(r.result.block) : "");
 const rowMark = (r: CheckedRow) => mark(r.result);
 
+/** Read back from the explorer when that was possible; otherwise what forge reported at deploy time, said as such. */
+function sourceVerification(c: ContractResult): string {
+  if (c.readBack === true) return c.readBackNote ?? "read back from the explorer: verified";
+  const atDeploy = c.source ? "verified at deploy (forge)" : "";
+  const readBack = c.readBackNote ?? "explorer read-back unavailable";
+  return [atDeploy, readBack].filter(Boolean).join("; ");
+}
+
 function pairMark(p: PairResult): string {
   if (p.outcome === "verified") return "✓";
   const reasons = [...p.reasons, ...[p.move, p.copy].filter((r) => r.result.reason).map((r) => `${r.role}: ${r.result.reason}`)];
@@ -289,9 +297,7 @@ export function renderProof(input: ProofInput): string {
     out.push("## Contracts", "");
     if (contracts.length) {
       out.push(
-        "Each address holds code now, and its deploy transaction created exactly that address (CopyEngine through the CREATE2 deployer, the relays by the hub inside a follow). Each address also matches `deployments/*.json`.",
-        "",
-        "| Contract | Chain | Address | Deployed in | Source | Check |",
+        "| Contract | Chain | Address | Deployed in | Source verification | On chain |",
         "|---|---|---|---|---|---|",
       );
       for (const c of contracts) {
@@ -302,12 +308,16 @@ export function renderProof(input: ProofInput): string {
             ? `opened by the hub in ${txLink(opened.chain, opened.hash)} (\`GroupOpened\`)`
             : "";
         if (c.deploy) show(c.deploy);
-        const source = [c.source, c.readBackNote].filter(Boolean).join("; ");
+        const source = sourceVerification(c);
         out.push(
           `| ${anchor(`contract-${c.id}`)}${esc(c.name)} | ${CHAINS[c.chain].name} | ${addrLink(c.chain, c.address)} | ${deployed} | ${esc(source)} | ${mark({ outcome: c.outcome, reason: c.reasons.join("; ") })} |`,
         );
       }
-      out.push("");
+      out.push(
+        "",
+        "**On chain** is what the ledger read from the chain: the address holds code now, its deploy transaction created exactly that address (CopyEngine through the CREATE2 deployer, the relays by the hub inside a follow, named by `GroupOpened`), and it matches `deployments/*.json`. **Source verification** is not a chain fact. The Shannon reviewers are read back from Shannon's explorer API on every run. The Hideki contracts were verified with `forge verify-contract` when they were deployed; the Tokyo explorer's API does not answer verification queries (\"Not available\"), so for them this column repeats what forge reported then and is not re-checked.",
+        "",
+      );
     }
     const config = sectionRows("contracts").filter((r) => !r.id.startsWith("deploy-"));
     if (config.length) {
@@ -495,7 +505,7 @@ export function renderProof(input: ProofInput): string {
     "cd e2e && npm ci && npm run proof",
     "```",
     "",
-    "It only reads (public RPCs, no key). It exits 0 when everything verifies, 1 when anything fails and 2 when the RPC kept failing for some transactions. The transactions and what was recorded for them are in `e2e/proof/sources.json`, `deployments/*.json` and `eval/*/anchor.json`; `HIDEKI_RPC` and `SHANNON_RPC` override the endpoints.",
+    "It only reads (public RPCs, no key). It exits 0 when everything verifies, 1 when anything fails and 2 when the RPC kept failing for some transactions, and it rewrites this file only on 0 (`npm run proof -- --write-anyway` writes it with the failures marked). The transactions and what was recorded for them are in `e2e/proof/sources.json`, `deployments/*.json` and `eval/*/anchor.json`; `HIDEKI_RPC` and `SHANNON_RPC` override the endpoints.",
     "",
   );
   return out.join("\n");

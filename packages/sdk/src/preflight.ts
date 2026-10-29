@@ -252,7 +252,8 @@ export async function preflightFollow(c: ReadContext, input: PreflightInput): Pr
         add({
           code: "ALLOW_ALL_MIRRORS_OPEN_BOOK",
           severity: "info",
-          message: "With no market list the follow mirrors the trader's whole book, including positions already open, and manages every market the trader trades.",
+          message:
+            "With no market list the follow mirrors the trader's whole book and manages every market the trader trades. A position the trader already holds opens here at their next move in that market, or via catchUp.",
         });
       }
       const [verdict, guardOn] = await Promise.all([

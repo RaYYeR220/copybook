@@ -15,7 +15,7 @@ export function Refusals({ counts }: { counts: { reason: ReasonName; n: number }
           </li>
         ))}
       </ul>
-      <PanelNote>Exits are never gated: a close is refused only when the book cannot fill its immediate-or-cancel order near the mark (BandUnfilled). Each refusal is a Refused event with its reason, in the feed above.</PanelNote>
+      <PanelNote>Exits are never gated, but the venue can still refuse a close: BandUnfilled when the book cannot fill its immediate-or-cancel order near the mark, VenueRejected for any other venue revert on the exit (a revoked grant, say). Each refusal is a Refused event with its reason, in the feed above.</PanelNote>
     </>
   );
 }

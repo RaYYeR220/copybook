@@ -12,7 +12,7 @@ import {
   type Hex,
   type TransactionReceipt,
 } from "viem";
-import { pub, wallet, chain, EXPLORER_TX, MARGIN_BANK, REACTIVITY, type Role } from "./env.ts";
+import { pub, wallet, chain, EXPLORER_TX, REACTIVITY, type Role } from "./env.ts";
 
 export const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
@@ -38,18 +38,7 @@ export const deployment = JSON.parse(readFileSync(resolve(ROOT, "deployments/hid
 export const HUB = getAddress(deployment.hub);
 export const THEMES = getAddress(deployment.themes);
 
-export const poolAbi = parseAbi([
-  "function getMarkPrice() view returns (uint256)",
-  "function getOneBase() view returns (uint256)",
-  "function getOrderBookParameters() view returns ((uint256 tickSize, uint256 minQuantity, uint256 lotSize))",
-  "function getBookLevels(bool isBid, uint64 numLevels) view returns ((uint256 price, uint256 quantity)[])",
-  "function isOperatorAuthorized(address owner, address operator, bytes4 selector) view returns (bool)",
-  "function placeOrder(bool isBid, uint64 userData, uint256 price, uint256 quantity, uint64 expireTimestampNs, uint8 orderType, uint8 selfMatchingOption, address builder, uint96 builderFeeBpsTimes1k) returns (bool, uint128)",
-]);
-export const bankAbi = parseAbi([
-  "function getPosition(address account, address pool) view returns ((int128 size, uint128 avgEntryPrice, int256 entryFundingIndex, uint64 lastUpdatedTimestampNs))",
-  "function getAccountHealth(address account) view returns (int256 equity, uint256 imReq, uint256 mmReq, uint256 cmReq)",
-]);
+export { poolAbi, bankAbi, size, equity, market } from "./venue.ts";
 export const registryAbi = parseAbi([
   "function setOperatorApprovalGlobal(address operator, bytes4[] selectors, bool approved)",
   "function setOperatorApprovalForPool(address pool, address operator, bytes4[] selectors, bool approved)",
@@ -213,25 +202,6 @@ export async function sendValue(s: Scenario, role: Role, label: string, to: Addr
 }
 
 // ---------------------------------------------------------------- reads
-
-export async function size(account: Address, pool: Address): Promise<bigint> {
-  const p = await pub.readContract({ address: MARGIN_BANK, abi: bankAbi, functionName: "getPosition", args: [account, pool] });
-  return p.size;
-}
-
-export async function equity(account: Address): Promise<bigint> {
-  const h = await pub.readContract({ address: MARGIN_BANK, abi: bankAbi, functionName: "getAccountHealth", args: [account] });
-  return h[0];
-}
-
-export async function market(pool: Address) {
-  const [mark, ob, oneBase] = await Promise.all([
-    pub.readContract({ address: pool, abi: poolAbi, functionName: "getMarkPrice" }),
-    pub.readContract({ address: pool, abi: poolAbi, functionName: "getOrderBookParameters" }),
-    pub.readContract({ address: pool, abi: poolAbi, functionName: "getOneBase" }),
-  ]);
-  return { mark, tick: ob.tickSize, lot: ob.lotSize, minQty: ob.minQuantity, oneBase };
-}
 
 export type HubEvent = { eventName: string; args: Record<string, unknown>; log: { blockNumber: bigint; transactionHash: Hex; transactionIndex: number; logIndex: number } };
 

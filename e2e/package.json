@@ -9,11 +9,12 @@
     "record-deploy": "tsx src/record-deploy.ts",
     "live": "tsx src/live.ts",
     "risk": "tsx src/risk.ts",
+    "leader-bot": "tsx src/leader-bot.ts",
     "typecheck": "tsc --noEmit",
     "eval": "tsx src/eval.ts",
     "eval:test": "tsx --test ../eval/rubric.test.ts",
     "proof": "tsx src/proof-ledger.ts",
-    "test": "tsx --test test/proof-ledger.test.ts"
+    "test": "tsx --test test/proof-ledger.test.ts test/leader-bot.test.ts"
   },
   "dependencies": {
     "@copybook/stats": "file:../packages/stats",

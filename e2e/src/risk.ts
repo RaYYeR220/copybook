@@ -54,7 +54,8 @@ import {
   SHANNON_EXPLORER_TX,
   type Role,
 } from "./env.ts";
-import { HUB, ROOT, artifact, decodeHub, errMsg, fmtEvent, hubAbi, market, reaction, size, sleep, type HubEvent } from "./lib.ts";
+import { HUB, ROOT, artifact, decodeHub, errMsg, fmtEvent, hubAbi, reaction, size, sleep, type HubEvent } from "./lib.ts";
+import { placeIoc } from "./venue.ts";
 import { SYSTEM_PROMPT } from "../../eval/rubric.ts";
 
 const HIDEKI_MAILBOX = getAddress("0xD7C2E95c62De3c0ad95b2C1cf08E4B85DF6b332D");
@@ -638,15 +639,7 @@ async function btc() {
 
 /** The leader's own IOC 1% through mark. */
 async function leaderTrade(label: string, isBid: boolean, qty: bigint) {
-  const pool = await btc();
-  const m = await market(pool);
-  const raw = isBid ? (m.mark * 10_100n) / 10_000n : (m.mark * 9_900n) / 10_000n;
-  const price = isBid ? ((raw + m.tick - 1n) / m.tick) * m.tick : (raw / m.tick) * m.tick;
-  const r = (await markets("LEADER").trader.placePerpOrder({ pool, isBid, price, quantity: qty, orderType: 2, gas: 20_000_000n })) as {
-    hash: Hex;
-    receipt?: TransactionReceipt;
-  };
-  const rc = r.receipt ?? (await pub.waitForTransactionReceipt({ hash: r.hash }));
+  const rc = await placeIoc(markets("LEADER"), await btc(), isBid, qty);
   track("hideki", label, rc);
   if (rc.status !== "success") throw new Error(`${label} reverted`);
   return rc;

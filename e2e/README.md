@@ -227,3 +227,38 @@ exists. It only reads (public RPCs, no key, no `contracts/out`), so it runs righ
 transactions are in `proof/sources.json`; it also checks everything in `deployments/*.json` and `eval/*/anchor.json`
 and every explorer link in the docs. Exit code 0 when all verify, 1 when any fails, 2 when the RPC kept failing.
 `npm test` runs the ledger's own tests (`COPYBOOK_LIVE=1` adds one against the live RPC). PROOF.md is written only when everything verifies; `npm run proof -- --write-anyway` writes it with the failures marked.
+
+## Demo leader bot
+
+`npm run leader-bot` keeps the demo leader trading, so anyone who follows it sees copies land in the leader's block.
+About every 25 minutes (± 4) it either opens a long at the venue minimum or twice it, on BTC (one open in four on
+ETH), or closes the position the tick before opened. It holds at most one position per market and never adds to one;
+the only exception is a residue under the venue minimum (an IOC that filled in part), which gets the minimum added on
+its side so the next close takes it all. A position bigger than the bot ever opens is left alone. The orders are the
+e2e runs' IOC 1% through mark (`placeIoc` in `src/venue.ts`), with a two-minute expiry.
+
+Before each trade it reads the leader's STT and perps equity. Under the gas floor it skips the tick; under the margin
+floor it skips opens and still closes. Either skip logs at `error` on every tick until the leader is topped up.
+
+```sh
+COPYBOOK_ENV=/path/to/leader.env npm run leader-bot             # runs until stopped
+COPYBOOK_ENV=/path/to/leader.env npm run leader-bot -- --once   # one tick now, then exits
+```
+
+The env file needs only `LEADER_PK`. Each tick prints one JSON line to stdout and writes `out/last-run.json`: the
+time, the action, the transaction and block, the hub's copies and refusals in that block, and the leader's balances
+(`lastTrade` keeps the last tick that traded). The next tick is due one interval after the time in that file, so a
+restart does not trade early. Stop the bot before `npm run live` or `npm run risk trade`: they trade the same leader.
+
+| variable | default | |
+|---|---|---|
+| `LEADER_BOT_INTERVAL_MIN` | 25 | minutes between ticks (at least 5) |
+| `LEADER_BOT_JITTER_MIN` | 4 | ± minutes around the interval |
+| `LEADER_BOT_MIN_STT` | 0.25 | gas floor (an order reserves 20M gas, 0.12 STT at 6 gwei) |
+| `LEADER_BOT_MIN_EQUITY` | 5 | margin floor for an open, in USDso |
+| `LEADER_BOT_ETH_SHARE` | 0.25 | share of opens on ETH |
+| `LEADER_BOT_UNTIL` | none | ISO time after which it only closes |
+| `LEADER_BOT_STATE` | `out/last-run.json` | the state file |
+
+A trade uses about 1.5M gas, about 0.01 STT, so the leader spends about 0.55 STT a day. Each follower pays for its
+own copies from its gas tank. `npm test` covers the bot's decisions and ticks against a fake chain.

@@ -34,6 +34,7 @@ import {
   type SameBlock,
   type Scenario,
 } from "./lib.ts";
+import { placeIoc } from "./venue.ts";
 
 const LEADER = account("LEADER").address;
 const FOLLOWER = account("FOLLOWER").address;
@@ -96,14 +97,7 @@ async function ownTrade(
   isBid: boolean,
   qty: bigint,
 ): Promise<TransactionReceipt> {
-  const m = await market(pool);
-  const raw = isBid ? (m.mark * 10_100n) / 10_000n : (m.mark * 9_900n) / 10_000n;
-  const price = isBid ? ((raw + m.tick - 1n) / m.tick) * m.tick : (raw / m.tick) * m.tick;
-  const r = (await mk.trader.placePerpOrder({ pool, isBid, price, quantity: qty, orderType: 2, gas: 20_000_000n })) as {
-    hash: Hex;
-    receipt: TransactionReceipt;
-  };
-  const rc = r.receipt ?? (await pub.waitForTransactionReceipt({ hash: r.hash }));
+  const rc = await placeIoc(mk, pool, isBid, qty);
   record(s, label, rc);
   if (rc.status !== "success") throw new Error(`${label} reverted`);
   return rc;

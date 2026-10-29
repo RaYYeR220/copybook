@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fmtPnl, fmtPrice18, fmtStt, fmtUnits, fmtUsd18, fmtUtc } from "@/lib/units";
+import { fmtFixed, fmtPnl, fmtPrice18, fmtStt, fmtUnits, fmtUsd18, fmtUtc } from "@/lib/units";
 
 describe("units", () => {
   it("formats base units with the market's decimals, trimming zeros", () => {
@@ -29,6 +29,13 @@ describe("units", () => {
     expect(fmtPnl(26075.06)).toBe("+26,075.06");
     expect(fmtPnl(-0.09)).toBe("−0.09");
     expect(fmtPnl(0)).toBe("0.00");
+  });
+
+  it("groups plain figures (drawdowns, counts)", () => {
+    expect(fmtFixed(8140.77)).toBe("8,140.77");
+    expect(fmtFixed(307.6)).toBe("307.60");
+    expect(fmtFixed(1895, 0)).toBe("1,895");
+    expect(fmtFixed(-1234.5)).toBe("−1,234.50");
   });
 
   it("formats STT", () => {

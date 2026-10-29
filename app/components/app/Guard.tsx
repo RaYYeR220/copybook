@@ -12,7 +12,8 @@ import { fmtUtc } from "@/lib/units";
 import { verdictView } from "@/lib/verdict";
 import { AskValidators } from "./AskValidators";
 import { DataState } from "./State";
-import { VerdictHistory, VerdictSince } from "./VerdictHistory";
+import { HoldNote, VerdictLabel } from "./HoldClock";
+import { VerdictHistory } from "./VerdictHistory";
 import styles from "./Guard.module.css";
 
 interface Props {
@@ -69,7 +70,7 @@ export function GuardPanel({ trader, pub, verdict, pending, fee, tally, shannonE
     rows.push({
       label: "Held until",
       value: <b>{fmtUtc(v.heldUntil)}</b>,
-      note: v.held ? "until then only another BLOCK can replace it" : "the hold is over: any new verdict replaces it",
+      note: <HoldNote heldUntil={v.heldUntil} renderedAt={now} />,
     });
   if (v.tier === "Block" && v.expiresAt !== undefined)
     rows.push({ label: v.expired ? "Lapsed" : "Blocks until", value: fmtUtc(v.expiresAt), note: v.expired ? undefined : "unless a new BLOCK refreshes it" });
@@ -99,7 +100,7 @@ export function GuardPanel({ trader, pub, verdict, pending, fee, tally, shannonE
             <b>{word}</b>
             {v.reviewed ? (
               <small>
-                <VerdictSince trader={trader} requestId={verdict.shannonRequestId.toString()} fallback={v.held ? "held" : v.tier === "Block" && v.blocking ? "blocking" : "stored"} />
+                <VerdictLabel trader={trader} requestId={verdict.shannonRequestId.toString()} heldUntil={v.heldUntil} holdSeconds={pub.risk.blockHoldSeconds} lapsed={v.tier === "Block" && v.expired} renderedAt={now} />
               </small>
             ) : (
               <small>no verdict on the gate</small>

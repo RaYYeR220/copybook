@@ -51,6 +51,8 @@
 }
 
 .vmeta {
+  flex: none;
+  white-space: nowrap;
   text-align: right;
   font: 400 11px/1.6 var(--mono);
   color: var(--night-4);
@@ -233,6 +235,7 @@ ol.rule li a:hover b {
 
   .vmeta {
     text-align: left;
+    white-space: normal;
   }
 
   .vmeta br {

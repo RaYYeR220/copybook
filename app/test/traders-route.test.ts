@@ -28,7 +28,7 @@ const topCalls: { n: number; window: number; opts: RankOptions }[] = [];
 const statsCalls: string[] = [];
 let topImpl: () => Promise<unknown>;
 let statsImpl: (t: string) => Promise<TraderStats>;
-let logImpl: () => Promise<{ events: CopybookEvent[] }>;
+let logImpl: () => Promise<{ events: CopybookEvent[]; complete: boolean }>;
 
 vi.mock("@copybook/stats", async () => {
   const actual = await vi.importActual<typeof import("@copybook/stats")>("@copybook/stats");
@@ -63,6 +63,7 @@ beforeEach(() => {
   statsImpl = async (t) => stats(t, -0.09);
   logImpl = async () => ({
     events: [{ name: "Followed", follower: COPY, sourceId: `0x${"1".repeat(64)}`, kind: "Theme", ref: 1n, log: { address: COPY, topics: [], data: "0x" } } as unknown as CopybookEvent],
+    complete: true,
   });
 });
 
@@ -92,6 +93,13 @@ describe("GET /api/traders", () => {
       [3, T3],
     ]);
     expect(body.removedFollowers).toEqual([COPY]);
+    expect(body.followerExclusion).toBe("complete");
+  });
+
+  it("says when the copy-wallet list came from a partly read log", async () => {
+    const full = await logImpl();
+    logImpl = async () => ({ ...full, complete: false });
+    expect((await (await GET()).json()).followerExclusion).toBe("partial");
   });
 
   it("reports skipped candidates and a candidate shortfall as they are", async () => {
@@ -115,6 +123,7 @@ describe("GET /api/traders", () => {
     const body = await (await GET()).json();
     expect(body.traders.length).toBe(4);
     expect(body.removedFollowers).toEqual([]);
+    expect(body.followerExclusion).toBe("unavailable");
   });
 
   it("the demo leader's stats are null, not invented, when the indexer fails on them", async () => {

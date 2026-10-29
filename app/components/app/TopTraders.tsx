@@ -4,9 +4,9 @@ import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { getAddress } from "viem";
 import type { RankedTrader, TraderStats } from "@copybook/stats";
-import { shortHex } from "@/lib/format";
+import { fmtInt, shortHex } from "@/lib/format";
 import type { TradersPayload } from "@/lib/server/traders";
-import { fmtPnl } from "@/lib/units";
+import { fmtFixed, fmtPnl } from "@/lib/units";
 import { PanelNote } from "./Panel";
 import { DataState } from "./State";
 import t from "./Table.module.css";
@@ -27,7 +27,7 @@ async function load(): Promise<TradersPayload> {
   return body;
 }
 
-const dd = (s: TraderStats) => (s.maxDrawdownAbs30d === null ? "n/a" : s.maxDrawdownAbs30d.toFixed(2));
+const dd = (s: TraderStats) => (s.maxDrawdownAbs30d === null ? "n/a" : fmtFixed(s.maxDrawdownAbs30d));
 const utc = (iso: string) => iso.replace("T", " ").slice(0, 16) + " UTC";
 
 function Row({ r }: { r: RankedTrader }) {
@@ -45,7 +45,7 @@ function Row({ r }: { r: RankedTrader }) {
         {fmtPnl(r.realizedPnl30d)}
       </td>
       <td className={t.num} data-label="Trades">
-        <b>{s.trades30d}</b>
+        <b>{fmtInt(s.trades30d)}</b>
       </td>
       <td className={t.num} data-label="Days">
         {s.activeDays30d}
@@ -149,7 +149,7 @@ export function TopTraders() {
                   {fmtPnl(demo.realizedPnl30d)}
                 </td>
                 <td className={t.num} data-label="Trades">
-                  <b>{demo.trades30d}</b>
+                  <b>{fmtInt(demo.trades30d)}</b>
                 </td>
                 <td className={t.num} data-label="Days">
                   {demo.activeDays30d}
@@ -177,7 +177,9 @@ export function TopTraders() {
         Ranked by realized PnL over {d.windowDays} days, in USDso, from the dreamDEX indexer, at {utc(d.asOf)}. Candidates are the {r.candidates} accounts behind the largest single gains; each
         needs {r.minTrades}+ trades on {r.minActiveDays}+ days and at most {r.maxLiquidations} liquidation. Max DD is the deepest fall of realized PnL. Copybook's own wallets and every wallet
         that follows through the hub are left out
-        {d.removedFollowers.length > 0 && <> ({d.removedFollowers.length} removed)</>}. The demo leader is a wallet Copybook trades to show copies landing live; it is not ranked.
+        {d.removedFollowers.length > 0 && <> ({d.removedFollowers.length} removed)</>}
+        {d.followerExclusion === "partial" && <>, as far as the hub&apos;s log had been read when this ranking ran</>}
+        {d.followerExclusion === "unavailable" && <>; the hub&apos;s log could not be read for this ranking, so copy wallets may still be listed</>}. The demo leader is a wallet Copybook trades to show copies landing live; it is not ranked.
         {d.candidateShortfall && <> Fewer than {r.candidates} candidates turned up within the page budget, so the list can be shorter.</>}
         {d.skipped.length > 0 && <> {d.skipped.length} candidates could not be read and are left out.</>}
       </PanelNote>

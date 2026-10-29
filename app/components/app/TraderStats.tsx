@@ -3,7 +3,7 @@ import { IndexerError, riskRubric, type TraderStats as Stats } from "@copybook/s
 import { Ledger } from "@/components/Ledger";
 import { fmtInt } from "@/lib/format";
 import { traderStats } from "@/lib/server/indexer";
-import { fmtPnl } from "@/lib/units";
+import { fmtFixed, fmtPnl } from "@/lib/units";
 import { DataState } from "./State";
 import styles from "./TraderStats.module.css";
 
@@ -18,7 +18,7 @@ function rows(s: Stats) {
     { label: "Liquidations", value: <b>{s.liquidations30d}</b> },
     {
       label: "Max drawdown",
-      value: s.maxDrawdownAbs30d === null ? "n/a" : `${s.maxDrawdownAbs30d.toFixed(2)} USDso${s.maxDrawdownPct30d === null ? "" : ` · ${s.maxDrawdownPct30d}%`}`,
+      value: s.maxDrawdownAbs30d === null ? "n/a" : `${fmtFixed(s.maxDrawdownAbs30d)} USDso${s.maxDrawdownPct30d === null ? "" : ` · ${s.maxDrawdownPct30d}%`}`,
       note: "deepest fall of realized PnL",
     },
     { label: "Avg leverage", value: s.avgLeverage === null ? "n/a" : `${s.avgLeverage}×`, note: s.avgLeverage === null ? "too few explicit leverage settings to say" : undefined },

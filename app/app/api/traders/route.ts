@@ -7,7 +7,7 @@ import { rankTraders } from "@/lib/server/traders";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 const CACHE = "public, s-maxage=300, stale-while-revalidate=600";
 /** How long the ranking waits on the hub log to learn which wallets are copy wallets. */
@@ -26,12 +26,15 @@ const ranking = unstable_cache(
     rankTraders({
       topTraders,
       getTraderStats,
-      followerWallets: async () => followerWallets((await hubLog.read({ budgetMs: LOG_BUDGET_MS })).events),
+      followerWallets: async () => {
+        const log = await hubLog.read({ budgetMs: LOG_BUDGET_MS });
+        return { wallets: followerWallets(log.events), complete: log.complete };
+      },
       ownWallets: config.ownWallets,
       demoLeader: config.demoLeader,
       now: () => new Date(),
     }),
-  ["top-traders", "v2"],
+  ["top-traders", "v3"],
   { revalidate: 300 },
 );
 

@@ -73,17 +73,3 @@ export function VerdictHistory({ trader, reviewed }: { trader: Address; reviewed
     </div>
   );
 }
-
-/**
- * "since block #N": the block the stored verdict reached the gate in, found in the gate's log by its Shannon request
- * id. Until the log answers, `fallback`.
- */
-export function VerdictSince({ trader, requestId, fallback }: { trader: Address; requestId: string; fallback: string }) {
-  const feed = useHubFeed();
-  const block = useMemo(() => {
-    for (const e of feed.events)
-      if (e.name === "VerdictReceived" && e.trader.toLowerCase() === trader.toLowerCase() && e.shannonRequestId.toString() === requestId) return e.log.blockNumber;
-    return undefined;
-  }, [feed.events, trader, requestId]);
-  return <>{block !== undefined ? `${fallback} since block #${fmtInt(block)}` : fallback}</>;
-}

@@ -45,6 +45,14 @@ export function fmtPnl(n: number): string {
   return `${r > 0 ? "+" : MINUS}${group(int)}.${frac}`;
 }
 
+/** A plain number with `dp` decimals, digits grouped: `8140.77` → `8,140.77`. */
+export function fmtFixed(n: number, dp = 2): string {
+  const neg = n < 0;
+  const [int, frac] = Math.abs(n).toFixed(dp).split(".");
+  const s = `${group(int)}${frac ? `.${frac}` : ""}`;
+  return neg && Number(s.replace(/,/g, "")) !== 0 ? `${MINUS}${s}` : s;
+}
+
 /** Native STT from wei. */
 export const fmtStt = (wei: bigint) => `${fmtUnits(wei, 18, 4)} STT`;
 

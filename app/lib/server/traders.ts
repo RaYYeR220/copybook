@@ -37,6 +37,8 @@ export interface TradersPayload {
   candidateShortfall: boolean;
   /** Copy wallets found in the hub's Followed events and removed from the ranking. */
   removedFollowers: Address[];
+  /** Whether that list came from the whole hub log, part of it (still being read), or none (it could not be read). */
+  followerExclusion: "complete" | "partial" | "unavailable";
   /** Copybook's own demo leader: listed apart, never ranked. `stats` is null when the indexer did not answer. */
   demo: { trader: Address; stats: TraderStats | null };
 }
@@ -44,8 +46,8 @@ export interface TradersPayload {
 export interface RankDeps {
   topTraders(n: number, windowDays: number, opts: RankOptions): Promise<TopTradersResult>;
   getTraderStats(trader: Address, opts: { windowDays: number; maxRows: number }): Promise<TraderStats>;
-  /** Wallets that ever followed through the hub (best effort: an empty list when the log is unavailable). */
-  followerWallets(): Promise<Address[]>;
+  /** Wallets that ever followed through the hub, and whether the log they come from was read in full. Throws when unreadable. */
+  followerWallets(): Promise<{ wallets: Address[]; complete: boolean }>;
   ownWallets: readonly Address[];
   demoLeader: Address;
   now(): Date;
@@ -55,9 +57,9 @@ export interface RankDeps {
 export async function rankTraders(d: RankDeps): Promise<TradersPayload> {
   const [ranked, followers] = await Promise.all([
     d.topTraders(TOP_N + SLACK, WINDOW_DAYS, { ...RANK_OPTIONS, exclude: [...d.ownWallets] }),
-    d.followerWallets().catch(() => [] as Address[]),
+    d.followerWallets().catch(() => null),
   ]);
-  const drop = new Set(followers.map((a) => a.toLowerCase()));
+  const drop = new Set((followers?.wallets ?? []).map((a) => a.toLowerCase()));
   const removed = ranked.traders.filter((t) => drop.has(t.trader.toLowerCase())).map((t) => t.trader as Address);
   const traders = ranked.traders
     .filter((t) => !drop.has(t.trader.toLowerCase()))
@@ -75,6 +77,7 @@ export async function rankTraders(d: RankDeps): Promise<TradersPayload> {
     skipped: ranked.skipped,
     candidateShortfall: ranked.candidateShortfall,
     removedFollowers: removed,
+    followerExclusion: followers === null ? "unavailable" : followers.complete ? "complete" : "partial",
     demo: { trader: d.demoLeader, stats: demoStats },
   };
 }

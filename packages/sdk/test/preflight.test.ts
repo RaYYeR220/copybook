@@ -120,6 +120,27 @@ describe("preflightFollow (trader)", () => {
     expect(r.reasons.find((x) => x.code === "ALLOW_ALL_MIRRORS_OPEN_BOOK")?.severity).toBe("info");
   });
 
+  it("with allowAll, checks the cap in the markets the trader holds now without limiting the follow", async () => {
+    const tight = policy({ maxNotional: 5n * E });
+    expect((await run(world(), { ...trader, joinPools: [], policy: tight })).ok).toBe(true);
+    const r = await run(world(), { ...trader, joinPools: [], checkPools: [ETH, ETH], policy: tight });
+    expect(r.ok).toBe(false);
+    expect(r.reasons.filter((x) => x.code === "CAP_BELOW_ONE_ORDER")).toEqual([expect.objectContaining({ pool: ETH, required: 12n * E })]);
+    expect(r.reasons.some((x) => x.code === "ALLOW_ALL_MIRRORS_OPEN_BOOK")).toBe(true);
+    // a market list is checked as named; checkPools does not add to it
+    const named = await run(world(), { ...trader, joinPools: [BTC], checkPools: [ETH], policy: tight });
+    expect(named.reasons.filter((x) => x.code === "CAP_BELOW_ONE_ORDER").map((x) => x.pool)).toEqual([BTC]);
+  });
+
+  it("takes the AI guard as the follow will run with it when the caller sets it", async () => {
+    const c = world();
+    const now = Math.floor(Date.now() / 1000);
+    c.on(deployments.gate, "verdictOf", { tier: 3, reviewedAt: BigInt(now - 60), shannonRequestId: 1n, summaryHash: `0x${"00".repeat(32)}` });
+    expect((await run(c, { ...trader, guardOn: false })).reasons.some((x) => x.code === "TRADER_BLOCKED")).toBe(false);
+    c.on(deployments.gate, "guardOf", false);
+    expect((await run(c, { ...trader, guardOn: true })).reasons.some((x) => x.code === "TRADER_BLOCKED")).toBe(true);
+  });
+
   it("rejects following yourself and a zero address", async () => {
     expect(codes(await run(world(), { ...trader, source: ME }))).toContain("INVALID_SOURCE");
     expect(codes(await run(world(), { ...trader, source: "0x0000000000000000000000000000000000000000" }))).toContain("INVALID_SOURCE");

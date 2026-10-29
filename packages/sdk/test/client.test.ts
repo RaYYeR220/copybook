@@ -54,6 +54,19 @@ describe("reads", () => {
     expect(await read(c).verdictOf(TRADER)).toMatchObject({ tier: "Caution", blocking: false });
   });
 
+  it("reads a perp position with its entry price, and the account's equity", async () => {
+    const c = world();
+    c.on(deployments.marginBank, "getPosition", (args: readonly unknown[]) => ({
+      size: args[1] === BTC ? -5n * 10n ** 14n : 0n,
+      avgEntryPrice: args[1] === BTC ? 61_000n * E : 0n,
+      entryFundingIndex: 0n,
+      lastUpdatedTimestampNs: 0n,
+    }));
+    expect(await read(c).position(ME, BTC)).toEqual({ size: -5n * 10n ** 14n, avgEntryPrice: 61_000n * E });
+    expect(await read(c).position(ME, ETH)).toEqual({ size: 0n, avgEntryPrice: 0n });
+    expect(await read(c).accountEquity(ME)).toBe(1_000n * E);
+  });
+
   it("reads gas params and review state", async () => {
     const c = world();
     c.on(deployments.hub, "gasParams", [8_000_000n, 20_000_000n, 90_000_000n, 1_200_000n, 30_000n, 300_000n, 2_000_000n]);

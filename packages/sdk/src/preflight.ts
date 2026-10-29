@@ -1,4 +1,4 @@
-import { formatUnits, getAddress, isAddress, type Address } from "viem";
+import { getAddress, isAddress, type Address } from "viem";
 import { MAX_JOIN_POOLS, MIN_TANK } from "./constants.ts";
 import { isTradeable, minOrderQty, minThemeAllocation, notionalOf, readMarket, scaledSize, simulateLeg, tradableQty, withHeadroom } from "./market.ts";
 import * as reads from "./reads.ts";
@@ -63,6 +63,13 @@ export interface PreflightInput {
   policy: Policy;
   /** Trader follows: markets to manage. Empty means allowAll. Theme follows: leave empty. */
   joinPools?: readonly Address[];
+  /**
+   * Trader follows with no market list (allowAll): markets to check the cap and the scaled size in, without
+   * limiting the follow to them. Pass the markets the trader holds now, so a cap below one order there is caught.
+   */
+  checkPools?: readonly Address[];
+  /** The AI guard as the follow will run with it, when the flow changes it before following. Default: read from the gate. */
+  guardOn?: boolean;
   /** STT the follow will fund the tank with, in wei. */
   tank: bigint;
   /** The chain the wallet is on, if the app knows it. */
@@ -199,7 +206,7 @@ export async function preflightFollow(c: ReadContext, input: PreflightInput): Pr
               field: "allocation",
               pool: leg.pool,
               required: min.allocation,
-              message: `The allocation is too small for this leg: it would size below the market's minimum order. The basket opens all legs or none, so the whole follow would be refused. Minimum allocation at today's marks: ${formatUnits(min.allocation, 18)} USD.`,
+              message: `The allocation is too small for this leg: it would size below the market's minimum order. The basket opens all legs or none, so the whole follow would be refused. Minimum allocation at today's marks: ${usdUp(min.allocation)} USD.`,
             });
             continue;
           }
@@ -242,7 +249,7 @@ export async function preflightFollow(c: ReadContext, input: PreflightInput): Pr
       }
       const [verdict, guardOn] = await Promise.all([
         reads.verdictOf(c, trader),
-        account ? reads.guardOf(c, account) : Promise.resolve(true),
+        input.guardOn !== undefined ? Promise.resolve(input.guardOn) : account ? reads.guardOf(c, account) : Promise.resolve(true),
       ]);
       if (verdict.blocking && guardOn) {
         add({
@@ -251,8 +258,11 @@ export async function preflightFollow(c: ReadContext, input: PreflightInput): Pr
           message: "The AI risk review rates this trader Block. With the guard on, this wallet gets no new size from them until the verdict expires or the guard is turned off. Exits are still copied.",
         });
       }
+      // a market list is checked as named; allowAll is checked in the markets the caller says the trader holds now
+      const checked =
+        joinPools.length > 0 ? joinPools : [...new Set((input.checkPools ?? []).filter((p) => isAddress(p, { strict: false })).map((p) => getAddress(p)))];
       await Promise.all(
-        joinPools.map(async (pool) => {
+        checked.map(async (pool) => {
           let m: Market;
           try {
             m = await readMarket(c.publicClient, pool);
@@ -317,3 +327,9 @@ export async function preflightFollow(c: ReadContext, input: PreflightInput): Pr
 }
 
 const abs = (x: bigint) => (x < 0n ? -x : x);
+
+/** An 18-decimal USD amount in dollars and cents, rounded up: a minimum is never understated. */
+function usdUp(x: bigint): string {
+  const cents = (x + 10n ** 16n - 1n) / 10n ** 16n;
+  return `${cents / 100n}.${(cents % 100n).toString().padStart(2, "0")}`;
+}

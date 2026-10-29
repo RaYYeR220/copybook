@@ -161,6 +161,22 @@ export async function positionSize(c: ReadContext, account: Address, pool: Addre
   return BigInt(p.size);
 }
 
+/** A perp position as the margin bank holds it: signed size in base units and the average entry price (18 decimals). */
+export interface PerpPosition {
+  size: bigint;
+  avgEntryPrice: bigint;
+}
+
+export async function position(c: ReadContext, account: Address, pool: Address): Promise<PerpPosition> {
+  const p = await c.publicClient.readContract({
+    address: c.deployments.marginBank,
+    abi: bankAbi,
+    functionName: "getPosition",
+    args: [account, pool],
+  });
+  return { size: BigInt(p.size), avgEntryPrice: BigInt(p.avgEntryPrice) };
+}
+
 export async function accountEquity(c: ReadContext, account: Address): Promise<bigint> {
   const [equity] = await c.publicClient.readContract({
     address: c.deployments.marginBank,

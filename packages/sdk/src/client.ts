@@ -282,6 +282,10 @@ export function createCopybook(config: CopybookConfig) {
     themes: (): Promise<Theme[]> => reads.listThemes(ctx),
     market: (pool: Address): Promise<Market> => readMarket(publicClient, pool),
     positionSize: (account: Address, pool: Address) => reads.positionSize(ctx, account, pool),
+    /** Size and average entry price of one perp position. */
+    position: (account: Address, pool: Address): Promise<reads.PerpPosition> => reads.position(ctx, account, pool),
+    /** The perps account's equity (18-decimal USD), as the margin bank reports it. */
+    accountEquity: (account: Address): Promise<bigint> => reads.accountEquity(ctx, account),
     isOperatorApproved: (owner: Address) => reads.isOperatorApproved(ctx, owner),
     status,
     themeMinimum,

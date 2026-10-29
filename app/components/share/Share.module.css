@@ -1,0 +1,58 @@
+/* Share on X and Copy link: hairline pills a step under the page's actions, never louder than Follow. */
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  min-width: 0;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 14px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--hair-3);
+  font: 400 12px var(--mono);
+  color: var(--bone);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: border-color 0.25s var(--ease);
+}
+
+.pill:hover {
+  border-color: var(--bone);
+}
+
+.pill:focus-visible {
+  outline: 1px solid var(--gold);
+  outline-offset: 3px;
+}
+
+.status {
+  font: 400 11px var(--mono);
+  color: var(--night-4);
+}
+
+/* the link to select by hand when the browser would not copy it */
+.field {
+  flex: 1 1 100%;
+  width: 100%;
+  min-width: 0;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--hair-2);
+  border-radius: 0;
+  background: rgba(21, 19, 15, 0.6);
+  font: 400 11.5px var(--mono);
+  color: var(--bone-2);
+}
+
+.field:focus-visible {
+  outline: 1px solid var(--gold);
+  outline-offset: 2px;
+  border-radius: 0;
+}

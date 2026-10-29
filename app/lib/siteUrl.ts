@@ -15,3 +15,12 @@ export function siteUrl(env: SiteEnv): string {
   const host = env.VERCEL_ENV === "preview" ? env.VERCEL_URL : env.VERCEL_PROJECT_PRODUCTION_URL;
   return host ? `https://${host}` : "http://localhost:3000";
 }
+
+/** The site's base on the server, from this deploy's environment (each variable read by name, so Next can inline it). */
+export const currentSiteUrl = () =>
+  siteUrl({
+    NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL,
+    VERCEL_ENV: process.env.VERCEL_ENV,
+    VERCEL_URL: process.env.VERCEL_URL,
+    VERCEL_PROJECT_PRODUCTION_URL: process.env.VERCEL_PROJECT_PRODUCTION_URL,
+  });

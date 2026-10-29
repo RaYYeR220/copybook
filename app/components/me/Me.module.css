@@ -118,6 +118,34 @@
   padding: 0 20px 16px;
 }
 
+/* the newest copy and its post, under the controls */
+.latest {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 20px 20px;
+  border-top: 1px solid var(--hair);
+}
+
+.latestLine {
+  font: 400 12px/1.6 var(--mono);
+  color: var(--bone-2);
+  overflow-wrap: anywhere;
+}
+
+.latestLine span {
+  color: var(--night-4);
+}
+
+.latestLine a {
+  border-bottom: 1px solid var(--hair-3);
+  transition: border-color 0.25s var(--ease);
+}
+
+.latestLine a:hover {
+  border-color: var(--bone);
+}
+
 .ledger {
   margin: 14px 20px 0;
 }
@@ -445,6 +473,7 @@
 
 @media (max-width: 720px) {
   .revoke,
+  .latest,
   .txBox {
     padding-left: 16px;
     padding-right: 16px;

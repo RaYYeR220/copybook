@@ -1,28 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { OwnerShareOnX } from "@/components/share/ShareOnX";
 import styles from "./Copy.module.css";
 
-/** The page's address, to paste anywhere the card should show. */
-export function ShareLink({ path }: { path: string }) {
-  const [state, setState] = useState<"idle" | "done" | "failed">("idle");
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(new URL(path, window.location.origin).toString());
-      setState("done");
-    } catch {
-      setState("failed");
-    }
-  };
+/** The page's address, to paste anywhere the card should show, and the post for X: the follower's own words when it is their wallet. */
+export function ShareLink({ path, url, text, ownText, follower }: { path: string; url: string; text: string; ownText: string; follower: string }) {
   return (
     <div className={styles.share}>
       <code className={styles.url}>{path}</code>
-      <button type="button" className={styles.copyBtn} onClick={copy}>
-        Copy link
-      </button>
-      <span className={styles.copied} role="status" aria-live="polite">
-        {state === "done" ? "Copied" : state === "failed" ? "The browser refused; copy it from the address bar" : ""}
-      </span>
+      <OwnerShareOnX owner={follower} ownText={ownText} text={text} url={url} subject="this copy" />
     </div>
   );
 }

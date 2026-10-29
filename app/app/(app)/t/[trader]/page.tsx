@@ -10,13 +10,16 @@ import { HubFeedProvider } from "@/components/app/HubFeed";
 import { FeedStatusLine, TapeRows, type TapeNames } from "@/components/app/LiveTape";
 import { AppMain, Col, Colophon, Kick, Panel, PanelNote } from "@/components/app/Panel";
 import { Positions, PositionsLoading } from "@/components/app/Positions";
-import { SourceActs, SourceLine, SourceTitle, SourceTop } from "@/components/app/SourceHead";
+import { SourceActs, SourceLine, SourceShare, SourceTitle, SourceTop } from "@/components/app/SourceHead";
 import { TraderStats, TraderStatsLoading } from "@/components/app/TraderStats";
+import { OwnerShareOnX } from "@/components/share/ShareOnX";
 import { addressUrl } from "@/lib/explorer";
 import { shortHex } from "@/lib/format";
 import { copybook } from "@/lib/server/chain";
 import { config } from "@/lib/server/config";
 import { perpMarkets } from "@/lib/server/indexer";
+import { pageUrl, traderShareText } from "@/lib/share";
+import { currentSiteUrl } from "@/lib/siteUrl";
 
 export const dynamic = "force-dynamic";
 
@@ -81,6 +84,15 @@ export default async function TraderPage({ params }: Params) {
                 Explorer ↗
               </Button>
             </SourceActs>
+            <SourceShare>
+              <OwnerShareOnX
+                owner={trader}
+                text={traderShareText({ trader, demo })}
+                ownText={traderShareText({ trader, own: true })}
+                url={pageUrl(currentSiteUrl(), `/t/${trader}`)}
+                subject="this trader's page"
+              />
+            </SourceShare>
           </Panel>
 
           <Panel id="guard-h" title="AI guard" aside={<Kick>Validators&apos; verdict · on chain</Kick>} order={2} d={0.08}>

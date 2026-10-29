@@ -3,6 +3,7 @@ import { Dashboard } from "@/components/me/Dashboard";
 import { config } from "@/lib/server/config";
 import { perpMarkets } from "@/lib/server/indexer";
 import { thesisNames } from "@/lib/server/theses";
+import { currentSiteUrl } from "@/lib/siteUrl";
 import type { MarketMeta } from "@/lib/tape";
 
 export const dynamic = "force-dynamic";
@@ -29,6 +30,7 @@ export default async function MePage() {
       theses={theses}
       traders={{ [config.demoLeader.toLowerCase()]: "demo leader" }}
       renderedAt={Math.floor(Date.now() / 1000)}
+      site={currentSiteUrl()}
     />
   );
 }

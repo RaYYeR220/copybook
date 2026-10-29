@@ -8,8 +8,9 @@ import { HubFeedProvider } from "@/components/app/HubFeed";
 import { FeedStatusLine, TapeRows, type TapeNames } from "@/components/app/LiveTape";
 import { NotFoundSource } from "@/components/app/NotFoundSource";
 import { AppMain, Col, Colophon, Kick, Panel, PanelNote } from "@/components/app/Panel";
-import { SourceActs, SourceLedger, SourceLine, SourceTitle, SourceTop } from "@/components/app/SourceHead";
+import { SourceActs, SourceLedger, SourceLine, SourceShare, SourceTitle, SourceTop } from "@/components/app/SourceHead";
 import { DataState } from "@/components/app/State";
+import { OwnerShareOnX } from "@/components/share/ShareOnX";
 import { RebalancePanel } from "@/components/thesis/Rebalance";
 import t from "@/components/app/Table.module.css";
 import { safeUri } from "@/lib/builder/basket";
@@ -19,6 +20,8 @@ import { config } from "@/lib/server/config";
 import { perpMarkets } from "@/lib/server/indexer";
 import { registeredPools, registryBank, registryRules } from "@/lib/server/registry";
 import { loadThesis, type Thesis } from "@/lib/server/theses";
+import { pageUrl, thesisShareText } from "@/lib/share";
+import { currentSiteUrl } from "@/lib/siteUrl";
 import { parseThesisId } from "@/lib/thesisId";
 import { ourWallet } from "@/lib/ours";
 import { decimalsOf, grossBps, legSide, netBps, pctOfBps } from "@/lib/thesis";
@@ -143,6 +146,15 @@ export default async function ThesisPage({ params }: Params) {
                 Registry ↗
               </Button>
             </SourceActs>
+            <SourceShare>
+              <OwnerShareOnX
+                owner={thesis.creator}
+                text={thesisShareText({ id, name: thesis.name, legs: thesis.legs.length })}
+                ownText={thesisShareText({ id, name: thesis.name, legs: thesis.legs.length, own: true })}
+                url={pageUrl(currentSiteUrl(), `/thesis/${id}`)}
+                subject="this thesis"
+              />
+            </SourceShare>
             <PanelNote>
               A thesis follow sizes every leg from your allocation, short legs included. A rebalance resizes followers&apos; legs in the rebalance&apos;s own block; catchUp finishes any the
               handler had to defer. Between versions the legs drift with prices until you resync. Exits are never gated; the AI guard applies to trader follows only.

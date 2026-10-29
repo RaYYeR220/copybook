@@ -31,3 +31,5 @@ export const SourceLine = ({ children }: { children: ReactNode }) => <p classNam
 export const SourceLead = ({ children }: { children: ReactNode }) => <p className={styles.lead}>{children}</p>;
 export const SourceLedger = ({ children }: { children: ReactNode }) => <div className={styles.ledger}>{children}</div>;
 export const SourceActs = ({ children }: { children: ReactNode }) => <div className={styles.acts}>{children}</div>;
+/** The share pills, a step under the actions. */
+export const SourceShare = ({ children }: { children: ReactNode }) => <div className={styles.share}>{children}</div>;

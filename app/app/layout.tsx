@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Figtree, Fragment_Mono, Fraunces } from "next/font/google";
 import type { ReactNode } from "react";
-import { siteUrl } from "@/lib/siteUrl";
+import { currentSiteUrl } from "@/lib/siteUrl";
 import "./globals.css";
 
 /** Display: Fraunces, variable, with the SOFT axis (100 at dusk, 0 at night). */
@@ -36,15 +36,7 @@ const fragmentMono = Fragment_Mono({
 
 
 export const metadata: Metadata = {
-  // each variable read by name, so Next inlines NEXT_PUBLIC_SITE_URL at build time
-  metadataBase: new URL(
-    siteUrl({
-      NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL,
-      VERCEL_ENV: process.env.VERCEL_ENV,
-      VERCEL_URL: process.env.VERCEL_URL,
-      VERCEL_PROJECT_PRODUCTION_URL: process.env.VERCEL_PROJECT_PRODUCTION_URL,
-    }),
-  ),
+  metadataBase: new URL(currentSiteUrl()),
   title: { default: "Copybook", template: "%s · Copybook" },
   description:
     "Follow a trader or a thesis on dreamDEX perps. Somnia validators run your copy in your own account, in the same block as the move.",

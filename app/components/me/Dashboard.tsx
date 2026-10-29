@@ -31,6 +31,7 @@ import { Banners } from "./Banners";
 import { BookTable } from "./BookTable";
 import { followMarginTarget } from "@/lib/follow/margin";
 import { GuardCard } from "./GuardCard";
+import { LatestCopy } from "./LatestCopy";
 import { MarginPanel } from "./MarginPanel";
 import { Refusals } from "./Refusals";
 import { SourceCard, type Drawer } from "./SourceCard";
@@ -44,6 +45,8 @@ interface Props {
   /** lower-case trader address → label (the demo leader). */
   traders: Record<string, string>;
   renderedAt: number;
+  /** The site's base, for the links a post carries. */
+  site: string;
 }
 
 const lc = (a: string) => a.toLowerCase();
@@ -84,7 +87,7 @@ export function Dashboard(props: Props) {
   );
 }
 
-function Mine({ pub, markets, theses, traders, renderedAt, who }: Props & { who: Address }) {
+function Mine({ pub, markets, theses, traders, renderedAt, site, who }: Props & { who: Address }) {
   const reader = useReader(pub);
   const writer = useWriter(reader);
   const feed = useHubFeed();
@@ -160,8 +163,10 @@ function Mine({ pub, markets, theses, traders, renderedAt, who }: Props & { who:
     );
 
   const data = me.data;
-  if (!data.status.follow) return <NotFollowing who={who} data={data} names={names} reader={reader} writer={writer} tx={tx} />;
-  return <Following who={who} data={data} names={names} markets={markets} traders={traders} pub={pub} reader={reader} writer={writer} tx={tx} now={now} drawer={drawer} setDrawer={setDrawer} />;
+  if (!data.status.follow) return <NotFollowing who={who} data={data} names={names} markets={markets} pub={pub} site={site} reader={reader} writer={writer} tx={tx} />;
+  return (
+    <Following who={who} data={data} names={names} markets={markets} traders={traders} pub={pub} site={site} reader={reader} writer={writer} tx={tx} now={now} drawer={drawer} setDrawer={setDrawer} />
+  );
 }
 
 interface FollowingProps {
@@ -171,6 +176,7 @@ interface FollowingProps {
   markets: Record<string, MarketMeta>;
   traders: Record<string, string>;
   pub: PublicConfig;
+  site: string;
   reader: ReturnType<typeof useReader>;
   writer: ReturnType<typeof useWriter>;
   tx: ReturnType<typeof useTx>;
@@ -179,7 +185,7 @@ interface FollowingProps {
   setDrawer: (d: Drawer) => void;
 }
 
-function Following({ who, data, names, markets, traders, pub, reader, writer, tx, now, drawer, setDrawer }: FollowingProps) {
+function Following({ who, data, names, markets, traders, pub, site, reader, writer, tx, now, drawer, setDrawer }: FollowingProps) {
   const feed = useHubFeed();
   const st = data.status;
   const follow = st.follow!;
@@ -306,6 +312,13 @@ function Following({ who, data, names, markets, traders, pub, reader, writer, tx
   const inStep = rows ? { n: rows.filter((r) => r.state === "in-step" || r.state === "flat").length, of: rows.length } : undefined;
   const name = follow.kind === "Trader" ? (traders[lc(trader!)] ? `${traders[lc(trader!)]}` : shortHex(trader!)) : (st.theme?.name ?? `Thesis #${follow.themeId}`);
   const sourceLabel = follow.kind === "Trader" ? `trader ${shortHex(trader!)}` : `thesis ${name}`;
+  const following = {
+    sourceId: follow.sourceId,
+    source:
+      follow.kind === "Trader"
+        ? ({ kind: "Trader", trader: trader!, demo: lc(trader!) === lc(pub.demoLeader) } as const)
+        : ({ kind: "Theme", themeId: follow.themeId!, name: st.theme?.name ?? null } as const),
+  };
 
   return (
     <AppMain label={`Dashboard: following ${sourceLabel}`}>
@@ -335,6 +348,7 @@ function Following({ who, data, names, markets, traders, pub, reader, writer, tx
             drawer={drawer}
             setDrawer={setDrawer}
           />
+          <LatestCopy who={who} site={site} demoLeader={pub.demoLeader} markets={markets} theses={names.theses} following={following} />
         </Panel>
         <Panel id="guard-h" title="AI guard" aside={<Kick>Validators&apos; verdict · on chain</Kick>} order={2} d={0.08}>
           <GuardCard kind={follow.kind} trader={trader} verdict={data.verdict} guardOn={st.guardOn} pub={pub} now={now} writer={writer} tx={tx} />
@@ -381,7 +395,19 @@ function Following({ who, data, names, markets, traders, pub, reader, writer, tx
   );
 }
 
-function NotFollowing({ who, data, names, reader, writer, tx }: { who: Address; data: MeReads; names: TapeNames; reader: ReturnType<typeof useReader>; writer: ReturnType<typeof useWriter>; tx: ReturnType<typeof useTx> }) {
+interface NotFollowingProps {
+  who: Address;
+  data: MeReads;
+  names: TapeNames;
+  markets: Record<string, MarketMeta>;
+  pub: PublicConfig;
+  site: string;
+  reader: ReturnType<typeof useReader>;
+  writer: ReturnType<typeof useWriter>;
+  tx: ReturnType<typeof useTx>;
+}
+
+function NotFollowing({ who, data, names, markets, pub, site, reader, writer, tx }: NotFollowingProps) {
   const st = data.status;
   const free = withdrawable(st.tank, false);
   const mine = txFor(tx, ["withdrawTank", "revoke"]);
@@ -413,6 +439,7 @@ function NotFollowing({ who, data, names, reader, writer, tx }: { who: Address; 
               </Button>
             )}
           </SourceActs>
+          <LatestCopy who={who} site={site} demoLeader={pub.demoLeader} markets={markets} theses={names.theses} />
           {data.approved && (
             <div className={styles.revoke}>
               <PanelNote>

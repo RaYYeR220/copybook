@@ -51,10 +51,11 @@ cd ../e2e && npm ci                      # links packages/stats as @copybook/sta
 
 ## 2. Deploy
 
-`forge script` cannot talk to a Hideki node directly. The node refuses state reads addressed by block
-hash. A bare hash gets `-1` "unable to load historical state", and an EIP-1898 object (`{"blockHash": ...}`
-or `{"blockNumber": ...}`) gets `-32602`. Reads by block number work, historical ones included. Forge pins
-its fork by block hash, so its first state read fails. Details are in
+`forge script` cannot talk to a Hideki node directly. The node refuses `eth_getBalance`, `eth_getCode`,
+`eth_getStorageAt` and `eth_getTransactionCount` addressed by block hash: a bare hash gets `-1` "unable to load
+historical state", and an EIP-1898 object (`{"blockHash": ...}` or `{"blockNumber": ...}`) gets `-32602`.
+`eth_call` accepts both hash forms and refuses only `{"blockNumber": ...}`. Reads by hex block number work,
+historical ones included. Forge pins its fork by block hash, so its first state read fails. Details are in
 [`feedback/02`](../feedback/02-rpc-block-hash-state-reads.md).
 
 `npm run rpc-shim` starts a local JSON-RPC proxy on `127.0.0.1:8547` that sends every state read to
@@ -64,8 +65,9 @@ padding is only a safeguard. The shim is for broadcasting from your own machine 
 
 Forge's local gas estimate is also about 10x below what Somnia charges, so the script runs with
 `--skip-simulation`: each transaction is estimated by the node itself. Contract creation costs 3,125 gas
-per deployed byte on Somnia, and the hub's deploy used 75,383,438 gas for 22,395 bytes of runtime, about
-3,366 per byte with its constructor.
+per deployed byte on Somnia
+([Somnia's gas differences](https://docs.somnia.network/developer/deployment-and-production/somnia-gas-differences-to-ethereum)),
+and the hub's deploy used 75,383,438 gas for 22,395 bytes of runtime, about 3,366 per byte with its constructor.
 
 ```sh
 cd e2e && npm run rpc-shim                     # terminal 1, leave it running

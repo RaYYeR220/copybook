@@ -1,7 +1,9 @@
-// Local JSON-RPC shim so `forge script` can run against Hideki. The node refuses state reads addressed by block
-// hash: a bare hash gets "unable to load historical state" and EIP-1898 objects get -32602, while reads by block
-// number work. Forge pins its fork by block hash (see feedback/02-rpc-block-hash-state-reads.md). It also answers
-// eth_getStorageAt for an empty slot with "0x". The shim reads state at "latest" and pads empty storage words.
+// Local JSON-RPC shim so `forge script` can run against Hideki. The node refuses eth_getBalance, eth_getCode,
+// eth_getStorageAt and eth_getTransactionCount addressed by block hash: a bare hash gets "unable to load historical
+// state" and EIP-1898 objects get -32602, while reads by hex block number work (eth_call accepts the hash forms and
+// refuses only {blockNumber}). Forge pins its fork by block hash (see feedback/02-rpc-block-hash-state-reads.md). It
+// also answers eth_getStorageAt for an empty slot with "0x". The shim reads state at "latest" and pads empty storage
+// words.
 // Usage: tsx src/rpc-shim.ts [port]  ->  forge script ... --rpc-url http://127.0.0.1:<port>
 // Warning: for broadcasting from this machine only. It listens on localhost and relays whatever it is sent; never
 // expose it beyond 127.0.0.1.

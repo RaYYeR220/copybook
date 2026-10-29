@@ -24,7 +24,7 @@ const DEFAULT_LOOKBACK = 50_000n;
 /** Extra places asked for, so dropping copy wallets after the ranking still leaves n when it can (as the app does). */
 const RANK_SLACK = 3;
 
-const TESTNET = "Copybook runs on the Somnia Hideki2 testnet (chain 50383); amounts are testnet tokens with no market value.";
+const TESTNET = "Copybook runs on the Somnia Hideki testnet (Tokyo), chain 50383; amounts are testnet tokens with no market value.";
 
 function defineTool<S extends ZodRawShape>(
   def: { name: string; title: string; description: string; write?: boolean; inputSchema: S },

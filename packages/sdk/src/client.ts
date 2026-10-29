@@ -114,7 +114,7 @@ export function createCopybook(config: CopybookConfig) {
     const wallet = walletClient!;
     const chainId = await wallet.getChainId();
     if (chainId !== deployments.chainId) {
-      throw new CopybookError("WRONG_CHAIN", `The wallet is on chain ${chainId}; Copybook runs on chain ${deployments.chainId} (Somnia Hideki2 testnet).`);
+      throw new CopybookError("WRONG_CHAIN", `The wallet is on chain ${chainId}; Copybook runs on Somnia Hideki testnet (Tokyo), chain ${deployments.chainId}.`);
     }
     const full = { ...call, abi: [...call.abi, ...revertAbi] as Abi };
     try {

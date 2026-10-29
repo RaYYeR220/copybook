@@ -106,7 +106,7 @@ export async function preflightFollow(c: ReadContext, input: PreflightInput): Pr
     add({
       code: "WRONG_CHAIN",
       severity: "error",
-      message: `The wallet is on chain ${input.walletChainId}; Copybook runs on chain ${c.deployments.chainId} (Somnia Hideki2 testnet). Switch networks first.`,
+      message: `The wallet is on chain ${input.walletChainId}; Copybook runs on Somnia Hideki testnet (Tokyo), chain ${c.deployments.chainId}. Switch networks first.`,
     });
   }
   if (!account) {

@@ -18,7 +18,7 @@ import { Refusal, type Deps, type ToolDef } from "./types.ts";
 import { redact } from "./redact.ts";
 import { InputError, addressField, fmt, parseAddress, parseDecimal, sttField, usdsoField } from "./units.ts";
 
-/** get_copy_history's default window: 50000 blocks, about two hours of Hideki blocks. */
+/** get_copy_history's default window: 50000 blocks, about 80 minutes of Hideki blocks (100 ms each). */
 const DEFAULT_LOOKBACK = 50_000n;
 
 /** Extra places asked for, so dropping copy wallets after the ranking still leaves n when it can (as the app does). */
@@ -441,10 +441,10 @@ export function buildTools(deps: Deps): ToolDef[] {
         description:
           "Hub events about one follower, oldest first: Followed, Copied, Refused (with the reason), Stopped, TankCharged and more. " +
           "Copied.limitPrice is the limit price of the order that moved the position, not the fill price. Scans blocks in chunks, so a long range is slow. " +
-          "By default it reads only the last 50000 blocks, about two hours of Hideki blocks: an older follow's Followed event and earlier copies are not in that window. Pass fromBlock to go further back (the answer's deployBlock reaches everything, slowly).",
+          "By default it reads only the last 50000 blocks, about 80 minutes of Hideki blocks: an older follow's Followed event and earlier copies are not in that window. Pass fromBlock to go further back (the answer's deployBlock reaches everything, slowly).",
         inputSchema: {
           follower: addressField("The follower wallet").optional(),
-          fromBlock: z.union([z.string(), z.number()]).optional().describe("First block to read. Default: 50000 blocks (about two hours) before the head, never before the hub's deploy block."),
+          fromBlock: z.union([z.string(), z.number()]).optional().describe("First block to read. Default: 50000 blocks (about 80 minutes) before the head, never before the hub's deploy block."),
           limit: z.number().int().min(1).max(500).default(100).describe("Most recent N events to return. Default 100."),
         },
       },
@@ -465,7 +465,7 @@ export function buildTools(deps: Deps): ToolDef[] {
           fromBlock: h.fromBlock,
           toBlock: h.toBlock,
           ...(fromBlock === undefined
-            ? { window: `the last ${DEFAULT_LOOKBACK} blocks only (about two hours); pass fromBlock for older events`, deployBlock: copybook.deployments.deployBlock }
+            ? { window: `the last ${DEFAULT_LOOKBACK} blocks only (about 80 minutes); pass fromBlock for older events`, deployBlock: copybook.deployments.deployBlock }
             : {}),
           total: h.events.length,
           returned: events.length,

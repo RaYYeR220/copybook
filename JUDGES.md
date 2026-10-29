@@ -108,11 +108,11 @@ Tests, run on 2026-10-29, all passing:
 | Suite | Command | Tests |
 | --- | --- | --- |
 | Contracts (unit and invariant) | `cd contracts && npm ci && forge test` | 257 |
-| App | `npm test -w @copybook/app` | 333 |
+| App | `npm test -w @copybook/app` | 377 |
 | SDK | `npm test -w @copybook/sdk` | 96, plus 5 live ones run with `COPYBOOK_LIVE=1` |
 | MCP server | `npm test -w @copybook/mcp` | 56 |
 | Trader statistics | `npm test -w @copybook/stats` | 35 |
-| Proof ledger and demo-leader bot | `cd e2e && npm test` | 38 |
+| Proof ledger, eval tooling and demo-leader bot | `cd e2e && npm test` | 41 |
 | AI-guard rubric | `cd e2e && npm run eval:test` | 8 |
 
 ## 4. Communication

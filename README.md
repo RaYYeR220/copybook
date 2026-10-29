@@ -152,8 +152,8 @@ cd contracts && npm ci && forge test && cd ..
 cd e2e && npm ci && npm test && npm run eval:test && cd ..
 ```
 
-Every suite passed in a run on 2026-10-29: `forge test` 257 tests, app 333, SDK 96 (plus 5 live ones, skipped
-without `COPYBOOK_LIVE=1`), MCP 56, stats 35, the e2e tests 38 (the proof ledger and the demo-leader bot, `npm test` in `e2e/`) and the rubric 8
+Every suite passed in a run on 2026-10-29: `forge test` 257 tests, app 377, SDK 96 (plus 5 live ones, skipped
+without `COPYBOOK_LIVE=1`), MCP 56, stats 35, the e2e tests 41 (the proof ledger, the eval tooling and the demo-leader bot, `npm test` in `e2e/`) and the rubric 8
 (`npm run eval:test`).
 
 `npm run start -w @copybook/app` serves the production build on port 3000. `cd e2e && npm run proof` re-reads every

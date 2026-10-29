@@ -1,0 +1,15 @@
+{
+  "name": "copybook-feedback-repro",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "description": "Minimal reproductions for the reports in feedback/. Public endpoints only, no keys.",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "dependencies": {
+    "@somnia-chain/markets-sdk": "0.32.1",
+    "viem": "2.57.12"
+  }
+}

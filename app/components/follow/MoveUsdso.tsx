@@ -5,7 +5,7 @@ import type { Address } from "viem";
 import type { Copybook } from "@copybook/sdk";
 import { Button } from "@/components/Button";
 import { FUNDS_X_HANDLE, FUNDS_X_URL, VOUCHER_REPORT_URL } from "@/content/site";
-import { checkMove, usdsoInput } from "@/lib/follow/margin";
+import { checkMove, moveField, refreshMoveField, usdsoInput } from "@/lib/follow/margin";
 import { shortHex } from "@/lib/format";
 import { fmtUsdso } from "@/lib/units";
 import { txFor, type useTx } from "./hooks";
@@ -56,11 +56,17 @@ interface Props {
  * allowance), so after a reload, or once the approval lands, the form offers the deposit.
  */
 export function MoveUsdso({ spot, allowance, initial, bank, writer, tx, id }: Props) {
-  const [typed, setTyped] = useState(() => usdsoInput(initial));
-  // a new suggestion from the chain (a deposit landed, a balance changed) replaces the typed amount
-  useEffect(() => setTyped(usdsoInput(initial)), [initial]);
-  const check = checkMove(typed, spot, allowance);
+  const [field, setField] = useState(() => moveField(initial, spot, allowance));
+  const typed = field.typed;
+  const setTyped = (v: string) => setField((f) => ({ ...f, typed: v, touched: true }));
+  // a re-read replaces the amount only when untouched, or when spot or the allowance moved (see refreshMoveField)
+  useEffect(() => setField((f) => refreshMoveField(f, initial, spot, allowance)), [initial, spot, allowance]);
   const mine = txFor(tx, MOVE_ACTIONS);
+  // a move that landed hands the field back to the chain's suggestion
+  useEffect(() => {
+    if (mine.phase === "confirmed") setField((f) => (f.touched ? { ...f, touched: false } : f));
+  }, [mine.phase]);
+  const check = checkMove(typed, spot, allowance);
   const amount = check.ok ? fmtUsdso(check.amount) : "USDso";
   const send = () => {
     if (!check.ok) return;

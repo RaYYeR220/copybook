@@ -8,6 +8,7 @@ import { defaultPolicyForm, parseAmount18, parseFixed } from "./policyForm";
  */
 
 const E18 = 10n ** 18n;
+const CENT = 10n ** 16n;
 const ceilDollars = (x: bigint) => ((x + E18 - 1n) / E18) * E18;
 
 /** The suggested margin for a follow and what it covers. */
@@ -47,28 +48,72 @@ export function followMarginTarget(kind: SourceKindName, policy: Pick<Policy, "a
 }
 
 /**
- * The amount the move form starts at: what brings equity up to the target, never more than the wallet holds on
- * spot. With no target, an unread equity, or nothing short, it offers the whole spot balance.
+ * The amount the move form starts at: what brings equity up to the target, rounded up to a whole cent and never more
+ * than the wallet holds on spot. With no target, an unread equity, or nothing short, it offers the whole spot balance.
  */
 export function suggestedDeposit(equity: bigint | null, target: bigint | undefined, spot: bigint): bigint {
   if (spot <= 0n) return 0n;
   if (target === undefined || equity === null) return spot;
   const short = target - equity;
   if (short <= 0n) return spot;
-  return short < spot ? short : spot;
+  const up = ((short + CENT - 1n) / CENT) * CENT;
+  return up < spot ? up : spot;
 }
 
 /**
- * Where the form starts: an approval already waiting for its deposit (above zero, below the suggestion) wins, so a
- * reload after the approval landed resumes on the deposit of that amount; otherwise the suggestion.
+ * Where the form starts: an approval already waiting for its deposit (above zero, within what spot holds) wins, so a
+ * reload after the approval landed resumes on the deposit of that amount; otherwise (none, or an unlimited one) the
+ * suggestion.
  */
 export function initialMove(equity: bigint | null, target: bigint | undefined, spot: bigint, allowance: bigint | null): bigint {
-  const suggested = suggestedDeposit(equity, target, spot);
-  return allowance !== null && allowance > 0n && allowance < suggested ? allowance : suggested;
+  if (allowance !== null && allowance > 0n && allowance <= spot) return allowance;
+  return suggestedDeposit(equity, target, spot);
 }
 
-/** A USDso amount as typed: up to 18 decimals, so a whole balance can be typed back. */
-export const parseUsdso = (s: string): bigint | null => parseFixed(s, 18);
+/**
+ * A USDso amount as typed, up to 18 decimals so a whole balance can be typed back. A comma is read only when it can
+ * mean one thing: digit groups (`1,500,000`, `1,500.5`) or a decimal comma (`1,5`). `1,500` could be either, so it is
+ * refused with a reason rather than guessed.
+ */
+export function readUsdso(raw: string): { amount: bigint } | { problem: string } {
+  let s = raw.trim().replace(/^\$/, "").trim();
+  if (s.includes(",")) {
+    if (/^\d{1,3}(,\d{3}){2,}(\.\d*)?$/.test(s) || /^\d{1,3}(,\d{3})+\.\d*$/.test(s)) s = s.replace(/,/g, "");
+    else if (/^\d+,\d+$/.test(s) && !/^\d{1,3},\d{3}$/.test(s)) s = s.replace(",", ".");
+    else return { problem: "Use a dot for decimals, like 1.5: this comma could mean either." };
+  }
+  const amount = parseFixed(s, 18);
+  return amount === null ? { problem: "Type an amount in USDso, like 25." } : { amount };
+}
+
+export const parseUsdso = (s: string): bigint | null => {
+  const r = readUsdso(s);
+  return "amount" in r ? r.amount : null;
+};
+
+/** The amount field, and the spot balance and allowance it was last set against. */
+export interface MoveField {
+  typed: string;
+  /** The person typed in it since it was last set. */
+  touched: boolean;
+  spot: bigint;
+  allowance: bigint | null;
+}
+
+export const moveField = (initial: bigint, spot: bigint, allowance: bigint | null): MoveField => ({ typed: usdsoInput(initial), touched: false, spot, allowance });
+
+/**
+ * A re-read of the chain. The field takes the new starting amount when the person has not typed in it, or when the
+ * wallet's spot balance or the bank's allowance moved (a move landed, or another tab sent one). An equity refresh
+ * alone never replaces what they typed.
+ */
+export function refreshMoveField(f: MoveField, initial: bigint, spot: bigint, allowance: bigint | null): MoveField {
+  const moved = spot !== f.spot || allowance !== f.allowance;
+  if (!moved && f.touched) return f;
+  const typed = usdsoInput(initial);
+  if (!moved && typed === f.typed) return f;
+  return { typed, touched: false, spot, allowance };
+}
 
 /** Plain digits for an 18-decimal amount, the way the input holds it (no grouping, no trailing zeros). */
 export function usdsoInput(x: bigint): string {
@@ -86,8 +131,10 @@ export type MoveCheck =
  * cover the amount; an unread allowance counts as none, so the worst case is one approval too many.
  */
 export function checkMove(typed: string, spot: bigint, allowance: bigint | null): MoveCheck {
-  const amount = parseUsdso(typed);
-  if (amount === null || amount === 0n) return { ok: false, problem: "Type an amount in USDso, like 25." };
+  const r = readUsdso(typed);
+  if ("problem" in r) return { ok: false, problem: r.problem };
+  const amount = r.amount;
+  if (amount === 0n) return { ok: false, problem: "Type an amount in USDso, like 25." };
   if (amount > spot) return { ok: false, problem: "That is more than this wallet holds on spot." };
   return { ok: true, amount, next: allowance !== null && allowance >= amount ? "deposit" : "approve" };
 }

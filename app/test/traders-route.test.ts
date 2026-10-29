@@ -44,7 +44,7 @@ vi.mock("@copybook/stats", async () => {
     },
   };
 });
-vi.mock("@/lib/server/chain", () => ({ hubLog: { read: () => logImpl(), settled: async () => undefined } }));
+vi.mock("@/lib/server/chain", () => ({ hubLog: { read: () => logImpl(), settled: async () => undefined }, primeHubLog: async () => undefined }));
 vi.mock("next/cache", () => ({ unstable_cache: (fn: () => unknown) => fn }));
 
 const { GET } = await import("../app/api/traders/route.ts");

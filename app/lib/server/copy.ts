@@ -6,7 +6,7 @@ import type { RawLog } from "@copybook/sdk";
 import { copyReader, type CopyDeps, type CopyView } from "../copy";
 import { followedSources } from "../followers";
 import { fromJsonSafe, toJsonSafe } from "../json";
-import { publicClient, hubLog } from "./chain";
+import { publicClient, hubLog, primeHubLog } from "./chain";
 import { config } from "./config";
 
 const toHexNum = (n: bigint) => `0x${n.toString(16)}`;
@@ -56,5 +56,11 @@ const read = copyReader(deps, (key, load) =>
   unstable_cache(async () => toJsonSafe(await load()), key, { revalidate: false })().then((v) => fromJsonSafe<CopyView>(v)),
 );
 
-/** One copy for the page, its metadata and its card. Null when the transaction holds no such copy; throws when the chain could not be read. */
-export const copyOf = cache((hash: string, logIndex: number | undefined): Promise<CopyView | null> => read(hash, logIndex));
+/**
+ * One copy for the page, its metadata and its card. Null when the transaction holds no such copy; throws when the chain
+ * could not be read. The copy cache's loader may name the source from the hub's log, so the log is read here first.
+ */
+export const copyOf = cache(async (hash: string, logIndex: number | undefined): Promise<CopyView | null> => {
+  await primeHubLog(8_000);
+  return read(hash, logIndex);
+});

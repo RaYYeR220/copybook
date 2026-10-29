@@ -3,6 +3,7 @@ import { unstable_cache } from "next/cache";
 import { createPublicClient, http, type PublicClient } from "viem";
 import { createCopybook } from "@copybook/sdk";
 import { fromJsonSafe, toJsonSafe } from "../json";
+import { readThrough } from "../readThrough";
 import { hideki } from "../wallet/hideki";
 import { config } from "./config";
 import { createHubLog, type LoggedEvent } from "./hubLog";
@@ -17,9 +18,16 @@ export const publicClient = createPublicClient({
 
 export const copybook = createCopybook({ publicClient, deployments: config.deployments });
 
-/** Sealed segments never change: keep them in the data cache for good (JSON-safe, since bigints do not serialise). */
+/**
+ * Sealed segments never change: keep them in the data cache for good (JSON-safe, since bigints do not serialise).
+ * A missing checkpoint is built outside the cache's loader, so the checkpoint and segments it is made of are read from
+ * the cache instead of being rescanned (Next skips the cache for an unstable_cache inside another one's loader).
+ */
 const persist = (key: string, load: () => Promise<LoggedEvent[]>) =>
-  unstable_cache(async () => toJsonSafe(await load()), ["hub-log", key], { revalidate: false })().then((v) => fromJsonSafe<LoggedEvent[]>(v));
+  readThrough<LoggedEvent[]>(
+    (loader) => unstable_cache(async () => toJsonSafe(await loader()), ["hub-log", "v2", key], { revalidate: false })().then((v) => fromJsonSafe<LoggedEvent[]>(v)),
+    load,
+  );
 
 /** The hub's and the gate's event log since deployment, shared by every route and page in this process. */
 export const hubLog = createHubLog({
@@ -33,3 +41,19 @@ export const hubLog = createHubLog({
   concurrency: 12,
   persist,
 });
+
+let primed: Promise<void> | undefined;
+
+/**
+ * Reads the log once at the top of a request, before a cache whose loader reads it too (the trader ranking, a copy's
+ * source). Inside a loader Next skips the data cache, so a cold process would rescan the chain there; after this the
+ * log is in memory, or its scans are in flight and the loader's read joins them. Read again until one read is complete.
+ */
+export function primeHubLog(budgetMs: number): Promise<void> {
+  primed ??= hubLog.read({ budgetMs }).then((r) => {
+    if (!r.complete) primed = undefined;
+  });
+  return primed.catch(() => {
+    primed = undefined;
+  });
+}

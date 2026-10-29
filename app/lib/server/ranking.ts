@@ -1,15 +1,15 @@
 import { unstable_cache } from "next/cache";
 import { getTraderStats, topTraders } from "@copybook/stats";
 import { followerWallets } from "@/lib/followers";
-import { hubLog } from "@/lib/server/chain";
+import { hubLog, primeHubLog } from "@/lib/server/chain";
 import { config } from "@/lib/server/config";
 import { rankTraders, type TradersPayload } from "@/lib/server/traders";
 
 /** How long the ranking waits on the hub log to learn which wallets are copy wallets. */
 const LOG_BUDGET_MS = 20_000;
 
-/** One ranking per five minutes across instances; a failed ranking is never cached. Served by /api/traders. */
-export const ranking = unstable_cache(
+/** One ranking per five minutes across instances; a failed ranking is never cached. */
+const cachedRanking = unstable_cache(
   () =>
     rankTraders({
       topTraders,
@@ -25,6 +25,12 @@ export const ranking = unstable_cache(
   ["top-traders", "v3"],
   { revalidate: 300 },
 );
+
+/** The ranking /api/traders serves. Its loader reads the hub's log for copy wallets: the log is read here first. */
+export async function ranking(): Promise<TradersPayload> {
+  await primeHubLog(LOG_BUDGET_MS);
+  return cachedRanking();
+}
 
 /**
  * The ranking when the data cache can answer within `waitMs` (a page renders it with the rest), else undefined and

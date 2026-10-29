@@ -1,0 +1,2758 @@
+{
+  "about": "The transactions docs/PROOF.md is built from, by section, with what was recorded for each when it was sent. `npm run proof` (in e2e/) re-reads every one from the chain and writes docs/PROOF.md. Everything recorded in deployments/*.json and eval/*/anchor.json, and every explorer link in the docs, is checked too; those are read from the files themselves.",
+  "runs": {
+    "deploy": "Deployment of the current hub, 2026-10-28",
+    "e2e": "The end-to-end run against the current hub (`npm run live`), 2026-10-28",
+    "risk": "The risk module's runs (`npm run risk`), 2026-10-28, recorded in deployments/risk.json",
+    "app": "A run through the web app's pages (a preview deployment) and the MCP server, 2026-10-29"
+  },
+  "markets": {
+    "0x4181dd08e73bbcdd1ba3e615a18f6abd941b94c0": {
+      "symbol": "BTC",
+      "decimals": 8
+    },
+    "0xd6cb1dd58580b84d76068ac21594219ce03aeddf": {
+      "symbol": "ETH",
+      "decimals": 18
+    },
+    "0xb483ec1fb34996638677c20ab087b16f1896fa53": {
+      "symbol": "SOL",
+      "decimals": 9
+    },
+    "0xfa9b9e50cc1745113d57893991af200a74c86b6f": {
+      "symbol": "1000PEPE",
+      "decimals": 18
+    }
+  },
+  "contracts": [
+    {
+      "id": "hub",
+      "name": "CopybookHub",
+      "chain": "hideki",
+      "address": "0xdF73BBbB6517B712BBeD9bfAe6253A5E1FCDE154",
+      "deployTx": "0x9301f8c0b32b4fab8b9c0919fa455c58c92090ca4f110eae29a31e03aef184cd",
+      "deployment": "deployments/hideki.json hub",
+      "source": "Pass - Verified (forge verify-contract, Blockscout verifier, linked to CopyEngine)",
+      "expect": {
+        "block": 35024249,
+        "gasUsed": 75383438,
+        "from": "0x5397812d66F3233E0972b7AEB5e195a945504632"
+      }
+    },
+    {
+      "id": "engine",
+      "name": "CopyEngine (library, CREATE2)",
+      "chain": "hideki",
+      "address": "0xE37F735b8E43e63E56f7E550e732Ab808257D56A",
+      "deployTx": "0x0799a2897eda354432344749f7788b775e037808bb6d6f98c9ce0c3b946cc4cd",
+      "deployment": "deployments/hideki.json engine",
+      "source": "Pass - Verified (forge verify-contract, Blockscout verifier)",
+      "expect": {
+        "block": 35024222,
+        "gasUsed": 46962361,
+        "from": "0x5397812d66F3233E0972b7AEB5e195a945504632"
+      }
+    },
+    {
+      "id": "themes",
+      "name": "ThemeRegistry",
+      "chain": "hideki",
+      "address": "0xbcA03A20eaf337b7bb35DBD76512Af5BC61f6c79",
+      "deployTx": "0x67500cb4f993ff4edf1073442f097144d94fb54a42ca795d59ee9f51b2705df1",
+      "deployment": "deployments/hideki.json themes",
+      "source": "Pass - Verified (forge verify-contract, Blockscout verifier)",
+      "expect": {
+        "block": 35024236,
+        "gasUsed": 12260562,
+        "from": "0x5397812d66F3233E0972b7AEB5e195a945504632"
+      }
+    },
+    {
+      "id": "relay-leader",
+      "name": "GroupRelay (the demo leader, group 0)",
+      "chain": "hideki",
+      "address": "0xEFf35D485c4559D9f44e5138B38Cd93052f2E7BF",
+      "openedIn": "e2e-follow",
+      "source": "Pass - Verified (forge verify-contract, Blockscout verifier)"
+    },
+    {
+      "id": "relay-thesis1",
+      "name": "GroupRelay (thesis 1, group 0)",
+      "chain": "hideki",
+      "address": "0x6DAda17bC84079374Bf73FCa8E9F1066290E648c",
+      "openedIn": "thesis1-follow",
+      "source": "Pass - Verified (forge verify-contract, Blockscout verifier)"
+    },
+    {
+      "id": "gate",
+      "name": "RiskGate",
+      "chain": "hideki",
+      "address": "0xEe54c49E9e70a0e5C2218Eec1b1BDBd4e1Cb20f1",
+      "deployTx": "0x7176d2e229bb9a88e2f853360dc81a6bf6597d3d1602f4f53554b53b469e72a5",
+      "deployment": "deployments/risk.json hideki.gate",
+      "source": "Pass - Verified (forge verify-contract, Blockscout verifier)",
+      "expect": {
+        "block": 35358791,
+        "gasUsed": 15273899,
+        "from": "0x5397812d66F3233E0972b7AEB5e195a945504632"
+      }
+    },
+    {
+      "id": "reviewer",
+      "name": "RiskReviewer (run v3 and after)",
+      "chain": "shannon",
+      "address": "0xc999B6924179a0dc9649DA7eBa8F3aC8b7CF7c25",
+      "deployTx": "0x99765a02b814805036c8293ff919d1cb1f0130829d6983272463ed4f919a3ced",
+      "deployment": "deployments/risk.json shannon.reviewer",
+      "source": "Pass - Verified (forge verify-contract, Blockscout verifier)",
+      "readBack": true,
+      "expect": {
+        "block": 526233904,
+        "gasUsed": 47234479,
+        "from": "0x5397812d66F3233E0972b7AEB5e195a945504632"
+      }
+    },
+    {
+      "id": "reviewer-v2",
+      "name": "RiskReviewer (runs v1 and v2, retired)",
+      "chain": "shannon",
+      "address": "0x45b46d39697Cfd191BfEb215512d012d28E6ECc3",
+      "deployTx": "0x7aaa705f0aad43c41404f55685e6b2c2e3df494112876456f4bdc524d8f39f17",
+      "deployment": "deployments/risk.json previousReviewers.0.reviewer",
+      "readBack": true,
+      "expect": {
+        "block": 526147746,
+        "gasUsed": 44433467,
+        "from": "0x5397812d66F3233E0972b7AEB5e195a945504632"
+      }
+    }
+  ],
+  "gas": [
+    {
+      "label": "follow a trader, joining an existing group",
+      "row": "app-follow",
+      "gasUsed": 1729420
+    },
+    {
+      "label": "follow a thesis, opening a new group (relay + subscription) and both legs",
+      "row": "mcp-follow",
+      "gasUsed": 13874538
+    },
+    {
+      "label": "catchUp over 3 markets (3 opens)",
+      "row": "app-catchup",
+      "gasUsed": 9576399
+    },
+    {
+      "label": "unfollow with flatten, 3 markets",
+      "row": "app-unfollow",
+      "gasUsed": 4830145
+    },
+    {
+      "label": "unfollow with flatten, a thesis of 2 legs (closes the group)",
+      "row": "mcp-unfollow",
+      "gasUsed": 3306516
+    },
+    {
+      "label": "fundTank",
+      "row": "app-fundtank",
+      "gasUsed": 25325
+    },
+    {
+      "label": "withdrawTank",
+      "row": "app-withdrawtank",
+      "gasUsed": 40747
+    },
+    {
+      "label": "operator approval",
+      "row": "app-approve",
+      "gasUsed": 283347
+    },
+    {
+      "label": "revoke the operator approval",
+      "row": "app-revoke",
+      "gasUsed": 83347
+    },
+    {
+      "label": "setGuard",
+      "row": "app-guard-off",
+      "gasUsed": 247799
+    },
+    {
+      "label": "createTheme (2 legs)",
+      "row": "thesis2-create",
+      "gasUsed": 1129554
+    },
+    {
+      "label": "rebalance a thesis",
+      "row": "thesis2-rebalance",
+      "gasUsed": 101157
+    },
+    {
+      "label": "the hub's handler run for the live copy above, a group of two followers (the hub pays the gas)",
+      "row": "app-live-copy",
+      "gasUsed": 2304508,
+      "tank": "0xDe52dd7f81F67D2124ae0fBd8567f405cFAEeaAB"
+    }
+  ],
+  "guard": {
+    "exampleNonce": 11
+  },
+  "rows": [
+    {
+      "chain": "hideki",
+      "id": "e2e-01-move",
+      "section": "same-block",
+      "run": "e2e",
+      "pair": "e2e-01",
+      "role": "move",
+      "label": "The leader opens 0.0005 BTC",
+      "hash": "0x6880ee77710e3156184063cce42be51517df7ca1bb835d25037ebe5556b7f44d",
+      "expect": {
+        "block": 35025602,
+        "index": 0,
+        "gasUsed": 1518546,
+        "from": "0xa1d0cb85c869e534fe1e0c22af3b238301157b5d",
+        "method": "placeOrder"
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "e2e-01-copy",
+      "section": "same-block",
+      "run": "e2e",
+      "pair": "e2e-01",
+      "role": "copy",
+      "label": "the hub's handler",
+      "hash": "0xd012c9ad808025ba8ff880bde67e6972b661b3824e839754bb8681cc1b878cbc",
+      "expect": {
+        "block": 35025602,
+        "index": 22,
+        "gasUsed": 2361128,
+        "from": "0xdf73bbbb6517b712bbed9bfae6253a5e1fcde154",
+        "method": "onEvent",
+        "events": [
+          {
+            "name": "Copied",
+            "args": {
+              "follower": "0x7d736A88978e94E60494Ff91C49Ba838EDfb1932",
+              "pool": "0x4181dd08E73BbCdd1Ba3E615A18f6abD941b94C0",
+              "fromSize": "0",
+              "toSize": "50000"
+            }
+          },
+          {
+            "name": "TankCharged",
+            "args": {
+              "follower": "0x7d736A88978e94E60494Ff91C49Ba838EDfb1932",
+              "amount": "14176200000000000"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "e2e-02-move",
+      "section": "same-block",
+      "run": "e2e",
+      "pair": "e2e-02",
+      "role": "move",
+      "label": "The leader closes 0.0005 BTC",
+      "hash": "0xcba6c257f59372db1a8030b7d35a38f5eb35b0271f21ea481e0d52878660e36b",
+      "expect": {
+        "block": 35025628,
+        "index": 5,
+        "gasUsed": 1634480,
+        "from": "0xa1d0cb85c869e534fe1e0c22af3b238301157b5d",
+        "method": "placeOrder"
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "e2e-02-copy",
+      "section": "same-block",
+      "run": "e2e",
+      "pair": "e2e-02",
+      "role": "copy",
+      "label": "the hub's handler",
+      "hash": "0xaf9ffc69574d39e48fca45fbcaa7051df1731f1921e3730d683599090a02d5b3",
+      "expect": {
+        "block": 35025628,
+        "index": 8,
+        "gasUsed": 1852296,
+        "from": "0xdf73bbbb6517b712bbed9bfae6253a5e1fcde154",
+        "method": "onEvent",
+        "events": [
+          {
+            "name": "Copied",
+            "args": {
+              "follower": "0x7d736A88978e94E60494Ff91C49Ba838EDfb1932",
+              "pool": "0x4181dd08E73BbCdd1Ba3E615A18f6abD941b94C0",
+              "fromSize": "50000",
+              "toSize": "0"
+            }
+          },
+          {
+            "name": "TankCharged",
+            "args": {
+              "follower": "0x7d736A88978e94E60494Ff91C49Ba838EDfb1932",
+              "amount": "11115138000000000"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "e2e-03-move",
+      "section": "same-block",
+      "run": "e2e",
+      "pair": "e2e-03",
+      "role": "move",
+      "label": "The leader buys 0.0005 BTC",
+      "hash": "0x7ca0215f4e467827f4f7c1536f2bf8edafe63e6de40edcd1089eb4179c572f57",
+      "expect": {
+        "block": 35025652,
+        "index": 0,
+        "gasUsed": 1715910,
+        "from": "0xa1d0cb85c869e534fe1e0c22af3b238301157b5d",
+        "method": "placeOrder"
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "e2e-03-copy",
+      "section": "same-block",
+      "run": "e2e",
+      "pair": "e2e-03",
+      "role": "copy",
+      "label": "the hub's handler",
+      "hash": "0x7af7d976bbe47aadb088187e8767bb1a2e7dafc96369af20b44c47014bbdaf71",
+      "expect": {
+        "block": 35025652,
+        "index": 4,
+        "gasUsed": 1952254,
+        "from": "0xdf73bbbb6517b712bbed9bfae6253a5e1fcde154",
+        "method": "onEvent",
+        "events": [
+          {
+            "name": "Copied",
+            "args": {
+              "follower": "0x7d736A88978e94E60494Ff91C49Ba838EDfb1932",
+              "pool": "0x4181dd08E73BbCdd1Ba3E615A18f6abD941b94C0",
+              "fromSize": "0",
+              "toSize": "50000"
+            }
+          },
+          {
+            "name": "TankCharged",
+            "args": {
+              "follower": "0x7d736A88978e94E60494Ff91C49Ba838EDfb1932",
+              "amount": "11722956000000000"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "e2e-04-move",
+      "section": "same-block",
+      "run": "e2e",
+      "pair": "e2e-04",
+      "role": "move",
+      "label": "The leader adds 0.0003 BTC",
+      "hash": "0x56d7a4c951a3c0a3672ab14998b717bb0206112abfb231294d9ef372a8f9b8d3",
+      "expect": {
+        "block": 35025675,
+        "index": 3,
+        "gasUsed": 1709357,
+        "from": "0xa1d0cb85c869e534fe1e0c22af3b238301157b5d",
+        "method": "placeOrder"
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "e2e-04-copy",
+      "section": "same-block",
+      "run": "e2e",
+      "pair": "e2e-04",
+      "role": "copy",
+      "label": "the hub's handler",
+      "hash": "0x054dd8abbf7856c19617dfb8439dddd3a6a27d2f7ba3189e949b6a39322a12bb",
+      "expect": {
+        "block": 35025675,
+        "index": 5,
+        "gasUsed": 1945740,
+        "from": "0xdf73bbbb6517b712bbed9bfae6253a5e1fcde154",
+        "method": "onEvent",
+        "events": [
+          {
+            "name": "Copied",
+            "args": {
+              "follower": "0x7d736A88978e94E60494Ff91C49Ba838EDfb1932",
+              "pool": "0x4181dd08E73BbCdd1Ba3E615A18f6abD941b94C0",
+              "fromSize": "50000",
+              "toSize": "80000"
+            }
+          },
+          {
+            "name": "TankCharged",
+            "args": {
+              "follower": "0x7d736A88978e94E60494Ff91C49Ba838EDfb1932",
+              "amount": "11683872000000000"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "e2e-05-move",
+      "section": "same-block",
+      "run": "e2e",
+      "pair": "e2e-05",
+      "role": "move",
+      "label": "The leader sells 0.0008 BTC (closes)",
+      "hash": "0x5efb1e4626c30e19059cb286d850a7cda21253307ed91f460b1296c5972e92da",
+      "expect": {
+        "block": 35025698,
+        "index": 5,
+        "gasUsed": 1651074,
+        "from": "0xa1d0cb85c869e534fe1e0c22af3b238301157b5d",
+        "method": "placeOrder"
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "e2e-05-copy",
+      "section": "same-block",
+      "run": "e2e",
+      "pair": "e2e-05",
+      "role": "copy",
+      "label": "the hub's handler",
+      "hash": "0x7f73a01c009941fad16113a9e3833c1d4e4e793c5abb43b6582fc143763fb050",
+      "expect": {
+        "block": 35025698,
+        "index": 6,
+        "gasUsed": 1868890,
+        "from": "0xdf73bbbb6517b712bbed9bfae6253a5e1fcde154",
+        "method": "onEvent",
+        "events": [
+          {
+            "name": "Copied",
+            "args": {
+              "follower": "0x7d736A88978e94E60494Ff91C49Ba838EDfb1932",
+              "pool": "0x4181dd08E73BbCdd1Ba3E615A18f6abD941b94C0",
+              "fromSize": "80000",
+              "toSize": "0"
+            }
+          },
+          {
+            "name": "TankCharged",
+            "args": {
+              "follower": "0x7d736A88978e94E60494Ff91C49Ba838EDfb1932",
+              "amount": "11214702000000000"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "e2e-06-move",
+      "section": "same-block",
+      "run": "e2e",
+      "pair": "e2e-06",
+      "role": "move",
+      "label": "The leader opens a short while the follower holds a long residue below the venue minimum: one order crosses zero",
+      "hash": "0x44415234b4210f04e0f036f26696ff4ceb2a25eceb32eba405d0354d557796a7",
+      "expect": {
+        "block": 35025759,
+        "index": 0,
+        "gasUsed": 1899094,
+        "from": "0xa1d0cb85c869e534fe1e0c22af3b238301157b5d",
+        "method": "placeOrder"
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "e2e-06-copy",
+      "section": "same-block",
+      "run": "e2e",
+      "pair": "e2e-06",
+      "role": "copy",
+      "label": "the hub's handler",
+      "hash": "0xdf3ce2e435557042671ae266f24f2a8adcedc3deb5397592cac97514423e7ecc",
+      "expect": {
+        "block": 35025759,
+        "index": 5,
+        "gasUsed": 2219218,
+        "from": "0xdf73bbbb6517b712bbed9bfae6253a5e1fcde154",
+        "method": "onEvent",
+        "events": [
+          {
+            "name": "Copied",
+            "args": {
+              "follower": "0x7d736A88978e94E60494Ff91C49Ba838EDfb1932",
+              "pool": "0x4181dd08E73BbCdd1Ba3E615A18f6abD941b94C0",
+              "fromSize": "10000",
+              "toSize": "-50000"
+            }
+          },
+          {
+            "name": "TankCharged",
+            "args": {
+              "follower": "0x7d736A88978e94E60494Ff91C49Ba838EDfb1932",
+              "amount": "13428858000000000"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "e2e-07-move",
+      "section": "same-block",
+      "run": "e2e",
+      "pair": "e2e-07",
+      "role": "move",
+      "label": "The leader closes the short",
+      "hash": "0xa34f2a0b878c224c7722974b421b66205fdd251b377de856aea9936fd9e2a973",
+      "expect": {
+        "block": 35025787,
+        "index": 3,
+        "gasUsed": 1962216,
+        "from": "0xa1d0cb85c869e534fe1e0c22af3b238301157b5d",
+        "method": "placeOrder"
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "e2e-07-copy",
+      "section": "same-block",
+      "run": "e2e",
+      "pair": "e2e-07",
+      "role": "copy",
+      "label": "the hub's handler",
+      "hash": "0x478fe99d8ab8a2414130bd79c9d54ff3d531273b874639189cdf9008797c0730",
+      "expect": {
+        "block": 35025787,
+        "index": 4,
+        "gasUsed": 1859134,
+        "from": "0xdf73bbbb6517b712bbed9bfae6253a5e1fcde154",
+        "method": "onEvent",
+        "events": [
+          {
+            "name": "Copied",
+            "args": {
+              "follower": "0x7d736A88978e94E60494Ff91C49Ba838EDfb1932",
+              "pool": "0x4181dd08E73BbCdd1Ba3E615A18f6abD941b94C0",
+              "fromSize": "-50000",
+              "toSize": "0"
+            }
+          },
+          {
+            "name": "TankCharged",
+            "args": {
+              "follower": "0x7d736A88978e94E60494Ff91C49Ba838EDfb1932",
+              "amount": "11156166000000000"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "refusal-band-move",
+      "section": "refusals",
+      "run": "e2e",
+      "pair": "refusal-band",
+      "role": "move",
+      "label": "The leader buys the 1000PEPE minimum; the follower's 5 bps band has no fill",
+      "hash": "0xb28470db4acd7be5aabb4434cd4a7e48997dbea79bdbe300397f9a5c958fbc86",
+      "expect": {
+        "block": 35025975,
+        "index": 3,
+        "gasUsed": 1608177,
+        "from": "0xa1d0cb85c869e534fe1e0c22af3b238301157b5d",
+        "method": "placeOrder"
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "refusal-band-copy",
+      "section": "refusals",
+      "run": "e2e",
+      "pair": "refusal-band",
+      "role": "copy",
+      "label": "the hub's handler",
+      "hash": "0xc97ecbd7710b42ac60f5321333cd95a6a3fb369c38c9ebe8986751840bdcffcb",
+      "expect": {
+        "block": 35025975,
+        "index": 5,
+        "gasUsed": 288359,
+        "from": "0xdf73bbbb6517b712bbed9bfae6253a5e1fcde154",
+        "method": "onEvent",
+        "events": [
+          {
+            "name": "Refused",
+            "args": {
+              "follower": "0x7d736A88978e94E60494Ff91C49Ba838EDfb1932",
+              "pool": "0xfA9B9e50CC1745113d57893991aF200a74c86B6f",
+              "reason": "BandUnfilled",
+              "venueError": "0xc04ad919"
+            }
+          },
+          {
+            "name": "TankCharged",
+            "args": {
+              "follower": "0x7d736A88978e94E60494Ff91C49Ba838EDfb1932",
+              "amount": "1739586000000000"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "thesis1-rebalance-move",
+      "section": "theses",
+      "run": "e2e",
+      "pair": "thesis1-rebalance",
+      "role": "move",
+      "label": "Thesis 1 rebalanced from 50/50 to 70/30",
+      "hash": "0xcb0712d3fd2a88c64bb4b5ed1d86246f36cf84df8e39d83ba17cf4959a20e4aa",
+      "expect": {
+        "block": 35026714,
+        "index": 5,
+        "gasUsed": 101157,
+        "from": "0x5397812d66f3233e0972b7aeb5e195a945504632",
+        "to": "0xbcA03A20eaf337b7bb35DBD76512Af5BC61f6c79",
+        "method": "rebalance",
+        "events": [
+          {
+            "name": "ThemeRebalanced",
+            "args": {
+              "themeId": "1",
+              "version": "2"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "thesis1-rebalance-copy",
+      "section": "theses",
+      "run": "e2e",
+      "pair": "thesis1-rebalance",
+      "role": "copy",
+      "label": "the hub's handler",
+      "hash": "0xd457cf3abe3c3ecf50aa76bb478143aaed88ea3460111a71b80c019692c1c114",
+      "expect": {
+        "block": 35026714,
+        "index": 6,
+        "gasUsed": 4234677,
+        "from": "0xdf73bbbb6517b712bbed9bfae6253a5e1fcde154",
+        "method": "onEvent",
+        "events": [
+          {
+            "name": "Copied",
+            "args": {
+              "follower": "0xcee40D3C7709404Cf60916BFEa39925fcB1f09Ed",
+              "pool": "0xD6Cb1DD58580B84D76068aC21594219ce03aeddf",
+              "fromSize": "-16900000000000000",
+              "toSize": "-10200000000000000"
+            }
+          },
+          {
+            "name": "Copied",
+            "args": {
+              "follower": "0xcee40D3C7709404Cf60916BFEa39925fcB1f09Ed",
+              "pool": "0x4181dd08E73BbCdd1Ba3E615A18f6abD941b94C0",
+              "fromSize": "49000",
+              "toSize": "69000"
+            }
+          },
+          {
+            "name": "TankCharged",
+            "args": {
+              "follower": "0xcee40D3C7709404Cf60916BFEa39925fcB1f09Ed",
+              "amount": "25626420000000000"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "e2e-10-move",
+      "section": "same-block",
+      "run": "e2e",
+      "pair": "e2e-10",
+      "role": "move",
+      "label": "The leader opens 0.0005 BTC (before the equity-floor test)",
+      "hash": "0xc45154527a098d6cf2cf6d7a2f7a378cf5eb590327ce583bd4d4d73e58d23afe",
+      "expect": {
+        "block": 35026764,
+        "index": 1,
+        "gasUsed": 2021684,
+        "from": "0xa1d0cb85c869e534fe1e0c22af3b238301157b5d",
+        "method": "placeOrder"
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "e2e-10-copy",
+      "section": "same-block",
+      "run": "e2e",
+      "pair": "e2e-10",
+      "role": "copy",
+      "label": "the hub's handler",
+      "hash": "0x265ab3d0763f1dcd18526109e7ab2993044ee640818e81c557d55f708520cae4",
+      "expect": {
+        "block": 35026764,
+        "index": 4,
+        "gasUsed": 1885907,
+        "from": "0xdf73bbbb6517b712bbed9bfae6253a5e1fcde154",
+        "method": "onEvent",
+        "events": [
+          {
+            "name": "Copied",
+            "args": {
+              "follower": "0x7d736A88978e94E60494Ff91C49Ba838EDfb1932",
+              "pool": "0x4181dd08E73BbCdd1Ba3E615A18f6abD941b94C0",
+              "fromSize": "0",
+              "toSize": "50000"
+            }
+          },
+          {
+            "name": "TankCharged",
+            "args": {
+              "follower": "0x7d736A88978e94E60494Ff91C49Ba838EDfb1932",
+              "amount": "11324874000000000"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "e2e-11-move",
+      "section": "same-block",
+      "run": "e2e",
+      "pair": "e2e-11",
+      "role": "move",
+      "label": "Guaranteed-delivery subscription: the leader opens 0.0005 BTC",
+      "hash": "0x528abfa4bb5021ba1001e270c45936f73ee907c904de6fdda28cf906d415e69b",
+      "expect": {
+        "block": 35027056,
+        "index": 5,
+        "gasUsed": 1652948,
+        "from": "0xa1d0cb85c869e534fe1e0c22af3b238301157b5d",
+        "method": "placeOrder"
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "e2e-11-copy",
+      "section": "same-block",
+      "run": "e2e",
+      "pair": "e2e-11",
+      "role": "copy",
+      "label": "the hub's handler",
+      "hash": "0xbc462faca32eed8d452ad257c73f3cd38c9eabc163b659363edec704a24ee244",
+      "expect": {
+        "block": 35027056,
+        "index": 7,
+        "gasUsed": 2096507,
+        "from": "0xdf73bbbb6517b712bbed9bfae6253a5e1fcde154",
+        "method": "onEvent",
+        "events": [
+          {
+            "name": "Copied",
+            "args": {
+              "follower": "0x7d736A88978e94E60494Ff91C49Ba838EDfb1932",
+              "pool": "0x4181dd08E73BbCdd1Ba3E615A18f6abD941b94C0",
+              "fromSize": "0",
+              "toSize": "50000"
+            }
+          },
+          {
+            "name": "TankCharged",
+            "args": {
+              "follower": "0x7d736A88978e94E60494Ff91C49Ba838EDfb1932",
+              "amount": "12588474000000000"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "e2e-12-move",
+      "section": "same-block",
+      "run": "e2e",
+      "pair": "e2e-12",
+      "role": "move",
+      "label": "Guaranteed-delivery subscription: the leader closes",
+      "hash": "0x05f50ecffa95cd53b380a3601f1cdd63b766248f0829bb576acc6ba3a6c2d133",
+      "expect": {
+        "block": 35027078,
+        "index": 1,
+        "gasUsed": 1578214,
+        "from": "0xa1d0cb85c869e534fe1e0c22af3b238301157b5d",
+        "method": "placeOrder"
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "e2e-12-copy",
+      "section": "same-block",
+      "run": "e2e",
+      "pair": "e2e-12",
+      "role": "copy",
+      "label": "the hub's handler",
+      "hash": "0x3b8133229788659e9898235437541e48724fb95278dfe7d437f8b3503626df80",
+      "expect": {
+        "block": 35027078,
+        "index": 7,
+        "gasUsed": 1786059,
+        "from": "0xdf73bbbb6517b712bbed9bfae6253a5e1fcde154",
+        "method": "onEvent",
+        "events": [
+          {
+            "name": "Copied",
+            "args": {
+              "follower": "0x7d736A88978e94E60494Ff91C49Ba838EDfb1932",
+              "pool": "0x4181dd08E73BbCdd1Ba3E615A18f6abD941b94C0",
+              "fromSize": "50000",
+              "toSize": "0"
+            }
+          },
+          {
+            "name": "TankCharged",
+            "args": {
+              "follower": "0x7d736A88978e94E60494Ff91C49Ba838EDfb1932",
+              "amount": "10717716000000000"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "e2e-13-move",
+      "section": "same-block",
+      "run": "e2e",
+      "pair": "e2e-13",
+      "role": "move",
+      "label": "After the gas parameters are set: the leader opens 0.0005 BTC",
+      "hash": "0x4a69971be05724f9ce4d4af69c113de68113a1c73076f0859287a3e6566a9c97",
+      "expect": {
+        "block": 35027146,
+        "index": 2,
+        "gasUsed": 1653518,
+        "from": "0xa1d0cb85c869e534fe1e0c22af3b238301157b5d",
+        "method": "placeOrder"
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "e2e-13-copy",
+      "section": "same-block",
+      "run": "e2e",
+      "pair": "e2e-13",
+      "role": "copy",
+      "label": "the hub's handler",
+      "hash": "0x496b10182c69ccced17a051aee3377f8551051b84ac6170da0079ec32341bd6e",
+      "expect": {
+        "block": 35027146,
+        "index": 3,
+        "gasUsed": 1889861,
+        "from": "0xdf73bbbb6517b712bbed9bfae6253a5e1fcde154",
+        "method": "onEvent",
+        "events": [
+          {
+            "name": "Copied",
+            "args": {
+              "follower": "0x7d736A88978e94E60494Ff91C49Ba838EDfb1932",
+              "pool": "0x4181dd08E73BbCdd1Ba3E615A18f6abD941b94C0",
+              "fromSize": "0",
+              "toSize": "50000"
+            }
+          },
+          {
+            "name": "TankCharged",
+            "args": {
+              "follower": "0x7d736A88978e94E60494Ff91C49Ba838EDfb1932",
+              "amount": "11348598000000000"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "e2e-14-move",
+      "section": "same-block",
+      "run": "e2e",
+      "pair": "e2e-14",
+      "role": "move",
+      "label": "After the gas parameters are set: the leader closes",
+      "hash": "0x921f679fe51bd59af27d724aa0775289e7264cb47510df288e2511a0799c9ac2",
+      "expect": {
+        "block": 35027167,
+        "index": 2,
+        "gasUsed": 1587806,
+        "from": "0xa1d0cb85c869e534fe1e0c22af3b238301157b5d",
+        "method": "placeOrder"
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "e2e-14-copy",
+      "section": "same-block",
+      "run": "e2e",
+      "pair": "e2e-14",
+      "role": "copy",
+      "label": "the hub's handler",
+      "hash": "0xa0ba2a112b3998d4949da89933711d11fa9870926bc91aeddf2a7f1b772890a9",
+      "expect": {
+        "block": 35027167,
+        "index": 3,
+        "gasUsed": 1805623,
+        "from": "0xdf73bbbb6517b712bbed9bfae6253a5e1fcde154",
+        "method": "onEvent",
+        "events": [
+          {
+            "name": "Copied",
+            "args": {
+              "follower": "0x7d736A88978e94E60494Ff91C49Ba838EDfb1932",
+              "pool": "0x4181dd08E73BbCdd1Ba3E615A18f6abD941b94C0",
+              "fromSize": "50000",
+              "toSize": "0"
+            }
+          },
+          {
+            "name": "TankCharged",
+            "args": {
+              "follower": "0x7d736A88978e94E60494Ff91C49Ba838EDfb1932",
+              "amount": "10835100000000000"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "e2e-15-move",
+      "section": "same-block",
+      "run": "e2e",
+      "pair": "e2e-15",
+      "role": "move",
+      "label": "After two minutes idle: the leader opens 0.0005 BTC",
+      "hash": "0x9aaf6bf449d4830f7869b7f4ff7b3d30ec4487c20465b27024e6cf958439d55b",
+      "expect": {
+        "block": 35027191,
+        "index": 2,
+        "gasUsed": 1648896,
+        "from": "0xa1d0cb85c869e534fe1e0c22af3b238301157b5d",
+        "method": "placeOrder"
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "e2e-15-copy",
+      "section": "same-block",
+      "run": "e2e",
+      "pair": "e2e-15",
+      "role": "copy",
+      "label": "the hub's handler",
+      "hash": "0x0b6e936df794987e25b9f8d60d1c129cc39e4e8b2c0c80ba6f5854180c0618ba",
+      "expect": {
+        "block": 35027191,
+        "index": 9,
+        "gasUsed": 1885558,
+        "from": "0xdf73bbbb6517b712bbed9bfae6253a5e1fcde154",
+        "method": "onEvent",
+        "events": [
+          {
+            "name": "Copied",
+            "args": {
+              "follower": "0x7d736A88978e94E60494Ff91C49Ba838EDfb1932",
+              "pool": "0x4181dd08E73BbCdd1Ba3E615A18f6abD941b94C0",
+              "fromSize": "0",
+              "toSize": "50000"
+            }
+          },
+          {
+            "name": "TankCharged",
+            "args": {
+              "follower": "0x7d736A88978e94E60494Ff91C49Ba838EDfb1932",
+              "amount": "11322780000000000"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "e2e-16-move",
+      "section": "same-block",
+      "run": "e2e",
+      "pair": "e2e-16",
+      "role": "move",
+      "label": "After two minutes idle: the leader closes",
+      "hash": "0x1aafd5456d899f377a80fe044b03b618c3362834f7da76ed1d0be65e7090ce48",
+      "expect": {
+        "block": 35027212,
+        "index": 0,
+        "gasUsed": 1602645,
+        "from": "0xa1d0cb85c869e534fe1e0c22af3b238301157b5d",
+        "method": "placeOrder"
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "e2e-16-copy",
+      "section": "same-block",
+      "run": "e2e",
+      "pair": "e2e-16",
+      "role": "copy",
+      "label": "the hub's handler",
+      "hash": "0x49f0b44a2152acf9384b49b7889df7115137edd8dcc6cd45b0fd2132f9a39b67",
+      "expect": {
+        "block": 35027212,
+        "index": 2,
+        "gasUsed": 1820637,
+        "from": "0xdf73bbbb6517b712bbed9bfae6253a5e1fcde154",
+        "method": "onEvent",
+        "events": [
+          {
+            "name": "Copied",
+            "args": {
+              "follower": "0x7d736A88978e94E60494Ff91C49Ba838EDfb1932",
+              "pool": "0x4181dd08E73BbCdd1Ba3E615A18f6abD941b94C0",
+              "fromSize": "50000",
+              "toSize": "0"
+            }
+          },
+          {
+            "name": "TankCharged",
+            "args": {
+              "follower": "0x7d736A88978e94E60494Ff91C49Ba838EDfb1932",
+              "amount": "10925184000000000"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "e2e-noop-move",
+      "section": "same-block",
+      "run": "e2e",
+      "pair": "e2e-noop",
+      "role": "move",
+      "label": "The leader sells 0.0005 BTC while the follower is already flat",
+      "hash": "0xdcc29d22f1d14258275123aea82d29cf03067f01fb06e9ad7638a6280ddab69c",
+      "expect": {
+        "block": 35026907,
+        "index": 4,
+        "gasUsed": 1614388,
+        "from": "0xa1d0cb85c869e534fe1e0c22af3b238301157b5d",
+        "method": "placeOrder"
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "e2e-noop-copy",
+      "section": "same-block",
+      "run": "e2e",
+      "pair": "e2e-noop",
+      "role": "copy",
+      "label": "the hub's handler (nothing to copy)",
+      "hash": "0x4f04dbfb5cd4f6741fe1d7a15cff1569d220fb4ed7f69f2da6b7ec3632abc1b0",
+      "expect": {
+        "block": 35026907,
+        "index": 5,
+        "to": "0xeff35d485c4559d9f44e5138b38cd93052f2e7bf",
+        "gasUsed": 148541,
+        "from": "0xdF73BBbB6517B712BBeD9bfAe6253A5E1FCDE154",
+        "method": "onEvent",
+        "noEvents": [
+          "Copied",
+          "Refused"
+        ]
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "residue-14e2",
+      "section": "same-block",
+      "run": "e2e",
+      "context": true,
+      "label": "Residue setup: the follower buys 0.00023 BTC on its own",
+      "hash": "0x14e23ae1e3caa789758991ba99fe3266a0c70ec4e6c0864731a104fb5070d4b4",
+      "expect": {
+        "block": 35025740,
+        "index": 2,
+        "gasUsed": 2032399,
+        "from": "0x7d736a88978e94e60494ff91c49ba838edfb1932",
+        "to": "0x4181dd08E73BbCdd1Ba3E615A18f6abD941b94C0",
+        "method": "placeOrder"
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "residue-7d03",
+      "section": "same-block",
+      "run": "e2e",
+      "context": true,
+      "label": "Residue setup: the follower sells 0.00013 BTC, leaving 0.0001 (below the 0.00013 minimum)",
+      "hash": "0x7d031829ef569159ec8aeaec4a7722d8386eb1b78e3d45d07939133a4af953ea",
+      "expect": {
+        "block": 35025748,
+        "index": 5,
+        "gasUsed": 1580367,
+        "from": "0x7d736a88978e94e60494ff91c49ba838edfb1932",
+        "to": "0x4181dd08E73BbCdd1Ba3E615A18f6abD941b94C0",
+        "method": "placeOrder"
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "app-live-move",
+      "section": "same-block",
+      "alsoIn": [
+        "refusals"
+      ],
+      "run": "app",
+      "pair": "app-live",
+      "role": "move",
+      "label": "The leader buys 0.00013 BTC while the follower's dashboard is open",
+      "hash": "0x020ad2ecfc395d95691ec72ab275e61a7a8d50ead2978b249773eba2d98a17c6",
+      "expect": {
+        "block": 35977607,
+        "index": 4,
+        "gasUsed": 1770144,
+        "from": "0xa1d0cb85c869e534fe1e0c22af3b238301157b5d",
+        "to": "0x4181dd08E73BbCdd1Ba3E615A18f6abD941b94C0",
+        "method": "placeOrder"
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "app-live-copy",
+      "section": "same-block",
+      "alsoIn": [
+        "refusals"
+      ],
+      "run": "app",
+      "pair": "app-live",
+      "role": "copy",
+      "label": "the hub's handler",
+      "hash": "0x9b950e40fe79338890174ef0e9d4ed7cc2bf5733e6d1df04b049f74b916e9e3c",
+      "expect": {
+        "block": 35977607,
+        "index": 7,
+        "gasUsed": 2304508,
+        "from": "0xdf73bbbb6517b712bbed9bfae6253a5e1fcde154",
+        "to": "0xEFf35D485c4559D9f44e5138B38Cd93052f2E7BF",
+        "method": "onEvent",
+        "events": [
+          {
+            "name": "Copied",
+            "args": {
+              "follower": "0xDe52dd7f81F67D2124ae0fBd8567f405cFAEeaAB",
+              "pool": "0x4181dd08E73BbCdd1Ba3E615A18f6abD941b94C0",
+              "fromSize": "15000",
+              "toSize": "28000"
+            }
+          },
+          {
+            "name": "TankCharged",
+            "args": {
+              "follower": "0xDe52dd7f81F67D2124ae0fBd8567f405cFAEeaAB"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "chain": "hideki",
+      "run": "e2e",
+      "hash": "0x73612c7e131d9a4a56261a4d0a47c647d9180f9f5b77dcea5577f5926d346f29",
+      "id": "band-approve",
+      "section": "refusals",
+      "context": true,
+      "label": "The follower approves the hub on 1000PEPE",
+      "expect": {
+        "block": 35025933,
+        "index": 0,
+        "gasUsed": 303421,
+        "from": "0x7d736a88978e94e60494ff91c49ba838edfb1932",
+        "to": "0x6B2FbfeD328FF5F20C0BE7D3C3437613aFFE8D3a",
+        "method": "setOperatorApprovalForPool",
+        "args": {
+          "pool": "0xfA9B9e50CC1745113d57893991aF200a74c86B6f",
+          "operator": "0xdF73BBbB6517B712BBeD9bfAe6253A5E1FCDE154",
+          "selectors": "[\"0x80054449\"]",
+          "approved": true
+        }
+      }
+    },
+    {
+      "chain": "hideki",
+      "run": "e2e",
+      "hash": "0x65893cab32bfe855dfcbec2fb9b50c013eb852a4bfd206f2ed02560107326def",
+      "id": "band-5bps",
+      "section": "refusals",
+      "context": true,
+      "label": "The follower narrows its price band to 5 bps",
+      "expect": {
+        "block": 35025959,
+        "index": 1,
+        "gasUsed": 70169,
+        "from": "0x7d736a88978e94e60494ff91c49ba838edfb1932",
+        "to": "0xdF73BBbB6517B712BBeD9bfAe6253A5E1FCDE154",
+        "method": "updatePolicy",
+        "events": [
+          {
+            "name": "PolicyUpdated",
+            "args": {
+              "follower": "0x7d736A88978e94E60494Ff91C49Ba838EDfb1932"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "chain": "hideki",
+      "run": "e2e",
+      "hash": "0x837fe45c246a84c6e98000096efe309a2cb2a5f8edb5c0f6f584148a566bde33",
+      "id": "band-leader-close",
+      "section": "refusals",
+      "context": true,
+      "label": "The leader closes 1000PEPE (the follower holds none)",
+      "expect": {
+        "block": 35025999,
+        "index": 0,
+        "gasUsed": 1522434,
+        "from": "0xa1d0cb85c869e534fe1e0c22af3b238301157b5d",
+        "to": "0xfA9B9e50CC1745113d57893991aF200a74c86B6f",
+        "method": "placeOrder"
+      }
+    },
+    {
+      "chain": "hideki",
+      "run": "e2e",
+      "hash": "0xc26581a0f5e9ce2583e2cd8947322f2ecc96dda1e05f7dec093339ba735080f7",
+      "id": "band-50bps",
+      "section": "refusals",
+      "context": true,
+      "label": "The band goes back to 50 bps",
+      "expect": {
+        "block": 35026036,
+        "index": 1,
+        "gasUsed": 70169,
+        "from": "0x7d736a88978e94e60494ff91c49ba838edfb1932",
+        "to": "0xdF73BBbB6517B712BBeD9bfAe6253A5E1FCDE154",
+        "method": "updatePolicy",
+        "events": [
+          {
+            "name": "PolicyUpdated",
+            "args": {
+              "follower": "0x7d736A88978e94E60494Ff91C49Ba838EDfb1932"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "chain": "hideki",
+      "run": "e2e",
+      "hash": "0xfcb2063a6ed0a452aa487aea155cbd1c6ef728b655c42cb4b9f16e7db08f5f0d",
+      "id": "floor-raise",
+      "section": "refusals",
+      "context": true,
+      "label": "The follower sets an equity floor above its equity",
+      "expect": {
+        "block": 35026806,
+        "index": 1,
+        "gasUsed": 70169,
+        "from": "0x7d736a88978e94e60494ff91c49ba838edfb1932",
+        "to": "0xdF73BBbB6517B712BBeD9bfAe6253A5E1FCDE154",
+        "method": "updatePolicy",
+        "events": [
+          {
+            "name": "PolicyUpdated",
+            "args": {
+              "follower": "0x7d736A88978e94E60494Ff91C49Ba838EDfb1932"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "chain": "hideki",
+      "run": "e2e",
+      "hash": "0x79963495fb026d81bf5917f25b826bf16cccbfc45fbdb75a2a8cf5814a88899d",
+      "id": "floor-poke",
+      "section": "refusals",
+      "label": "Anyone calls poke(follower): equity is under the floor, so the hub flattens the copy and stops the follow",
+      "expect": {
+        "block": 35026832,
+        "index": 2,
+        "gasUsed": 1762545,
+        "from": "0x5397812d66F3233E0972b7AEB5e195a945504632",
+        "to": "0xdF73BBbB6517B712BBeD9bfAe6253A5E1FCDE154",
+        "method": "poke",
+        "args": {
+          "follower": "0x7d736A88978e94E60494Ff91C49Ba838EDfb1932"
+        },
+        "events": [
+          {
+            "name": "Copied",
+            "args": {
+              "follower": "0x7d736A88978e94E60494Ff91C49Ba838EDfb1932",
+              "pool": "0x4181dd08E73BbCdd1Ba3E615A18f6abD941b94C0",
+              "fromSize": "50000",
+              "toSize": "0"
+            }
+          },
+          {
+            "name": "Stopped",
+            "args": {
+              "follower": "0x7d736A88978e94E60494Ff91C49Ba838EDfb1932"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "chain": "hideki",
+      "run": "e2e",
+      "hash": "0x78d78a2f8617e65dcc0fadea3d3fb92b92320b9f06cd2795e24a241fda1e8521",
+      "id": "floor-lower",
+      "section": "refusals",
+      "context": true,
+      "label": "The follower lowers the floor to 1 USDso",
+      "expect": {
+        "block": 35026863,
+        "index": 0,
+        "gasUsed": 70169,
+        "from": "0x7d736a88978e94e60494ff91c49ba838edfb1932",
+        "to": "0xdF73BBbB6517B712BBeD9bfAe6253A5E1FCDE154",
+        "method": "updatePolicy",
+        "events": [
+          {
+            "name": "PolicyUpdated",
+            "args": {
+              "follower": "0x7d736A88978e94E60494Ff91C49Ba838EDfb1932"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "chain": "hideki",
+      "run": "e2e",
+      "hash": "0x4f4429339093297b6153e72ea47f60bd36805cac4be9bf8fa18338ac25653fd6",
+      "id": "floor-resume",
+      "section": "refusals",
+      "context": true,
+      "label": "The follower resumes",
+      "expect": {
+        "block": 35026888,
+        "index": 10,
+        "gasUsed": 43520,
+        "from": "0x7d736a88978e94e60494ff91c49ba838edfb1932",
+        "to": "0xdF73BBbB6517B712BBeD9bfAe6253A5E1FCDE154",
+        "method": "resume",
+        "events": [
+          {
+            "name": "Resumed",
+            "args": {
+              "follower": "0x7d736A88978e94E60494Ff91C49Ba838EDfb1932"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "chain": "hideki",
+      "run": "e2e",
+      "hash": "0xe7372945b88861c3ce357f063f408dbe01985ddea0bdb07cfd022f7c7ed27104",
+      "id": "thesis1-create",
+      "section": "theses",
+      "label": "Thesis 1 \"BTC vs ETH\" is created: BTC +50%, ETH -50%",
+      "expect": {
+        "block": 35026061,
+        "index": 4,
+        "gasUsed": 1329554,
+        "from": "0x5397812d66F3233E0972b7AEB5e195a945504632",
+        "to": "0xbcA03A20eaf337b7bb35DBD76512Af5BC61f6c79",
+        "method": "createTheme",
+        "events": [
+          {
+            "name": "ThemeCreated",
+            "args": {
+              "themeId": "1",
+              "creator": "0x5397812d66F3233E0972b7AEB5e195a945504632",
+              "name": "BTC vs ETH"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "chain": "hideki",
+      "run": "e2e",
+      "hash": "0x9ba45cff499cf822453b385cba8a0b1286c1ec06a43a9abac360e23af19ecd3e",
+      "id": "thesis1-follow",
+      "section": "theses",
+      "label": "A wallet follows thesis 1: both legs open in this one transaction",
+      "expect": {
+        "block": 35026093,
+        "index": 0,
+        "gasUsed": 11426420,
+        "from": "0xcee40D3C7709404Cf60916BFEa39925fcB1f09Ed",
+        "to": "0xdF73BBbB6517B712BBeD9bfAe6253A5E1FCDE154",
+        "method": "follow",
+        "events": [
+          {
+            "name": "Followed",
+            "args": {
+              "follower": "0xcee40D3C7709404Cf60916BFEa39925fcB1f09Ed",
+              "kind": "Theme",
+              "ref": "1"
+            }
+          },
+          {
+            "name": "GroupOpened",
+            "args": {
+              "relay": "0x6DAda17bC84079374Bf73FCa8E9F1066290E648c"
+            }
+          },
+          {
+            "name": "Copied",
+            "args": {
+              "follower": "0xcee40D3C7709404Cf60916BFEa39925fcB1f09Ed",
+              "pool": "0x4181dd08E73BbCdd1Ba3E615A18f6abD941b94C0",
+              "fromSize": "0",
+              "toSize": "49000"
+            }
+          },
+          {
+            "name": "Copied",
+            "args": {
+              "follower": "0xcee40D3C7709404Cf60916BFEa39925fcB1f09Ed",
+              "pool": "0xd6cb1dd58580b84d76068ac21594219ce03aeddf",
+              "fromSize": "0",
+              "toSize": "-16900000000000000"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "thesis2-create",
+      "section": "theses",
+      "run": "app",
+      "label": "Thesis 2 \"BTC over ETH, small\" is published from the thesis builder: BTC +100%, ETH -100%",
+      "hash": "0x019449d0e698a29b44c910d9748f56d6619977ff03c7a9e03601471c8e053dc0",
+      "expect": {
+        "block": 35973954,
+        "index": 3,
+        "gasUsed": 1129554,
+        "from": "0xA969Dd0B79Ca1d4571E45d97A8f4981805eBaEd3",
+        "to": "0xbcA03A20eaf337b7bb35DBD76512Af5BC61f6c79",
+        "method": "createTheme",
+        "events": [
+          {
+            "name": "ThemeCreated",
+            "args": {
+              "themeId": "2",
+              "creator": "0xA969Dd0B79Ca1d4571E45d97A8f4981805eBaEd3",
+              "name": "BTC over ETH, small"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "thesis2-rebalance",
+      "section": "theses",
+      "run": "app",
+      "label": "Its creator rebalances thesis 2 to v2 from the thesis page: BTC +120%, ETH -80%",
+      "hash": "0x02e4c2ddf942d9c69265bf70cd2d31af0a5800ad9e78080cf34844888a9d3f2e",
+      "expect": {
+        "block": 35974871,
+        "index": 0,
+        "gasUsed": 101157,
+        "from": "0xA969Dd0B79Ca1d4571E45d97A8f4981805eBaEd3",
+        "to": "0xbcA03A20eaf337b7bb35DBD76512Af5BC61f6c79",
+        "method": "rebalance",
+        "events": [
+          {
+            "name": "ThemeRebalanced",
+            "args": {
+              "themeId": "2",
+              "version": "2"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "app-setup-btc",
+      "section": "lifecycle",
+      "run": "app",
+      "label": "Before the follow, the leader opens 0.00015 BTC",
+      "hash": "0x1582615d4afa2bd851f4b4463da1aed8e81e6db0bbe3e3145890164af0a970be",
+      "expect": {
+        "block": 35975363,
+        "index": 5,
+        "gasUsed": 744370,
+        "from": "0xa1d0cb85c869e534fe1e0c22af3b238301157b5d",
+        "to": "0x4181dd08E73BbCdd1Ba3E615A18f6abD941b94C0",
+        "method": "placeOrder"
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "app-setup-eth",
+      "section": "lifecycle",
+      "run": "app",
+      "label": "… and 0.005 ETH",
+      "hash": "0x69326fc9c0db5f3b71951ae0db7a9d6c6d82b612f874b6f9ba8eb4fb397ff153",
+      "expect": {
+        "block": 35975371,
+        "index": 0,
+        "gasUsed": 2568807,
+        "from": "0xa1d0cb85c869e534fe1e0c22af3b238301157b5d",
+        "to": "0xd6cb1dd58580b84d76068ac21594219ce03aeddf",
+        "method": "placeOrder"
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "app-setup-sol",
+      "section": "lifecycle",
+      "run": "app",
+      "label": "… and 0.12 SOL",
+      "hash": "0x80f3f2abf7a466cee356f77ad9b2cb8ce42106aa75e4bab6438dd22326eecf50",
+      "expect": {
+        "block": 35975379,
+        "index": 0,
+        "gasUsed": 2700508,
+        "from": "0xa1d0cb85c869e534fe1e0c22af3b238301157b5d",
+        "to": "0xb483ec1fb34996638677c20ab087b16f1896fa53",
+        "method": "placeOrder"
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "app-approve",
+      "section": "lifecycle",
+      "run": "app",
+      "label": "Operator approval: the follower lets the hub place orders for it (placeOrderFor, every market)",
+      "hash": "0x1760ec9879d73e5c2e5cd8c0c226021ec906a86f566f9f408148deade0281fb6",
+      "expect": {
+        "block": 35976301,
+        "index": 2,
+        "gasUsed": 283347,
+        "from": "0xDe52dd7f81F67D2124ae0fBd8567f405cFAEeaAB",
+        "to": "0x6B2FbfeD328FF5F20C0BE7D3C3437613aFFE8D3a",
+        "method": "setOperatorApprovalGlobal",
+        "args": {
+          "operator": "0xdF73BBbB6517B712BBeD9bfAe6253A5E1FCDE154",
+          "selectors": "[\"0x80054449\"]",
+          "approved": true
+        }
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "app-guard-off",
+      "section": "lifecycle",
+      "run": "app",
+      "label": "The follower turns its AI guard off (the leader held a BLOCK at the time)",
+      "hash": "0x81dbf87607123781727a3897049ea2e7f7b6865211b4c63c695857e1acda2e0c",
+      "expect": {
+        "block": 35976601,
+        "index": 1,
+        "gasUsed": 247799,
+        "from": "0xDe52dd7f81F67D2124ae0fBd8567f405cFAEeaAB",
+        "to": "0xEe54c49E9e70a0e5C2218Eec1b1BDBd4e1Cb20f1",
+        "method": "setGuard",
+        "args": {
+          "on": false
+        },
+        "events": [
+          {
+            "name": "GuardSet",
+            "args": {
+              "follower": "0xDe52dd7f81F67D2124ae0fBd8567f405cFAEeaAB",
+              "on": "false"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "app-follow",
+      "section": "lifecycle",
+      "run": "app",
+      "label": "Follow the leader: scale 1x, cap $30 a position and $80 in all, band 0.5%, 0.5 STT gas tank",
+      "hash": "0xc2656028fdad16e91bbd2d46190e698307f158e5eb59620d11406a3a4e2deb5f",
+      "expect": {
+        "block": 35976849,
+        "index": 4,
+        "gasUsed": 1729420,
+        "from": "0xDe52dd7f81F67D2124ae0fBd8567f405cFAEeaAB",
+        "to": "0xdF73BBbB6517B712BBeD9bfAe6253A5E1FCDE154",
+        "method": "follow",
+        "events": [
+          {
+            "name": "Followed",
+            "args": {
+              "follower": "0xDe52dd7f81F67D2124ae0fBd8567f405cFAEeaAB",
+              "kind": "Trader"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "app-catchup",
+      "section": "lifecycle",
+      "run": "app",
+      "label": "catchUp from the dashboard banner: the three markets the leader already held open in one transaction",
+      "hash": "0x0ad2a45d92030aa3e8279a558f0bd1574a761ec38a28af37e52bebb07b1849d5",
+      "expect": {
+        "block": 35977159,
+        "index": 3,
+        "gasUsed": 9576399,
+        "from": "0xDe52dd7f81F67D2124ae0fBd8567f405cFAEeaAB",
+        "to": "0xdF73BBbB6517B712BBeD9bfAe6253A5E1FCDE154",
+        "method": "catchUp",
+        "events": [
+          {
+            "name": "Copied",
+            "args": {
+              "follower": "0xDe52dd7f81F67D2124ae0fBd8567f405cFAEeaAB",
+              "pool": "0x4181dd08E73BbCdd1Ba3E615A18f6abD941b94C0",
+              "fromSize": "0"
+            }
+          },
+          {
+            "name": "Copied",
+            "args": {
+              "follower": "0xDe52dd7f81F67D2124ae0fBd8567f405cFAEeaAB",
+              "pool": "0xd6cb1dd58580b84d76068ac21594219ce03aeddf",
+              "fromSize": "0"
+            }
+          },
+          {
+            "name": "Copied",
+            "args": {
+              "follower": "0xDe52dd7f81F67D2124ae0fBd8567f405cFAEeaAB",
+              "pool": "0xb483ec1fb34996638677c20ab087b16f1896fa53",
+              "fromSize": "0"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "app-fundtank",
+      "section": "lifecycle",
+      "run": "app",
+      "label": "Top up the gas tank by 0.2 STT",
+      "hash": "0xebf678d27deeb680e045909974b5357f54f726f176f48ef9e7a42a5b57b6dfe7",
+      "expect": {
+        "block": 35978536,
+        "index": 0,
+        "gasUsed": 25325,
+        "from": "0xDe52dd7f81F67D2124ae0fBd8567f405cFAEeaAB",
+        "to": "0xdF73BBbB6517B712BBeD9bfAe6253A5E1FCDE154",
+        "method": "fundTank",
+        "value": "200000000000000000"
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "app-unfollow",
+      "section": "lifecycle",
+      "run": "app",
+      "label": "Unfollow with flatten: BTC, SOL and ETH closed in the same transaction",
+      "hash": "0x50c6e56a7479a74bebf41bf75192fafe2430cef13b868e019692c5562866f8ab",
+      "expect": {
+        "block": 35979004,
+        "index": 6,
+        "gasUsed": 4830145,
+        "from": "0xDe52dd7f81F67D2124ae0fBd8567f405cFAEeaAB",
+        "to": "0xdF73BBbB6517B712BBeD9bfAe6253A5E1FCDE154",
+        "method": "unfollow",
+        "args": {
+          "flatten": true
+        },
+        "events": [
+          {
+            "name": "Copied",
+            "args": {
+              "follower": "0xDe52dd7f81F67D2124ae0fBd8567f405cFAEeaAB",
+              "pool": "0x4181dd08E73BbCdd1Ba3E615A18f6abD941b94C0",
+              "toSize": "0"
+            }
+          },
+          {
+            "name": "Copied",
+            "args": {
+              "follower": "0xDe52dd7f81F67D2124ae0fBd8567f405cFAEeaAB",
+              "pool": "0xd6cb1dd58580b84d76068ac21594219ce03aeddf",
+              "toSize": "0"
+            }
+          },
+          {
+            "name": "Copied",
+            "args": {
+              "follower": "0xDe52dd7f81F67D2124ae0fBd8567f405cFAEeaAB",
+              "pool": "0xb483ec1fb34996638677c20ab087b16f1896fa53",
+              "toSize": "0"
+            }
+          },
+          {
+            "name": "Unfollowed",
+            "args": {
+              "follower": "0xDe52dd7f81F67D2124ae0fBd8567f405cFAEeaAB",
+              "flattened": "true"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "app-withdrawtank",
+      "section": "lifecycle",
+      "run": "app",
+      "label": "Withdraw the whole gas tank",
+      "hash": "0x9f97e5f0fce9e177d1ab6b6f45251065056679e897fd573d3b293f6c469107bd",
+      "expect": {
+        "block": 35982776,
+        "index": 2,
+        "gasUsed": 40747,
+        "from": "0xDe52dd7f81F67D2124ae0fBd8567f405cFAEeaAB",
+        "to": "0xdF73BBbB6517B712BBeD9bfAe6253A5E1FCDE154",
+        "method": "withdrawTank"
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "app-revoke",
+      "section": "lifecycle",
+      "run": "app",
+      "label": "Revoke the operator approval",
+      "hash": "0x14f5150b385a478f2c5c8b4c57b2bb9dda3469b777f82aae227304491c853d16",
+      "expect": {
+        "block": 35982859,
+        "index": 1,
+        "gasUsed": 83347,
+        "from": "0xDe52dd7f81F67D2124ae0fBd8567f405cFAEeaAB",
+        "to": "0x6B2FbfeD328FF5F20C0BE7D3C3437613aFFE8D3a",
+        "method": "setOperatorApprovalGlobal",
+        "args": {
+          "operator": "0xdF73BBbB6517B712BBeD9bfAe6253A5E1FCDE154",
+          "selectors": "[\"0x80054449\"]",
+          "approved": false
+        }
+      }
+    },
+    {
+      "chain": "hideki",
+      "run": "e2e",
+      "hash": "0xfab1d716afad51ed68790476da7d8014b92ade230b5226a4273f0e67894f38fd",
+      "id": "e2e-approve-btc",
+      "section": "lifecycle",
+      "label": "Operator approval for one market: the follower approves the hub on BTC only",
+      "expect": {
+        "block": 35025503,
+        "index": 6,
+        "gasUsed": 303421,
+        "from": "0x7d736A88978e94E60494Ff91C49Ba838EDfb1932",
+        "to": "0x6B2FbfeD328FF5F20C0BE7D3C3437613aFFE8D3a",
+        "method": "setOperatorApprovalForPool",
+        "args": {
+          "pool": "0x4181dd08E73BbCdd1Ba3E615A18f6abD941b94C0",
+          "operator": "0xdF73BBbB6517B712BBeD9bfAe6253A5E1FCDE154",
+          "selectors": "[\"0x80054449\"]",
+          "approved": true
+        }
+      }
+    },
+    {
+      "chain": "hideki",
+      "run": "e2e",
+      "hash": "0xd91681320febba9206b7240cf25fa8e9b1294f65cbd49bd99615bb7dd8894f12",
+      "id": "e2e-approve-global",
+      "section": "lifecycle",
+      "label": "Operator approval for every market (the thesis follower)",
+      "expect": {
+        "block": 35025532,
+        "index": 2,
+        "gasUsed": 283347,
+        "from": "0xcee40D3C7709404Cf60916BFEa39925fcB1f09Ed",
+        "to": "0x6B2FbfeD328FF5F20C0BE7D3C3437613aFFE8D3a",
+        "method": "setOperatorApprovalGlobal",
+        "args": {
+          "operator": "0xdF73BBbB6517B712BBeD9bfAe6253A5E1FCDE154",
+          "selectors": "[\"0x80054449\"]",
+          "approved": true
+        }
+      }
+    },
+    {
+      "chain": "hideki",
+      "run": "e2e",
+      "hash": "0x07e53352b9e495f57377bfc383df4c0ef64d05eb4c2647f29b7e3ad7ea35af92",
+      "id": "e2e-follow",
+      "section": "lifecycle",
+      "label": "Follow the leader (scale 1x, max $100, band 50 bps, 1 STT tank): the hub opens the leader's first group, a relay and a Reactivity subscription",
+      "expect": {
+        "block": 35025568,
+        "index": 5,
+        "gasUsed": 6538534,
+        "from": "0x7d736A88978e94E60494Ff91C49Ba838EDfb1932",
+        "to": "0xdF73BBbB6517B712BBeD9bfAe6253A5E1FCDE154",
+        "method": "follow",
+        "events": [
+          {
+            "name": "Followed",
+            "args": {
+              "follower": "0x7d736A88978e94E60494Ff91C49Ba838EDfb1932",
+              "kind": "Trader"
+            }
+          },
+          {
+            "name": "GroupOpened",
+            "args": {
+              "relay": "0xEFf35D485c4559D9f44e5138B38Cd93052f2E7BF"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "chain": "hideki",
+      "run": "e2e",
+      "hash": "0x32a24aa9078495c35ac6bc78fc2097eff2e088f72a0a35b79f056700a71e1382",
+      "id": "e2e-unfollow-last",
+      "section": "lifecycle",
+      "label": "The group's last member unfollows: the hub cancels the group's subscription",
+      "expect": {
+        "block": 35026952,
+        "index": 1,
+        "gasUsed": 329365,
+        "from": "0x7d736A88978e94E60494Ff91C49Ba838EDfb1932",
+        "to": "0xdF73BBbB6517B712BBeD9bfAe6253A5E1FCDE154",
+        "method": "unfollow",
+        "args": {
+          "flatten": true
+        },
+        "events": [
+          {
+            "name": "Unfollowed",
+            "args": {
+              "follower": "0x7d736A88978e94E60494Ff91C49Ba838EDfb1932"
+            }
+          },
+          {
+            "name": "GroupClosed",
+            "args": {
+              "cancelled": "true"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "chain": "hideki",
+      "run": "e2e",
+      "hash": "0xf674ad340dbda52017d4fde31a14a0628d5c41c9c8b53dd4523c657b0aba6ed2",
+      "id": "e2e-ensure",
+      "section": "lifecycle",
+      "label": "ensureSubscribed on the empty group does nothing (no events)",
+      "expect": {
+        "block": 35026983,
+        "index": 3,
+        "gasUsed": 36642,
+        "from": "0x5397812d66F3233E0972b7AEB5e195a945504632",
+        "to": "0xdF73BBbB6517B712BBeD9bfAe6253A5E1FCDE154",
+        "method": "ensureSubscribed",
+        "noEvents": [
+          "GroupOpened"
+        ]
+      }
+    },
+    {
+      "chain": "hideki",
+      "run": "e2e",
+      "hash": "0xb3307cd7424cd336d6a257fe39c0634d22f7c5595ce64dcf74a3ae49818d3835",
+      "id": "e2e-guaranteed",
+      "section": "lifecycle",
+      "label": "The owner turns on guaranteed delivery for new subscriptions",
+      "expect": {
+        "block": 35027012,
+        "index": 4,
+        "gasUsed": 84718,
+        "from": "0x5397812d66F3233E0972b7AEB5e195a945504632",
+        "to": "0xdF73BBbB6517B712BBeD9bfAe6253A5E1FCDE154",
+        "method": "setSubParams",
+        "events": [
+          {
+            "name": "SubParamsSet",
+            "args": {
+              "guaranteed": "true"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "chain": "hideki",
+      "run": "e2e",
+      "hash": "0x791e3d3a329cd6c8f86ab36ab3836681e0512c4a3adbb150e719da62324174ad",
+      "id": "e2e-refollow",
+      "section": "lifecycle",
+      "label": "The follower follows again: the group re-subscribes with guaranteed delivery",
+      "expect": {
+        "block": 35027038,
+        "index": 2,
+        "gasUsed": 384463,
+        "from": "0x7d736A88978e94E60494Ff91C49Ba838EDfb1932",
+        "to": "0xdF73BBbB6517B712BBeD9bfAe6253A5E1FCDE154",
+        "method": "follow",
+        "events": [
+          {
+            "name": "Followed",
+            "args": {
+              "follower": "0x7d736A88978e94E60494Ff91C49Ba838EDfb1932"
+            }
+          },
+          {
+            "name": "GroupOpened"
+          }
+        ]
+      }
+    },
+    {
+      "chain": "hideki",
+      "run": "e2e",
+      "hash": "0xbe7a3962ba2ca629e6b0ae3b6734fca193c8a9458ced70be02627eb8ed06c623",
+      "id": "cfg-gas-e2e",
+      "section": "contracts",
+      "label": "The e2e run re-derives and re-sets the gas parameters (handler floor 12M, charge overhead 150k)",
+      "expect": {
+        "block": 35027127,
+        "index": 2,
+        "gasUsed": 105377,
+        "from": "0x5397812d66F3233E0972b7AEB5e195a945504632",
+        "to": "0xdF73BBbB6517B712BBeD9bfAe6253A5E1FCDE154",
+        "method": "setGasParams",
+        "events": [
+          {
+            "name": "GasParamsSet",
+            "args": {
+              "floor": "12000000",
+              "chargeOverhead": "150000"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "cfg-gas",
+      "section": "contracts",
+      "run": "deploy",
+      "label": "setGasParams: floor 12M, per-follower cap 20M, thesis per-follower cap 90M, tail base 1.2M, per deferral 30k, charge overhead 150k, risk-gate budget 2M",
+      "hash": "0x33f200e8dbdddc0335c4f9d4a851f4513d6662c8288491b6d26f602972e994c1",
+      "expect": {
+        "from": "0x5397812d66F3233E0972b7AEB5e195a945504632",
+        "to": "0xdF73BBbB6517B712BBeD9bfAe6253A5E1FCDE154",
+        "method": "setGasParams",
+        "gasUsed": 105377,
+        "events": [
+          {
+            "name": "GasParamsSet",
+            "args": {
+              "floor": "12000000",
+              "perFollowerCap": "20000000",
+              "themePerFollowerCap": "90000000",
+              "tailBase": "1200000",
+              "perDefer": "30000",
+              "chargeOverhead": "150000",
+              "riskGateGas": "2000000"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "cfg-sub",
+      "section": "contracts",
+      "run": "deploy",
+      "label": "setSubParams: priority fee 0, max fee 20 gwei, gas limits 200M, guaranteed delivery on",
+      "hash": "0x340b347789881a0f26324194324789280549c1e5862fbccb253ee0237ee3b4b1",
+      "expect": {
+        "from": "0x5397812d66F3233E0972b7AEB5e195a945504632",
+        "to": "0xdF73BBbB6517B712BBeD9bfAe6253A5E1FCDE154",
+        "method": "setSubParams",
+        "gasUsed": 284718,
+        "events": [
+          {
+            "name": "SubParamsSet",
+            "args": {
+              "priorityFeePerGas": "0",
+              "maxFeePerGas": "20000000000",
+              "traderGasLimit": "200000000",
+              "themeGasLimit": "200000000",
+              "guaranteed": "true"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "cfg-riskgate",
+      "section": "contracts",
+      "run": "risk",
+      "label": "The hub's risk gate is set (hub.setRiskGate)",
+      "hash": "0x4c0bac32cca8bd1f21357a671b217f91d50672805e0280735cc884cef6d21cc2",
+      "expect": {
+        "block": 35359076,
+        "gasUsed": 242086,
+        "from": "0x5397812d66F3233E0972b7AEB5e195a945504632",
+        "to": "0xdF73BBbB6517B712BBeD9bfAe6253A5E1FCDE154",
+        "method": "setRiskGate",
+        "events": [
+          {
+            "name": "RiskGateSet",
+            "args": {
+              "gate": "0xEe54c49E9e70a0e5C2218Eec1b1BDBd4e1Cb20f1"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "cfg-reviewer",
+      "section": "contracts",
+      "run": "risk",
+      "label": "The gate is pointed at the current reviewer on Shannon (gate.setReviewer)",
+      "hash": "0xf759ef8170f5fbae91a43c94a96261055bf280afee4375723bf73f7eb782e6b2",
+      "expect": {
+        "block": 35444833,
+        "gasUsed": 41403,
+        "from": "0x5397812d66F3233E0972b7AEB5e195a945504632",
+        "to": "0xEe54c49E9e70a0e5C2218Eec1b1BDBd4e1Cb20f1",
+        "method": "setReviewer",
+        "events": [
+          {
+            "name": "ReviewerSet",
+            "args": {
+              "reviewer": "0xc999B6924179a0dc9649DA7eBa8F3aC8b7CF7c25"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "gate-open-move",
+      "section": "guard",
+      "subsection": "gate",
+      "run": "risk",
+      "label": "The leader buys 0.0005 BTC: an increase, so the hub asks the gate",
+      "hash": "0xee83f43787fcc8b1b2fffd9be6724f0cf421b26a18aa4d1a5cac971d19955a48",
+      "pair": "gate-open",
+      "role": "move",
+      "expect": {
+        "block": 35360100,
+        "gasUsed": 1688036,
+        "from": "0xA1d0CB85c869e534Fe1e0c22af3b238301157b5d",
+        "to": "0x4181dd08E73BbCdd1Ba3E615A18f6abD941b94C0",
+        "method": "placeOrder"
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "gate-open-copy",
+      "section": "guard",
+      "subsection": "gate",
+      "run": "risk",
+      "label": "the hub's handler",
+      "hash": "0xaf42db532b9270bc6ed447adb41bbc7859e548b89186c3d377803870acc370fe",
+      "pair": "gate-open",
+      "role": "copy",
+      "expect": {
+        "block": 35360100,
+        "gasUsed": 1928359,
+        "from": "0xdF73BBbB6517B712BBeD9bfAe6253A5E1FCDE154",
+        "to": "0xEFf35D485c4559D9f44e5138B38Cd93052f2E7BF",
+        "method": "onEvent",
+        "events": [
+          {
+            "name": "Copied",
+            "args": {
+              "follower": "0x7d736A88978e94E60494Ff91C49Ba838EDfb1932",
+              "pool": "0x4181dd08E73BbCdd1Ba3E615A18f6abD941b94C0",
+              "fromSize": "0",
+              "toSize": "50000"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "gate-close-move",
+      "section": "guard",
+      "subsection": "gate",
+      "run": "risk",
+      "label": "The leader sells 0.0005 BTC: an exit, which never asks the gate",
+      "hash": "0xc5f6b7d1bfa5c3492c60607d2f02b564d8fb699dbf22e87ac6c4f342ff1e0488",
+      "pair": "gate-close",
+      "role": "move",
+      "expect": {
+        "block": 35360151,
+        "gasUsed": 1588025,
+        "from": "0xA1d0CB85c869e534Fe1e0c22af3b238301157b5d",
+        "to": "0x4181dd08E73BbCdd1Ba3E615A18f6abD941b94C0",
+        "method": "placeOrder"
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "gate-close-copy",
+      "section": "guard",
+      "subsection": "gate",
+      "run": "risk",
+      "label": "the hub's handler",
+      "hash": "0x3a6c3caac06422dafbff719d731b1118c7959666bfa1bf13d2c22f34a62468d8",
+      "pair": "gate-close",
+      "role": "copy",
+      "expect": {
+        "block": 35360151,
+        "gasUsed": 1816566,
+        "from": "0xdF73BBbB6517B712BBeD9bfAe6253A5E1FCDE154",
+        "to": "0xEFf35D485c4559D9f44e5138B38Cd93052f2E7BF",
+        "method": "onEvent",
+        "events": [
+          {
+            "name": "Copied",
+            "args": {
+              "follower": "0x7d736A88978e94E60494Ff91C49Ba838EDfb1932",
+              "pool": "0x4181dd08E73BbCdd1Ba3E615A18f6abD941b94C0",
+              "fromSize": "50000",
+              "toSize": "0"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "guard-off",
+      "section": "guard",
+      "subsection": "block",
+      "run": "risk",
+      "label": "The follower opts out of the guard",
+      "hash": "0x514511897ce35f14c2addde4e7e5c838f83ac4c5e4194a935b4b05457268fbfa",
+      "context": true,
+      "expect": {
+        "block": 35414455,
+        "gasUsed": 247799,
+        "from": "0x7d736A88978e94E60494Ff91C49Ba838EDfb1932",
+        "to": "0xEe54c49E9e70a0e5C2218Eec1b1BDBd4e1Cb20f1",
+        "method": "setGuard",
+        "args": {
+          "on": false
+        },
+        "events": [
+          {
+            "name": "GuardSet",
+            "args": {
+              "follower": "0x7d736A88978e94E60494Ff91C49Ba838EDfb1932",
+              "on": "false"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "guard-unguarded-move",
+      "section": "guard",
+      "subsection": "block",
+      "run": "risk",
+      "label": "The leader (BLOCK on the gate) buys 0.0005 BTC; the follower is unguarded",
+      "hash": "0x90d223e26f2f54faed03da9bd63a917f77176c8ad662246f30b11cd040e32c9a",
+      "pair": "guard-unguarded",
+      "role": "move",
+      "expect": {
+        "block": 35414495,
+        "gasUsed": 1684713,
+        "from": "0xA1d0CB85c869e534Fe1e0c22af3b238301157b5d",
+        "to": "0x4181dd08E73BbCdd1Ba3E615A18f6abD941b94C0",
+        "method": "placeOrder"
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "guard-unguarded-copy",
+      "section": "guard",
+      "subsection": "block",
+      "run": "risk",
+      "label": "the hub's handler: copied",
+      "hash": "0x8a2d36e01bb352e5feebd523381f2c9d0f2ef410bd111868a71071b18dee07ef",
+      "pair": "guard-unguarded",
+      "role": "copy",
+      "expect": {
+        "block": 35414495,
+        "gasUsed": 1926099,
+        "from": "0xdF73BBbB6517B712BBeD9bfAe6253A5E1FCDE154",
+        "to": "0xEFf35D485c4559D9f44e5138B38Cd93052f2E7BF",
+        "method": "onEvent",
+        "events": [
+          {
+            "name": "Copied",
+            "args": {
+              "follower": "0x7d736A88978e94E60494Ff91C49Ba838EDfb1932",
+              "pool": "0x4181dd08E73BbCdd1Ba3E615A18f6abD941b94C0",
+              "fromSize": "0",
+              "toSize": "50000"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "guard-on",
+      "section": "guard",
+      "subsection": "block",
+      "run": "risk",
+      "label": "The follower turns the guard on",
+      "hash": "0x39d65da7c37379db8e2992fae1f20cf3266ac417743e766610d5304b154b1075",
+      "context": true,
+      "expect": {
+        "block": 35414540,
+        "gasUsed": 47799,
+        "from": "0x7d736A88978e94E60494Ff91C49Ba838EDfb1932",
+        "to": "0xEe54c49E9e70a0e5C2218Eec1b1BDBd4e1Cb20f1",
+        "method": "setGuard",
+        "args": {
+          "on": true
+        },
+        "events": [
+          {
+            "name": "GuardSet",
+            "args": {
+              "follower": "0x7d736A88978e94E60494Ff91C49Ba838EDfb1932",
+              "on": "true"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "guard-blocked-move",
+      "section": "guard",
+      "subsection": "block",
+      "alsoIn": [
+        "refusals"
+      ],
+      "run": "risk",
+      "label": "The leader adds 0.0003 BTC; the follower is guarded",
+      "hash": "0xe2cf079e39cd19fab19ab610dd1b9dfa81a8c5e2eabe0deeadadf91dede4dc2d",
+      "pair": "guard-blocked",
+      "role": "move",
+      "expect": {
+        "block": 35414570,
+        "gasUsed": 1615666,
+        "from": "0xA1d0CB85c869e534Fe1e0c22af3b238301157b5d",
+        "to": "0x4181dd08E73BbCdd1Ba3E615A18f6abD941b94C0",
+        "method": "placeOrder"
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "guard-blocked-copy",
+      "section": "guard",
+      "subsection": "block",
+      "alsoIn": [
+        "refusals"
+      ],
+      "run": "risk",
+      "label": "the hub's handler: refused, reason RiskGate",
+      "hash": "0x6d1513eae0aa1c0aa4a9bad7059388f42b2eeebea8cbb502aa5631356ef51c79",
+      "pair": "guard-blocked",
+      "role": "copy",
+      "expect": {
+        "block": 35414570,
+        "gasUsed": 270165,
+        "from": "0xdF73BBbB6517B712BBeD9bfAe6253A5E1FCDE154",
+        "to": "0xEFf35D485c4559D9f44e5138B38Cd93052f2E7BF",
+        "method": "onEvent",
+        "events": [
+          {
+            "name": "Refused",
+            "args": {
+              "follower": "0x7d736A88978e94E60494Ff91C49Ba838EDfb1932",
+              "pool": "0x4181dd08E73BbCdd1Ba3E615A18f6abD941b94C0",
+              "reason": "RiskGate"
+            }
+          }
+        ],
+        "noEvents": [
+          "Copied"
+        ]
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "guard-exit-move",
+      "section": "guard",
+      "subsection": "block",
+      "run": "risk",
+      "label": "The leader sells 0.0008 BTC (closes); the follower is still guarded and the BLOCK still stands",
+      "hash": "0x18c5625772d2bbdcd2402012f3bf167de8117d47435c9b53fcda3918fc40daa6",
+      "pair": "guard-exit",
+      "role": "move",
+      "expect": {
+        "block": 35414612,
+        "gasUsed": 1575655,
+        "from": "0xA1d0CB85c869e534Fe1e0c22af3b238301157b5d",
+        "to": "0x4181dd08E73BbCdd1Ba3E615A18f6abD941b94C0",
+        "method": "placeOrder"
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "guard-exit-copy",
+      "section": "guard",
+      "subsection": "block",
+      "run": "risk",
+      "label": "the hub's handler: the exit is copied",
+      "hash": "0x0f1c670aa00e4b3269e829241a63ce9c4f6189a3e540f8a42ff366b5b01487f9",
+      "pair": "guard-exit",
+      "role": "copy",
+      "expect": {
+        "block": 35414612,
+        "gasUsed": 1812616,
+        "from": "0xdF73BBbB6517B712BBeD9bfAe6253A5E1FCDE154",
+        "to": "0xEFf35D485c4559D9f44e5138B38Cd93052f2E7BF",
+        "method": "onEvent",
+        "events": [
+          {
+            "name": "Copied",
+            "args": {
+              "follower": "0x7d736A88978e94E60494Ff91C49Ba838EDfb1932",
+              "pool": "0x4181dd08E73BbCdd1Ba3E615A18f6abD941b94C0",
+              "fromSize": "50000",
+              "toSize": "0"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "mcp-approve",
+      "section": "mcp",
+      "run": "app",
+      "label": "follow_thesis, step 1: operator approval",
+      "hash": "0xce3aacb8fa0811174fa662622183276d77511d529c07a53dcc7cc414da240fc7",
+      "expect": {
+        "block": 35981056,
+        "index": 8,
+        "gasUsed": 283347,
+        "from": "0xCDE791006eA6E99e9A614Bc9d0995879E2Cc5E72",
+        "to": "0x6B2FbfeD328FF5F20C0BE7D3C3437613aFFE8D3a",
+        "method": "setOperatorApprovalGlobal",
+        "args": {
+          "operator": "0xdF73BBbB6517B712BBeD9bfAe6253A5E1FCDE154",
+          "selectors": "[\"0x80054449\"]",
+          "approved": true
+        }
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "mcp-follow",
+      "section": "mcp",
+      "run": "app",
+      "label": "follow_thesis, step 2: follow thesis 2 with $14 (caps $20 / $40, 0.3 STT tank); both legs open in this transaction",
+      "hash": "0xd11d8f20041babf70975902587d9b53d631e5fd1f7a2151a4867fd7a95d2fbb1",
+      "expect": {
+        "block": 35981075,
+        "index": 0,
+        "gasUsed": 13874538,
+        "from": "0xCDE791006eA6E99e9A614Bc9d0995879E2Cc5E72",
+        "to": "0xdF73BBbB6517B712BBeD9bfAe6253A5E1FCDE154",
+        "method": "follow",
+        "events": [
+          {
+            "name": "Followed",
+            "args": {
+              "follower": "0xCDE791006eA6E99e9A614Bc9d0995879E2Cc5E72",
+              "kind": "Theme",
+              "ref": "2"
+            }
+          },
+          {
+            "name": "GroupOpened"
+          },
+          {
+            "name": "Copied",
+            "args": {
+              "follower": "0xCDE791006eA6E99e9A614Bc9d0995879E2Cc5E72",
+              "pool": "0x4181dd08E73BbCdd1Ba3E615A18f6abD941b94C0",
+              "fromSize": "0"
+            }
+          },
+          {
+            "name": "Copied",
+            "args": {
+              "follower": "0xCDE791006eA6E99e9A614Bc9d0995879E2Cc5E72",
+              "pool": "0xd6cb1dd58580b84d76068ac21594219ce03aeddf",
+              "fromSize": "0"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "mcp-unfollow",
+      "section": "mcp",
+      "run": "app",
+      "label": "unfollow {flatten: true}: both legs closed, the group closed",
+      "hash": "0xe3dfba35475ac4021659b35d9d8a79f0d6037bfd4ed5fa8a369e852c4f1530ea",
+      "expect": {
+        "block": 35981273,
+        "index": 4,
+        "gasUsed": 3306516,
+        "from": "0xCDE791006eA6E99e9A614Bc9d0995879E2Cc5E72",
+        "to": "0xdF73BBbB6517B712BBeD9bfAe6253A5E1FCDE154",
+        "method": "unfollow",
+        "args": {
+          "flatten": true
+        },
+        "events": [
+          {
+            "name": "Copied",
+            "args": {
+              "follower": "0xCDE791006eA6E99e9A614Bc9d0995879E2Cc5E72",
+              "pool": "0x4181dd08E73BbCdd1Ba3E615A18f6abD941b94C0",
+              "toSize": "0"
+            }
+          },
+          {
+            "name": "Copied",
+            "args": {
+              "follower": "0xCDE791006eA6E99e9A614Bc9d0995879E2Cc5E72",
+              "pool": "0xd6cb1dd58580b84d76068ac21594219ce03aeddf",
+              "toSize": "0"
+            }
+          },
+          {
+            "name": "GroupClosed"
+          },
+          {
+            "name": "Unfollowed",
+            "args": {
+              "follower": "0xCDE791006eA6E99e9A614Bc9d0995879E2Cc5E72",
+              "flattened": "true"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "mcp-withdraw",
+      "section": "mcp",
+      "run": "app",
+      "label": "withdraw_tank: 0.3 STT back to the agent",
+      "hash": "0x0d97c81dfb3136a29193488c6306eb359fdd7874987611ca9d4d1a21f0c9a2cc",
+      "expect": {
+        "block": 35982319,
+        "index": 0,
+        "gasUsed": 40747,
+        "from": "0xCDE791006eA6E99e9A614Bc9d0995879E2Cc5E72",
+        "to": "0xdF73BBbB6517B712BBeD9bfAe6253A5E1FCDE154",
+        "method": "withdrawTank",
+        "args": {
+          "amount": "300000000000000000"
+        }
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "app-other-961e93",
+      "section": "other",
+      "run": "app",
+      "label": "Fund the app run's follower: 3 STT",
+      "hash": "0x961e9314fda88c6e61879f5ba1316d31946bd2f0cb9c950dddb1e9166af6faf0",
+      "expect": {
+        "block": 35959263,
+        "index": 2,
+        "gasUsed": 421000,
+        "from": "0x5397812d66f3233e0972b7aeb5e195a945504632"
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "app-other-b53e4c",
+      "section": "other",
+      "run": "app",
+      "label": "… 7 USDso",
+      "hash": "0xb53e4c369ba324927d0b805f04f60aa84e876bf81b333bd863787ad9e7cce7d9",
+      "expect": {
+        "block": 35959281,
+        "index": 2,
+        "gasUsed": 262837,
+        "from": "0x5397812d66f3233e0972b7aeb5e195a945504632"
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "app-other-eb5a6a",
+      "section": "other",
+      "run": "app",
+      "label": "The follower deposits 7 USDso margin",
+      "hash": "0xeb5a6ace5fd1d6f9a68388c578957d6491c986a5b0395f2a583392e528e3c0be",
+      "expect": {
+        "block": 35959311,
+        "index": 0,
+        "gasUsed": 493534,
+        "from": "0xde52dd7f81f67d2124ae0fbd8567f405cfaeeaab"
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "app-other-fd7697",
+      "section": "other",
+      "run": "app",
+      "label": "Fund the thesis creator: 1 STT",
+      "hash": "0xfd7697ba185195e85ca3ae24fbdee473cfc6b25f959a024ca5c55a7aecca4feb",
+      "expect": {
+        "block": 35959327,
+        "index": 3,
+        "gasUsed": 421000,
+        "from": "0x5397812d66f3233e0972b7aeb5e195a945504632"
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "app-other-dee3a5",
+      "section": "other",
+      "run": "app",
+      "label": "Fund the agent: 2 STT",
+      "hash": "0xdee3a597d7954ff7b9cbac1366e040b43b022a81e1224f6456ac102661ad93b3",
+      "expect": {
+        "block": 35959342,
+        "index": 8,
+        "gasUsed": 421000,
+        "from": "0x5397812d66f3233e0972b7aeb5e195a945504632"
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "app-other-4198e8",
+      "section": "other",
+      "run": "app",
+      "label": "… 6 USDso",
+      "hash": "0x4198e8f50addd84e2b1e918ac547dc19782ea3127beabfc84a79385204a91d84",
+      "expect": {
+        "block": 35959360,
+        "index": 2,
+        "gasUsed": 262837,
+        "from": "0x5397812d66f3233e0972b7aeb5e195a945504632"
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "app-other-739d8e",
+      "section": "other",
+      "run": "app",
+      "label": "The agent deposits 6 USDso margin",
+      "hash": "0x739d8e1ea91e24da5d388521f9a7037bcb738777e522add9f2821d21465d6bfa",
+      "expect": {
+        "block": 35959389,
+        "index": 3,
+        "gasUsed": 493534,
+        "from": "0xcde791006ea6e99e9a614bc9d0995879e2cc5e72"
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "app-other-c89459",
+      "section": "other",
+      "run": "app",
+      "label": "Cleanup: the leader closes 0.00028 BTC (no follower left)",
+      "hash": "0xc89459af8fde109edec65c67ab845f7d72ca8d31dbaf491f3e070d71a75a0b03",
+      "expect": {
+        "block": 35982558,
+        "index": 0,
+        "gasUsed": 1506562,
+        "from": "0xa1d0cb85c869e534fe1e0c22af3b238301157b5d"
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "app-other-4d33b4",
+      "section": "other",
+      "run": "app",
+      "label": "Cleanup: the leader closes 0.005 ETH",
+      "hash": "0x4d33b4459cb4e2e46bb9abaac49206450cb325093878a530eef0507bdb32d3c5",
+      "expect": {
+        "block": 35982565,
+        "index": 1,
+        "gasUsed": 1446955,
+        "from": "0xa1d0cb85c869e534fe1e0c22af3b238301157b5d"
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "app-other-fae443",
+      "section": "other",
+      "run": "app",
+      "label": "Cleanup: the leader closes 0.12 SOL",
+      "hash": "0xfae4438fc26a5a006dca48de6473b132053e34fe509a83e1130b6010d894f211",
+      "expect": {
+        "block": 35982573,
+        "index": 2,
+        "gasUsed": 1340976,
+        "from": "0xa1d0cb85c869e534fe1e0c22af3b238301157b5d"
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "app-other-f4cde1",
+      "section": "other",
+      "run": "app",
+      "label": "Cleanup: the follower withdraws 6.89 USDso margin",
+      "hash": "0xf4cde1441df3008bf420a77c51499bc7990b477c827cce154ff7bf4b7f70af83",
+      "expect": {
+        "block": 36046868,
+        "index": 0,
+        "gasUsed": 91086,
+        "from": "0xde52dd7f81f67d2124ae0fbd8567f405cfaeeaab"
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "app-other-130d42",
+      "section": "other",
+      "run": "app",
+      "label": "… and returns it to the owner",
+      "hash": "0x130d42af67f5a4a1bab5e36a0f33d0e3b6880184dc2a472cda304e8f61f817ca",
+      "expect": {
+        "block": 36046889,
+        "index": 0,
+        "gasUsed": 62837,
+        "from": "0xde52dd7f81f67d2124ae0fbd8567f405cfaeeaab"
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "app-other-42a75a",
+      "section": "other",
+      "run": "app",
+      "label": "… and its STT",
+      "hash": "0x42a75a874150c510ce0df42efd173c344fd97d768107b40c9757031ea7d60a28",
+      "expect": {
+        "block": 36046904,
+        "index": 4,
+        "gasUsed": 21000,
+        "from": "0xde52dd7f81f67d2124ae0fbd8567f405cfaeeaab"
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "app-other-6ca9b5",
+      "section": "other",
+      "run": "app",
+      "label": "Cleanup: the agent withdraws 5.97 USDso margin",
+      "hash": "0x6ca9b5f00026b2e56f770943e34c21b5dc4cd6cd68097d71212bd7b9f1800bed",
+      "expect": {
+        "block": 36046931,
+        "index": 3,
+        "gasUsed": 91086,
+        "from": "0xcde791006ea6e99e9a614bc9d0995879e2cc5e72"
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "app-other-a327b3",
+      "section": "other",
+      "run": "app",
+      "label": "… and returns it to the owner",
+      "hash": "0xa327b38259f69324e71c54559cdf759622dcbb456076894aeace19ecfaf0ba78",
+      "expect": {
+        "block": 36046946,
+        "index": 7,
+        "gasUsed": 62837,
+        "from": "0xcde791006ea6e99e9a614bc9d0995879e2cc5e72"
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "app-other-4659ea",
+      "section": "other",
+      "run": "app",
+      "label": "… and its STT",
+      "hash": "0x4659ea7ae89b15edb1ad25a04e20762197fb1433c2bdac98fd2b31da9c8dd63e",
+      "expect": {
+        "block": 36046962,
+        "index": 0,
+        "gasUsed": 21000,
+        "from": "0xcde791006ea6e99e9a614bc9d0995879e2cc5e72"
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "cfg-fund",
+      "section": "contracts",
+      "run": "deploy",
+      "label": "The owner funds the hub with 40 STT (the Reactivity subscription owner's balance)",
+      "hash": "0x625b4f1d688056e80f04eece7e43c607ed2eb532153a87d5fd9380391eab3296",
+      "expect": {
+        "block": 35024262,
+        "gasUsed": 21062,
+        "from": "0x5397812d66F3233E0972b7AEB5e195a945504632",
+        "to": "0xdF73BBbB6517B712BBeD9bfAe6253A5E1FCDE154",
+        "value": "40000000000000000000"
+      }
+    }
+  ]
+}

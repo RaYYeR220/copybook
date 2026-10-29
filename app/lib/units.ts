@@ -37,6 +37,16 @@ export function fmtUsd18(amount: bigint, round: "nearest" | "up" = "nearest"): s
   return `$${group((cents / 100n).toString())}.${(cents % 100n).toString().padStart(2, "0")}`;
 }
 
+/** A signed 18-decimal USD amount in cents, rounded half away from zero: `+$0.42`, `−$1,250.00`, `$0.00`. */
+export function fmtUsdSigned18(amount: bigint): string {
+  const unit = 10n ** 16n;
+  const neg = amount < 0n;
+  const a = neg ? -amount : amount;
+  const cents = (a + unit / 2n) / unit;
+  if (cents === 0n) return "$0.00";
+  return `${neg ? MINUS : "+"}$${group((cents / 100n).toString())}.${(cents % 100n).toString().padStart(2, "0")}`;
+}
+
 /** Realized PnL in quote units (USDso), signed, two decimals. */
 export function fmtPnl(n: number): string {
   const r = Math.round(n * 100) / 100;

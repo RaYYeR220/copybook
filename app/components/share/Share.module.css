@@ -36,3 +36,23 @@
   font: 400 11px var(--mono);
   color: var(--night-4);
 }
+
+/* the link to select by hand when the browser would not copy it */
+.field {
+  flex: 1 1 100%;
+  width: 100%;
+  min-width: 0;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--hair-2);
+  border-radius: 0;
+  background: rgba(21, 19, 15, 0.6);
+  font: 400 11.5px var(--mono);
+  color: var(--bone-2);
+}
+
+.field:focus-visible {
+  outline: 1px solid var(--gold);
+  outline-offset: 2px;
+  border-radius: 0;
+}

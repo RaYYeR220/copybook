@@ -25,7 +25,7 @@ import raw from "./fixtures/copies.json";
 // the connected wallet, as wagmi would report it
 const account: { address?: Address } = {};
 vi.mock("wagmi", () => ({ useAccount: () => account }));
-const { OwnerShareOnX, ShareOnX } = await import("@/components/share/ShareOnX");
+const { CopyStatus, OwnerShareOnX, ShareOnX } = await import("@/components/share/ShareOnX");
 
 interface Entry {
   hash: Hex;
@@ -238,6 +238,18 @@ describe("the share pills", () => {
     expect(html).toContain('aria-label="Share on X: this trader&#x27;s page (opens in a new tab)"');
     expect(html).toMatch(/<button type="button"[^>]*aria-label="Copy link to this trader&#x27;s page"[^>]*>Copy link<\/button>/);
     expect(html).toContain('role="status"');
+  });
+
+  it("say Copied, or when the browser refuses, hold the link in a field to select and copy", () => {
+    const url = pageUrl(SITE, "/copy/0xabc?log=1");
+    const idle = renderToStaticMarkup(<CopyStatus state="idle" url={url} subject="your latest copy" />);
+    expect(idle).toMatch(/^<span [^>]*role="status" aria-live="polite"><\/span>$/);
+    expect(renderToStaticMarkup(<CopyStatus state="done" url={url} subject="your latest copy" />)).toContain(">Copied</span>");
+    const failed = renderToStaticMarkup(<CopyStatus state="failed" url={url} subject="your latest copy" />);
+    expect(failed).toContain(">Not copied: select the link and copy it</span>");
+    const input = failed.match(/<input [^>]*\/>/)?.[0] ?? "";
+    for (const attr of ['type="text"', 'readOnly=""', `value="${url}"`, 'aria-label="Link to your latest copy"']) expect(input).toContain(attr);
+    expect(failed).not.toMatch(/address bar/);
   });
 
   it("speak in the owner's words only when the connected wallet is the owner", () => {

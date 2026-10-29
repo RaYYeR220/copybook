@@ -650,7 +650,12 @@ export function buildRows(sources: Sources, sweep = true): LedgerRow[] {
     }),
   );
   rows.push(...reviewRows(riskDeployment.reviews as Review[], riskDeployment.hideki.gate));
-  for (const rel of ["eval/anchor.json", "eval/v3/anchor.json"]) {
+  // run v2's anchor sits at the top of eval/, each later run's in its own folder (eval/v3/, eval/v4/, …)
+  const runDirs = readdirSync(resolve(ROOT, "eval"), { withFileTypes: true })
+    .filter((d) => d.isDirectory() && /^v\d+$/.test(d.name))
+    .map((d) => d.name)
+    .sort((a, b) => Number(a.slice(1)) - Number(b.slice(1)));
+  for (const rel of ["eval/anchor.json", ...runDirs.map((d) => `eval/${d}/anchor.json`)]) {
     if (!existsSync(resolve(ROOT, rel))) continue;
     const a = readJson<{ run: string; commit: string; data: Hex; tx: Hex; block: number; from: string; status: string; gasUsed: number }>(rel);
     const results = rel.replace(/anchor\.json$/, "results.json");

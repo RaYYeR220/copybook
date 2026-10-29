@@ -137,8 +137,29 @@ export function defaultPolicyForm(kind: SourceKindName, thesis?: { recommendedAl
   return { ...base, allocation: alloc.toString(), maxNotional: (cap > 0n ? cap : 1n).toString() };
 }
 
-/** The form's tank field: STT with up to six decimals, as wei. */
-export const parseTank = (s: string): bigint | null => parseAmount18(s);
+/** An STT amount as wei: up to 18 decimals, so a whole tank balance can be typed back. */
+export const parseTank = (s: string): bigint | null => parseFixed(s, 18);
 
 /** A field's first error, for the input it belongs to. */
 export const errorFor = (errors: readonly FieldError[], field: FormField) => errors.find((e) => e.field === field)?.message;
+
+const plain = (x: bigint, decimals: number) => {
+  const one = 10n ** BigInt(decimals);
+  const frac = (x % one).toString().padStart(decimals, "0").replace(/0+$/, "");
+  return `${x / one}${frac ? `.${frac}` : ""}`;
+};
+
+/** A policy on chain back into the form, to edit it: the inverse of `parsePolicyForm` for the values it can hold. */
+export function policyToForm(kind: SourceKindName, p: Policy): PolicyFormValues {
+  return {
+    scale: kind === "Trader" ? plain(BigInt(p.scaleBps), 4) : "1",
+    allocation: kind === "Theme" ? plain(p.allocation, 18) : "",
+    maxNotional: plain(p.maxNotional, 18),
+    maxTotalNotional: p.maxTotalNotional > 0n ? plain(p.maxTotalNotional, 18) : "",
+    band: plain(BigInt(p.bandBps), 2),
+    equityFloor: p.equityFloor > 0n ? plain(p.equityFloor, 18) : "",
+    // the market list is set when following; updatePolicy keeps it
+    allowAll: true,
+    pools: [],
+  };
+}

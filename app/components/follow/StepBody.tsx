@@ -358,7 +358,7 @@ function TankStep(props: StepBodyProps) {
   const { tankInput, setTankInput, tank, preflight, data, markets, apply, setLocal, parsed } = props;
   const result = lastResult(preflight);
   const shown = result ? reasonsFor("tank", result.reasons).filter((r) => r.field === "tank" || r.severity === "error") : [];
-  const err = tank === null ? "Type the tank in STT, like 0.5 (up to six decimals)." : undefined;
+  const err = tank === null ? "Type the tank in STT, like 0.5." : undefined;
   const ready = preflight.status === "ready" && tank !== null && !!parsed.policy && !blocks("tank", preflight.result.reasons);
   return (
     <div className={styles.body}>

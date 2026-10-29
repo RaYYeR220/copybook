@@ -127,3 +127,15 @@ describe("transactions", () => {
     expect(recallTx(undefined, ME, 1_000)).toBeUndefined();
   });
 });
+
+describe("editing a policy on chain", () => {
+  it("round-trips through the form", async () => {
+    const { policyToForm } = await import("@/lib/follow/policyForm");
+    const trader = { scaleBps: 12_500, allocation: 0n, maxNotional: 1_250_500_000_000_000_000_000n, maxTotalNotional: 0n, bandBps: 25, equityFloor: 20n * E };
+    const v = policyToForm("Trader", trader);
+    expect(v).toMatchObject({ scale: "1.25", maxNotional: "1250.5", maxTotalNotional: "", band: "0.25", equityFloor: "20" });
+    expect(parsePolicyForm("Trader", v).policy).toEqual(trader);
+    const theme = { scaleBps: 0, allocation: 80n * E, maxNotional: 100n * E, maxTotalNotional: 300n * E, bandBps: 50, equityFloor: 0n };
+    expect(parsePolicyForm("Theme", policyToForm("Theme", theme)).policy).toEqual(theme);
+  });
+});

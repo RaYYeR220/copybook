@@ -15,6 +15,8 @@ import { copyCardModel, type CardNames } from "@/lib/og/model";
 import { config } from "@/lib/server/config";
 import { copyOf } from "@/lib/server/copy";
 import { cardNames } from "@/lib/server/og";
+import { copyShareOf, copyShareText, pageUrl } from "@/lib/share";
+import { currentSiteUrl } from "@/lib/siteUrl";
 
 export const dynamic = "force-dynamic";
 
@@ -153,7 +155,13 @@ export default async function CopyPage(props: Props) {
             {/* the card is a PNG drawn on the server from the same reads as this page */}
             <img className={styles.preview} src={`/og/copy/${v.hash}?log=${v.logIndex}`} width={1200} height={630} alt={`Share card: ${m.market} ${m.move}, block #${m.block}`} />
           </div>
-          <ShareLink path={sharePath(v)} />
+          <ShareLink
+            path={sharePath(v)}
+            url={pageUrl(currentSiteUrl(), sharePath(v))}
+            text={copyShareText({ ...copyShareOf(v, names), mine: false })}
+            ownText={copyShareText({ ...copyShareOf(v, names), mine: true })}
+            follower={v.follower}
+          />
           <PanelNote>Paste the link anywhere that shows previews; the card above comes with it. Every figure on it is read from this transaction and its block.</PanelNote>
         </Panel>
 

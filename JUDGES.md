@@ -18,9 +18,9 @@ chain 50312), and every wallet that follows, leads or creates a thesis in the ev
 
 ## 1. MVP potential (2 minutes)
 
-**The value.** Copy-trading without a copy server: you follow a trader or a thesis, and the chain resizes your own
-dreamDEX perps account in the source's block, inside the scale, caps, price band and equity floor you set. Exits
-always copy. A refusal is written on chain with its reason.
+**The value.** Copy-trading without a copy server: you follow a trader or a thesis, and the Copybook hub resizes the
+positions in your own dreamDEX perps account in the source's block, inside the scale, caps, price band and equity
+floor you set. Exits always copy. A refusal is written on chain with its reason.
 
 **See it.**
 
@@ -56,8 +56,8 @@ Somnia Agents committees on Shannon, with the verdict carried over Hyperlane. Di
 
 ## 2. Evidence of building (2 minutes)
 
-Every row below is a transaction read back from the chain by `npm run proof` (in `e2e/`), with its block, position,
-sender, target, function, gas and events checked.
+Each PROOF.md section below lists transactions read back from the chain by `npm run proof` (in `e2e/`), with their
+block, position, sender, target, function, gas and events checked.
 
 | What | Where |
 | --- | --- |

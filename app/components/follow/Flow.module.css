@@ -468,6 +468,12 @@
   color: var(--bone);
 }
 
+/* a warning about what saving does to the follow itself: the warning's mark, an error's voice */
+.strong .rtext,
+.strong .rkind {
+  color: var(--bone);
+}
+
 .rmarket {
   margin-right: 8px;
   font: 400 12px var(--mono);

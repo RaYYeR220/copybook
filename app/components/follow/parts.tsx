@@ -52,11 +52,11 @@ export function ReasonList({
       {reasons.map((r) => {
         const v = reasonView(r, markets, recommendedAllocation);
         return (
-          <li key={v.key} className={`${styles.reason} ${styles[v.severity]}`} data-reason={v.code} data-severity={v.severity}>
+          <li key={v.key} className={`${styles.reason} ${styles[v.severity]} ${v.strong ? styles.strong : ""}`} data-reason={v.code} data-severity={v.severity}>
             <span className={styles.rmark} aria-hidden="true" />
             <div>
               <p className={styles.rtext}>
-                <span className={styles.rkind}>{KIND[v.severity]}</span>
+                <span className={styles.rkind}>{v.strong ? "Warning" : KIND[v.severity]}</span>
                 {v.market && <span className={styles.rmarket}>{v.market}</span>}
                 {v.message}
               </p>

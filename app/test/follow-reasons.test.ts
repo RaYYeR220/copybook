@@ -42,6 +42,12 @@ describe("preflight reasons before signing", () => {
     expect(reasonView(r({ code: "EQUITY_BELOW_FLOOR", field: "equityFloor", required: 32_799_123_999_999_999_999n }), markets)).toMatchObject({ field: "equityFloor", needs: expect.stringContaining("$32.80") });
   });
 
+  it("an edit's floor above equity is a strong warning that names the equity, with no fix to apply", () => {
+    const v = reasonView(r({ code: "EQUITY_BELOW_FLOOR", severity: "warning", field: "equityFloor", required: 6_850_000_000_000_000_000n }), markets);
+    expect(v).toMatchObject({ severity: "warning", strong: true, field: "equityFloor", needs: expect.stringContaining("$6.85") });
+    expect(v.apply).toBeUndefined();
+  });
+
   it("warnings and info never carry a fix", () => {
     const w = reasonView(r({ code: "SCALED_BELOW_MINIMUM", severity: "warning", pool: ETH }), markets);
     expect(w).toMatchObject({ severity: "warning", market: "ETH-PERP" });

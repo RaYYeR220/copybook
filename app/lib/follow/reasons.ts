@@ -22,6 +22,8 @@ export interface ReasonView {
   needs?: string;
   /** Writes a value into a field: the least value that clears it, rounded up to a whole dollar (or exact STT). */
   apply?: { field: FormField | "tank"; value: string; label: string };
+  /** A warning about something saving will do to the follow itself (stop it, close its positions): said loudly. */
+  strong?: boolean;
 }
 
 const E18 = 10n ** 18n;
@@ -54,6 +56,10 @@ export function reasonView(r: PreflightReason, markets: Record<string, MarketMet
     ...(r.pool ? { market: m ? `${m.symbol}-PERP` : shortHex(r.pool) } : {}),
     ...(field ? { field } : {}),
   };
+  // a policy edit may set a floor above equity (updatePolicy takes it): the same figure, said as what saving does
+  if (r.code === "EQUITY_BELOW_FLOOR" && r.severity === "warning" && r.required !== undefined) {
+    return { ...v, strong: true, needs: `Equity now: ${fmtUsd18(r.required)}. Set the floor below it to keep copying.` };
+  }
   if (r.required === undefined || r.severity !== "error") return v;
   switch (r.code) {
     case "ALLOCATION_BELOW_MINIMUM": {

@@ -1,0 +1,237 @@
+/* The thesis builder: the legs as an editable ledger (index, market, side, weight), the venue's facts under each
+   row in mono, and the registry's verdict below in the follow flow's reason style. */
+
+.legs {
+  margin-top: 2px;
+}
+
+.rows {
+  list-style: none;
+  border-top: 1px solid var(--hair);
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto 10ch 28px;
+  align-items: center;
+  gap: 6px 14px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--hair);
+}
+
+.idx {
+  font: 400 11px var(--mono);
+  color: var(--night-4);
+  font-variant-numeric: tabular-nums;
+}
+
+.pick {
+  min-width: 0;
+}
+
+.select {
+  width: 100%;
+  max-width: 22ch;
+  height: 30px;
+  padding: 0 22px 0 0;
+  border: 0;
+  border-bottom: 1px solid var(--hair-3);
+  border-radius: 0;
+  appearance: none;
+  background:
+    linear-gradient(45deg, transparent 50%, var(--night-4) 50%) calc(100% - 9px) 13px / 5px 5px no-repeat,
+    linear-gradient(-45deg, transparent 50%, var(--night-4) 50%) calc(100% - 4px) 13px / 5px 5px no-repeat;
+  font: 400 13px var(--mono);
+  color: var(--bone);
+  cursor: pointer;
+  transition: border-color 0.25s var(--ease);
+}
+
+.select:hover {
+  border-bottom-color: var(--bone-2);
+}
+
+.select:focus {
+  outline: 0;
+  border-bottom-color: var(--gold);
+}
+
+.select option {
+  background: var(--night-1);
+  color: var(--bone);
+}
+
+.row[data-invalid] .select,
+.row[data-invalid] .weight input {
+  border-bottom-style: dashed;
+  border-bottom-color: var(--bone);
+}
+
+.weight {
+  justify-content: flex-end;
+}
+
+.weight input {
+  width: 6ch;
+}
+
+.remove {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--hair-2);
+  font: 400 15px/1 var(--body);
+  color: var(--night-4);
+  cursor: pointer;
+  transition:
+    color 0.25s var(--ease),
+    border-color 0.25s var(--ease);
+}
+
+.remove:hover {
+  color: var(--bone);
+  border-color: var(--bone);
+}
+
+.remove:focus-visible {
+  outline: 1px solid var(--gold);
+  outline-offset: 3px;
+}
+
+.facts {
+  grid-column: 2 / -1;
+  font: 400 11px/1.5 var(--mono);
+  color: var(--night-4);
+  font-variant-numeric: tabular-nums;
+}
+
+.sets {
+  color: var(--gold);
+}
+
+.add {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  margin-top: 12px;
+}
+
+.add button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.minWrap {
+  margin-top: 2px;
+}
+
+.minCap {
+  font: 400 11px/1.5 var(--mono);
+  color: var(--night-4);
+}
+
+.created {
+  margin-top: 10px;
+  font: 400 12px/1.5 var(--mono);
+  color: var(--bone);
+}
+
+/* rebalance: the change per market and the clock */
+.diff {
+  list-style: none;
+  border-top: 1px solid var(--hair);
+}
+
+.diff li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 4px 16px;
+  align-items: baseline;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--hair);
+  font: 400 12.5px var(--mono);
+  color: var(--bone-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.diff b {
+  font: 560 17px/1 var(--display);
+  font-variation-settings: "opsz" 48, "SOFT" 0;
+  letter-spacing: -0.01em;
+  color: var(--bone);
+}
+
+.change {
+  font: 400 10px var(--mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--night-4);
+}
+
+.diff li[data-change="same"] {
+  color: var(--night-4);
+}
+
+.clock {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  padding: 12px 0 2px;
+  font: 400 12px/1.5 var(--mono);
+  color: var(--bone-2);
+}
+
+.clock b {
+  font: 560 22px/1 var(--display);
+  font-variation-settings: "opsz" 48, "SOFT" 0;
+  letter-spacing: -0.02em;
+  color: var(--bone);
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.clock[data-wait] b {
+  color: var(--gold);
+}
+
+@media (max-width: 720px) {
+  /* line 1: the market and remove; line 2: side and weight */
+  .row {
+    grid-template-columns: 18px minmax(0, 1fr) auto 28px;
+  }
+
+  .pick {
+    grid-column: 2 / 4;
+    grid-row: 1;
+  }
+
+  .remove {
+    grid-column: 4;
+    grid-row: 1;
+  }
+
+  .row > [role="radiogroup"] {
+    grid-column: 2;
+    grid-row: 2;
+  }
+
+  .weight {
+    grid-column: 3 / 5;
+    grid-row: 2;
+  }
+
+  .facts {
+    grid-column: 2 / -1;
+  }
+
+  .select {
+    max-width: none;
+  }
+
+  .diff li {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+}

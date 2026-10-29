@@ -9,5 +9,7 @@ export default defineConfig({
       "server-only": fileURLToPath(new URL("./test/stubs/server-only.ts", import.meta.url)),
     },
   },
-  test: { include: ["test/**/*.test.ts"] },
+  // tsconfig keeps JSX for Next; the share-card tests render it here
+  oxc: { jsx: { runtime: "automatic" } },
+  test: { include: ["test/**/*.test.ts", "test/**/*.test.tsx"] },
 });

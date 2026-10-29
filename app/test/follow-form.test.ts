@@ -126,6 +126,17 @@ describe("transactions", () => {
     expect(recallTx(store, ME, 1_000)).toBeUndefined();
     expect(recallTx(undefined, ME, 1_000)).toBeUndefined();
   });
+
+  it("keeps the thesis builder's pending transaction apart from the follow flow's", () => {
+    const m = new Map<string, string>();
+    const store = { getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => void m.set(k, v), removeItem: (k: string) => void m.delete(k) };
+    const ME = "0x5397812d66F3233E0972b7AEB5e195a945504632";
+    rememberTx(store, { address: ME, action: "createTheme", hash: HASH, at: 1_000 }, "thesis");
+    expect(recallTx(store, ME, 1_010)).toBeUndefined();
+    expect(recallTx(store, ME, 1_010, "thesis")).toMatchObject({ action: "createTheme" });
+    forgetTx(store, ME, "thesis");
+    expect(m.size).toBe(0);
+  });
 });
 
 describe("editing a policy on chain", () => {

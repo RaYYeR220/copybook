@@ -642,3 +642,14 @@
     width: 8ch;
   }
 }
+
+/* a text value (a thesis name, a link) takes the rest of the line */
+.wideInput {
+  flex: 1 1 16ch;
+  min-width: 0;
+}
+
+.wideInput input {
+  width: 100%;
+  text-align: left;
+}

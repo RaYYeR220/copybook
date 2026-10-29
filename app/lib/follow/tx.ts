@@ -83,23 +83,24 @@ export interface PendingTx {
 export const PENDING_MAX_AGE_S = 15 * 60;
 
 type Store = Pick<Storage, "getItem" | "setItem" | "removeItem">;
-const key = (address: string) => `copybook:pending:${address.toLowerCase()}`;
+/** `scope` keeps pages apart: the follow flow's pending transaction is not the thesis builder's. */
+const key = (address: string, scope = "pending") => `copybook:${scope}:${address.toLowerCase()}`;
 
-export function rememberTx(store: Store | undefined, tx: PendingTx): void {
+export function rememberTx(store: Store | undefined, tx: PendingTx, scope?: string): void {
   try {
-    store?.setItem(key(tx.address), JSON.stringify(tx));
+    store?.setItem(key(tx.address, scope), JSON.stringify(tx));
   } catch {
     /* storage full or blocked: the chain reads still decide the step */
   }
 }
 
-export function recallTx(store: Store | undefined, address: string, now: number): PendingTx | undefined {
+export function recallTx(store: Store | undefined, address: string, now: number, scope?: string): PendingTx | undefined {
   try {
-    const raw = store?.getItem(key(address));
+    const raw = store?.getItem(key(address, scope));
     if (!raw) return undefined;
     const tx = JSON.parse(raw) as PendingTx;
     if (typeof tx.hash !== "string" || !/^0x[0-9a-fA-F]{64}$/.test(tx.hash) || tx.address?.toLowerCase() !== address.toLowerCase() || !(now - tx.at <= PENDING_MAX_AGE_S)) {
-      store?.removeItem(key(address));
+      store?.removeItem(key(address, scope));
       return undefined;
     }
     return tx;
@@ -108,9 +109,9 @@ export function recallTx(store: Store | undefined, address: string, now: number)
   }
 }
 
-export function forgetTx(store: Store | undefined, address: string): void {
+export function forgetTx(store: Store | undefined, address: string, scope?: string): void {
   try {
-    store?.removeItem(key(address));
+    store?.removeItem(key(address, scope));
   } catch {
     /* nothing to do */
   }

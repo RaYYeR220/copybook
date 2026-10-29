@@ -157,6 +157,7 @@ export function Field({
   error,
   placeholder,
   inputMode = "decimal",
+  wide = false,
 }: {
   id: string;
   label: string;
@@ -167,7 +168,9 @@ export function Field({
   help?: ReactNode;
   error?: string;
   placeholder?: string;
-  inputMode?: "decimal" | "numeric";
+  inputMode?: "decimal" | "numeric" | "text" | "url";
+  /** A text value (a name, a link): the input takes the line instead of a figure's width. */
+  wide?: boolean;
 }) {
   const helpId = `${id}-help`;
   const errId = `${id}-err`;
@@ -176,7 +179,7 @@ export function Field({
       <div className={styles.fieldLine}>
         <label htmlFor={id}>{label}</label>
         <span className={styles.leader} aria-hidden="true" />
-        <span className={styles.input}>
+        <span className={wide ? `${styles.input} ${styles.wideInput}` : styles.input}>
           {prefix && <span aria-hidden="true">{prefix}</span>}
           <input
             id={id}

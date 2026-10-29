@@ -9,14 +9,18 @@ import { NotFoundSource } from "@/components/app/NotFoundSource";
 import { AppMain, Col, Colophon, Kick, Panel, PanelNote } from "@/components/app/Panel";
 import { SourceActs, SourceLedger, SourceLine, SourceTitle, SourceTop } from "@/components/app/SourceHead";
 import { DataState } from "@/components/app/State";
+import { RebalancePanel } from "@/components/thesis/Rebalance";
 import t from "@/components/app/Table.module.css";
+import { safeUri } from "@/lib/builder/basket";
 import { addressUrl } from "@/lib/explorer";
 import { shortHex } from "@/lib/format";
 import { copybook } from "@/lib/server/chain";
 import { config } from "@/lib/server/config";
 import { perpMarkets } from "@/lib/server/indexer";
+import { registeredPools, registryBank, registryRules } from "@/lib/server/registry";
 import { isOwner, loadThesis, type Thesis } from "@/lib/server/theses";
 import { decimalsOf, grossBps, legSide, netBps, pctOfBps } from "@/lib/thesis";
+import { toJsonSafe } from "@/lib/json";
 import { fmtPrice18, fmtUnits, fmtUsd18 } from "@/lib/units";
 
 export const dynamic = "force-dynamic";
@@ -61,7 +65,7 @@ export default async function ThesisPage({ params }: Params) {
       </NotFoundSource>
     );
   const id = BigInt(raw);
-  const [thesisR, marketsR, countR] = await Promise.allSettled([loadThesis(id), perpMarkets(), copybook.themeCount()]);
+  const [thesisR, marketsR, countR, rulesR, bankR] = await Promise.allSettled([loadThesis(id), perpMarkets(), copybook.themeCount(), registryRules(), registryBank()]);
   if (thesisR.status === "rejected")
     return (
       <NotFoundSource kick={`Thesis #${id}`} title="Registry unreadable">
@@ -77,6 +81,8 @@ export default async function ThesisPage({ params }: Params) {
     );
 
   const markets = marketsR.status === "fulfilled" ? marketsR.value : {};
+  const registered = await registeredPools(Object.keys(markets)).catch(() => ({}) as Record<string, boolean>);
+  const writeUp = thesis.uri ? safeUri(thesis.uri) : null;
   const legs = legRows(thesis, markets);
   const min = thesis.minimum;
   const byOwner = config.owner ? isOwner(thesis.creator, config.owner) : false;
@@ -113,6 +119,14 @@ export default async function ThesisPage({ params }: Params) {
               </a>
               {byOwner && <span> · Copybook&apos;s owner wallet</span>}
               <span> · ThemeRegistry</span>
+              {writeUp && (
+                <>
+                  <span> · </span>
+                  <a href={writeUp} target="_blank" rel="noopener noreferrer nofollow">
+                    write-up ↗
+                  </a>
+                </>
+              )}
             </SourceLine>
             <SourceLedger>
               <Ledger size="md" rows={ledger} />
@@ -195,6 +209,17 @@ export default async function ThesisPage({ params }: Params) {
               {marketsR.status === "rejected" && " Market names are missing because the dreamDEX indexer did not answer."}
             </PanelNote>
           </Panel>
+
+          {rulesR.status === "fulfilled" && marketsR.status === "fulfilled" && (
+            <RebalancePanel
+              pub={config.publicConfig}
+              thesis={toJsonSafe({ id, creator: thesis.creator, version: thesis.version, legs: thesis.legs })}
+              markets={markets}
+              registered={registered}
+              bank={bankR.status === "fulfilled" ? bankR.value : null}
+              rules={rulesR.value.rules}
+            />
+          )}
 
           <Panel id="act-h" title={<>On <em>Copybook</em></>} aside={<FeedStatusLine extra="follows and copies · newest first" />} order={3} d={0.1}>
             <TapeRows names={names} label={`Copybook events about thesis ${thesis.name}, newest first`} empty="Nobody has followed this thesis yet." />

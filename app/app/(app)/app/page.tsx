@@ -3,10 +3,11 @@ import { Suspense } from "react";
 import { AppMain, Col, Colophon, Kick, Panel, PanelNote } from "@/components/app/Panel";
 import { HubFeedProvider } from "@/components/app/HubFeed";
 import { FeedStatusLine, TapeRows, type TapeNames } from "@/components/app/LiveTape";
-import { SourceLead, SourceLedger, SourceTitle, SourceTop } from "@/components/app/SourceHead";
+import { SourceActs, SourceLead, SourceLedger, SourceTitle, SourceTop } from "@/components/app/SourceHead";
 import { DataState } from "@/components/app/State";
 import { ThesisList } from "@/components/app/ThesisList";
 import { TopTraders } from "@/components/app/TopTraders";
+import { Button } from "@/components/Button";
 import { Ledger } from "@/components/Ledger";
 import { addressUrl } from "@/lib/explorer";
 import { fmtInt, shortHex } from "@/lib/format";
@@ -89,6 +90,11 @@ export default async function Discover() {
             <Suspense fallback={<DataState kind="loading" title="Reading the ThemeRegistry and each leg's market…" />}>
               <ThesesBody markets={marketMap} marketsMissing={markets.status === "rejected"} />
             </Suspense>
+            <SourceActs>
+              <Button size="md" variant="quiet" href="/thesis/new" prefetch={false}>
+                Publish a thesis
+              </Button>
+            </SourceActs>
           </Panel>
         </Col>
 

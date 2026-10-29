@@ -55,7 +55,7 @@ const session = (): Storage | undefined => {
  * reload waits for it instead of offering to send it again. `onLanded` runs after every confirmed (or recalled
  * and confirmed) transaction, to re-read the chain.
  */
-export function useTx(address: Address | undefined, publicClient: PublicClient, onLanded: () => void) {
+export function useTx(address: Address | undefined, publicClient: PublicClient, onLanded: () => void, scope?: string) {
   const [tx, setTx] = useState<TxPhase>(IDLE);
   const [recalled, setRecalled] = useState(false);
   const landed = useRef(onLanded);
@@ -68,7 +68,7 @@ export function useTx(address: Address | undefined, publicClient: PublicClient, 
     setTx(IDLE);
     setRecalled(false);
     if (!address) return;
-    const kept = recallTx(session(), address, Math.floor(Date.now() / 1000));
+    const kept = recallTx(session(), address, Math.floor(Date.now() / 1000), scope);
     if (!kept) return;
     let live = true;
     setRecalled(true);
@@ -77,7 +77,7 @@ export function useTx(address: Address | undefined, publicClient: PublicClient, 
       .waitForTransactionReceipt({ hash: kept.hash, timeout: 120_000, pollingInterval: 1_000 })
       .then((r) => {
         if (!live || owner.current !== address) return;
-        forgetTx(session(), address);
+        forgetTx(session(), address, scope);
         setTx(
           r.status === "success"
             ? { phase: "confirmed", action: kept.action, hash: kept.hash, block: r.blockNumber }
@@ -92,7 +92,7 @@ export function useTx(address: Address | undefined, publicClient: PublicClient, 
     return () => {
       live = false;
     };
-  }, [address, publicClient]);
+  }, [address, publicClient, scope]);
 
   const run = useCallback(
     async (action: string, send: () => Promise<Sent>): Promise<TxPhase> => {
@@ -102,13 +102,13 @@ export function useTx(address: Address | undefined, publicClient: PublicClient, 
         action,
         send,
         (p) => owner.current === who && setTx(p),
-        (hash: Hex) => who && rememberTx(session(), { address: who, action, hash, at: Math.floor(Date.now() / 1000) }),
+        (hash: Hex) => who && rememberTx(session(), { address: who, action, hash, at: Math.floor(Date.now() / 1000) }, scope),
       );
-      if (who) forgetTx(session(), who);
+      if (who) forgetTx(session(), who, scope);
       if (out.phase === "confirmed" || (out.phase === "failed" && out.hash)) landed.current();
       return out;
     },
-    [address],
+    [address, scope],
   );
 
   const busy = tx.phase === "signing" || tx.phase === "pending";

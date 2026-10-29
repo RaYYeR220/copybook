@@ -650,6 +650,15 @@ function DoneStep({ view, source, sourceName }: StepBodyProps & { sourceName: st
       </Lead>
       {source.kind === "Trader" && view.review === "pending" && <Lead>A review of this trader is on its way; the guard uses the verdict as soon as it reaches the gate.</Lead>}
       {source.kind === "Trader" && view.review === "needed" && <Lead>The review was skipped: the guard has no verdict on this trader yet, so nothing stops its new size.</Lead>}
+      {source.kind === "Trader" && view.guardOn === false && (
+        <Lead>The AI guard is off for this wallet: a Block verdict on this trader does not stop new size. Exits are copied either way.</Lead>
+      )}
+      {view.noGrant && (
+        <Lead>
+          <b>This wallet holds no operator grant.</b> The hub cannot place a copy, not even an exit, until it grants placeOrderFor again; your dashboard
+          offers the call.
+        </Lead>
+      )}
       <Acts>
         <Button size="md" href="/me" prefetch={false} arrow>
           Open your dashboard

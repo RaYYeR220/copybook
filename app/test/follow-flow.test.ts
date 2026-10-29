@@ -149,6 +149,16 @@ describe("follow flow: after the follow lands", () => {
     expect(stale).toMatchObject({ step: "review", review: "needed" });
   });
 
+  it("the approval reads from the chain while following: no grant leaves it to do and the done step says so", () => {
+    const fresh = { ...NONE, tier: "Block" as const, reviewedAt: NOW - 3_600 };
+    const granted = flow({ reads: ready({ ...following, verdict: fresh }) });
+    expect(states(granted).approve).toBe("done");
+    expect(granted.noGrant).toBe(false);
+    const revoked = flow({ reads: ready({ ...following, approved: false, verdict: fresh, guardOn: false }) });
+    expect(revoked).toMatchObject({ step: "done", noGrant: true, guardOn: false });
+    expect(states(revoked).approve).toBe("todo");
+  });
+
   it("a thesis follow is done as soon as the chain shows it", () => {
     const v = flow({ kind: "Theme", sourceId: THESIS, reads: ready({ approved: true, follow: { sourceId: THESIS, kind: "Theme", ref: 1n } }) });
     expect(v).toMatchObject({ step: "done", followingThis: true });

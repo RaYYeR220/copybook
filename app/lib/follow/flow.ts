@@ -102,6 +102,10 @@ export interface FlowView {
   followingThis: boolean;
   /** Trader follows: what the review step does (or why it is skipped). */
   review?: ReviewNeed;
+  /** Done: the wallet follows but holds no operator grant, so the hub can place no copy until it grants again. */
+  noGrant?: boolean;
+  /** Done, trader follows: the wallet's AI guard as the gate has it. */
+  guardOn?: boolean;
 }
 
 export type ReviewNeed =
@@ -143,6 +147,8 @@ export function deriveFlow(input: FlowInput): FlowView {
   const view = (step: StepId, extra: Partial<FlowView> = {}): FlowView => {
     const at = ids.indexOf(step);
     const passed = (id: StepId): StepState => {
+      // the grant is read from the chain, not assumed: a wallet that follows without it (revoked elsewhere) shows it to do
+      if (id === "approve" && data && !data.approved) return "todo";
       if (id !== "review") return "done";
       // a review on its way counts as done; a fresh verdict, a cooldown or a skip leave the step skipped
       return extra.review === "pending" ? "done" : "skipped";
@@ -164,10 +170,11 @@ export function deriveFlow(input: FlowInput): FlowView {
 
   if (data.follow) {
     if (data.follow.sourceId.toLowerCase() !== input.sourceId.toLowerCase()) return view("source", { blocker: "following-other" });
-    if (!trader) return view("done", { followingThis: true });
+    const noGrant = !data.approved;
+    if (!trader) return view("done", { followingThis: true, noGrant });
     const need = reviewNeed(data.verdict, data.reviewPending, input.now, input.risk);
     if (need === "needed" && !local.reviewSkipped) return view("review", { followingThis: true, review: need });
-    return view("done", { followingThis: true, review: need });
+    return view("done", { followingThis: true, review: need, noGrant, guardOn: data.guardOn });
   }
 
   if (!local.marginWaived) {

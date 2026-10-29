@@ -14,6 +14,7 @@ import { fmtInt, shortHex } from "@/lib/format";
 import { publicClient } from "@/lib/server/chain";
 import { config } from "@/lib/server/config";
 import { perpMarkets } from "@/lib/server/indexer";
+import { rankingIfReady } from "@/lib/server/ranking";
 import { loadTheses, thesisNames } from "@/lib/server/theses";
 import type { MarketMeta } from "@/lib/tape";
 
@@ -59,7 +60,8 @@ async function ThesesBody({ markets, marketsMissing }: { markets: Record<string,
 
 export default async function Discover() {
   // the theses' minimums read every leg's market: they stream in behind Suspense; names alone are cheap
-  const [theses, markets, head] = await Promise.allSettled([thesisNames(), perpMarkets(), publicClient.getBlockNumber()]);
+  // a ranking already in the data cache renders with the page, so the panels below it never move when it arrives
+  const [theses, markets, head, ranked] = await Promise.allSettled([thesisNames(), perpMarkets(), publicClient.getBlockNumber(), rankingIfReady()]);
   const marketMap = markets.status === "fulfilled" ? markets.value : {};
   const d = config.deployments;
   const names: TapeNames = {
@@ -103,7 +105,7 @@ export default async function Discover() {
 
         <Col>
           <Panel id="top-h" title="Top traders" aside={<Kick>Realized PnL · 30 days · dreamDEX indexer</Kick>} order={2} d={0.06}>
-            <TopTraders />
+            <TopTraders initial={ranked.status === "fulfilled" ? ranked.value : undefined} />
           </Panel>
 
           <Panel id="tape-h" title="Live tape" aside={<FeedStatusLine extra="followed sources · newest first" />} order={3} d={0.12}>

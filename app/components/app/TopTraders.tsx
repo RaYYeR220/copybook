@@ -63,9 +63,12 @@ function Row({ r }: { r: RankedTrader }) {
   );
 }
 
-/** Top dreamDEX traders by 30-day realized PnL (the /api/traders ranking), and Copybook's demo leader, labelled. */
-export function TopTraders() {
-  const q = useQuery({ queryKey: ["traders"], queryFn: load, staleTime: 300_000, retry: 1 });
+/**
+ * Top dreamDEX traders by 30-day realized PnL (the /api/traders ranking), and Copybook's demo leader, labelled.
+ * `initial` is the same ranking when the server had it cached at render time.
+ */
+export function TopTraders({ initial }: { initial?: TradersPayload }) {
+  const q = useQuery({ queryKey: ["traders"], queryFn: load, staleTime: 300_000, retry: 1, initialData: initial });
 
   if (q.isPending)
     return (

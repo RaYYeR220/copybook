@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { IndexerError, getTraderStats } from "../src/index.ts";
+import { Indexer, IndexerError, getTraderStats } from "../src/index.ts";
 import { LEVERAGED, LIQUIDATED, NOW, STEADY, fixtureFetch } from "./helpers.ts";
 
 const stats = (a: typeof STEADY, extra: object = {}) => {
@@ -120,5 +120,20 @@ describe("getTraderStats", () => {
     const err = await getTraderStats(STEADY, { fetch: bad, now: NOW, delayMs: 0, retries: 0 }).catch((e) => e);
     expect(err).toBeInstanceOf(IndexerError);
     expect(err.cause).toBeInstanceOf(TypeError);
+  });
+});
+
+describe("openPositionPools", () => {
+  it("lists each pool the account holds a non-zero position in, once, lower-cased", async () => {
+    const seen: { operationName: string; variables: Record<string, unknown> }[] = [];
+    const fetch = (async (_url: string, init: RequestInit) => {
+      const body = JSON.parse(String(init.body));
+      seen.push(body);
+      const rows = [{ pool: "0x4181DD08E73BBCDD1BA3E615A18F6ABD941B94C0" }, { pool: "0xd6cb1dd58580b84d76068ac21594219ce03aeddf" }, { pool: "0x4181dd08e73bbcdd1ba3e615a18f6abd941b94c0" }];
+      return new Response(JSON.stringify({ data: { PerpPosition: rows } }));
+    }) as unknown as typeof globalThis.fetch;
+    const pools = await new Indexer({ fetch, delayMs: 0 }).openPositionPools("0xA1d0CB85c869e534Fe1e0c22af3b238301157b5d");
+    expect(pools).toEqual(["0x4181dd08e73bbcdd1ba3e615a18f6abd941b94c0", "0xd6cb1dd58580b84d76068ac21594219ce03aeddf"]);
+    expect(seen[0]).toMatchObject({ operationName: "OpenPools", variables: { account: "0xa1d0cb85c869e534fe1e0c22af3b238301157b5d" } });
   });
 });

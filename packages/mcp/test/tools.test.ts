@@ -75,6 +75,7 @@ function fakeDeps(over: { agent?: boolean; pre?: PreflightResult; copybook?: Rec
       candidateShortfall: true,
     })),
     riskSummary: vi.fn(() => "trades30d=40"),
+    openPositionPools: vi.fn(async (): Promise<string[]> => []),
   };
   const deps = { copybook, stats, ...(over.agent === false ? {} : { agent: AGENT }) } as unknown as Deps;
   return { deps, copybook, stats };
@@ -216,6 +217,37 @@ describe("follow_trader / follow_thesis", () => {
     expect(copybook.approveOperator).not.toHaveBeenCalled();
     expect(copybook.follow).not.toHaveBeenCalled();
     expect(copybook.preflightFollow).toHaveBeenCalledWith(expect.objectContaining({ account: AGENT, kind: "Trader", source: TRADER, tank: E18 / 2n }));
+  });
+
+  it("a whole-book trader follow checks the caps in the markets the trader holds now", async () => {
+    const BTC = "0x4181dd08e73bbcdd1ba3e615a18f6abd941b94c0";
+    const refused: PreflightResult = {
+      ok: false,
+      reasons: [{ code: "CAP_BELOW_ONE_ORDER", severity: "error", field: "maxNotional", pool: BTC, required: 11n * E18, message: "The per-position cap is below the size of one order in this market." }],
+      steps: okPre.steps,
+    } as PreflightResult;
+    const { deps, copybook, stats } = fakeDeps();
+    stats.openPositionPools.mockResolvedValue([BTC]);
+    // the preflight refuses exactly when it is told to check BTC, as the SDK does for a cap below one BTC order
+    copybook.preflightFollow.mockImplementation((async (i: { checkPools?: string[] }) => (i.checkPools?.includes(BTC) ? refused : okPre)) as never);
+    const r = await call(deps, "follow_trader", { trader: TRADER, maxNotionalUsdso: "5", tankStt: "0.5", dryRun: false });
+    expect(stats.openPositionPools).toHaveBeenCalledWith(TRADER);
+    expect(copybook.preflightFollow).toHaveBeenCalledWith(expect.objectContaining({ checkPools: [BTC] }));
+    expect(r.isError).toBe(true);
+    expect(JSON.stringify(r.body)).toContain("CAP_BELOW_ONE_ORDER");
+    expect(copybook.follow).not.toHaveBeenCalled();
+    expect(copybook.approveOperator).not.toHaveBeenCalled();
+  });
+
+  it("says so when the trader's open markets could not be read, and checks a market list as given", async () => {
+    const { deps, copybook, stats } = fakeDeps();
+    stats.openPositionPools.mockRejectedValue(new Error("indexer HTTP 502"));
+    const dry = await call(deps, "follow_trader", { trader: TRADER, ...policyArgs });
+    expect(dry.body.notes[0]).toMatch(/could not be read/);
+    expect(copybook.preflightFollow).toHaveBeenCalledWith(expect.not.objectContaining({ checkPools: expect.anything() }));
+    stats.openPositionPools.mockClear();
+    await call(deps, "follow_trader", { trader: TRADER, ...policyArgs, markets: [POOL] });
+    expect(stats.openPositionPools).not.toHaveBeenCalled();
   });
 
   it("skips the approval call in the plan when it is already granted", async () => {

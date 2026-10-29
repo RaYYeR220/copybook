@@ -88,6 +88,10 @@ const LIQUIDATIONS = `query Liquidations($account:String!,$since:numeric!,$limit
 const LAST_ACTIVE = `query LastActive($account:String!){
   PerpPosition(where:{account:{_eq:$account}},order_by:[{updatedAt:desc}],limit:1){ updatedAt }}`;
 
+// the same rows the app's open-positions read takes: every perp position of the account with a non-zero size
+const OPEN_POOLS = `query OpenPools($account:String!){
+  PerpPosition(where:{account:{_eq:$account},size:{_neq:"0"}},order_by:[{updatedAtBlock:desc}],limit:50){ pool }}`;
+
 const LEVERAGE = `query Leverage($account:String!){
   PerpLeverageSetting(where:{account:{_eq:$account}}){ pool leverageX }}`;
 
@@ -185,6 +189,12 @@ export class Indexer {
     });
     const t = d.PerpPosition[0]?.updatedAt;
     return t === undefined ? null : Number(t);
+  }
+
+  /** The perp pools the account holds a position in now, as the indexer last saw them. */
+  async openPositionPools(account: Address): Promise<Address[]> {
+    const d = await this.query<{ PerpPosition: { pool: string }[] }>("OpenPools", OPEN_POOLS, { account: account.toLowerCase() });
+    return [...new Set(d.PerpPosition.map((p) => p.pool.toLowerCase() as Address))];
   }
 
   async leverage(account: Address): Promise<LeverageRow[]> {

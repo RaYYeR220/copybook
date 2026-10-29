@@ -7,6 +7,8 @@ export interface StatsApi {
   getTraderStats: typeof getTraderStats;
   topTraders: typeof topTraders;
   riskSummary: typeof riskSummary;
+  /** The perp pools a trader holds a position in now, from the dreamDEX indexer. Throws when it does not answer. */
+  openPositionPools(trader: Address): Promise<Address[]>;
 }
 
 export interface Deps {

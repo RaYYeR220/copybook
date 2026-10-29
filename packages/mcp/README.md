@@ -59,7 +59,7 @@ Write (registered only when `COPYBOOK_AGENT_KEY` is set; all dry-run by default)
 
 | Tool | What it does |
 | --- | --- |
-| `follow_trader {trader, scaleBps?, maxNotionalUsdso, maxTotalNotionalUsdso?, bandBps?, equityFloorUsdso?, markets?, tankStt, dryRun?}` | Mirror a trader into the agent's wallet. |
+| `follow_trader {trader, scaleBps?, maxNotionalUsdso, maxTotalNotionalUsdso?, bandBps?, equityFloorUsdso?, markets?, tankStt, dryRun?}` | Mirror a trader into the agent's wallet. Without `markets`, the caps are also checked in the markets the trader holds now. |
 | `follow_thesis {themeId, allocationUsdso, maxNotionalUsdso, ..., tankStt, dryRun?}` | Open a thesis basket in one block. |
 | `unfollow {flatten, dryRun?}` | Stop; `flatten` also closes positions. The tank stays on the hub until `withdraw_tank`. |
 | `withdraw_tank {amountStt?, dryRun?}` | Take STT out of the gas tank: by default all of it once unfollowed, or what is above the 0.2 STT floor while following. |

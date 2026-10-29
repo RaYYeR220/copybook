@@ -57,6 +57,7 @@ export function depsFromEnv(env: Env = process.env as Env): Deps {
       getTraderStats: (trader, opts) => stats.getTraderStats(trader, { indexer, ...opts }),
       topTraders: (n, days, opts) => stats.topTraders(n, days, { indexer, ...opts }),
       riskSummary: stats.riskSummary,
+      openPositionPools: (trader) => indexer.openPositionPools(trader),
     },
   };
 }

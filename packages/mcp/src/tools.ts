@@ -85,11 +85,12 @@ async function guard<T>(what: string, fn: () => Promise<T>): Promise<T> {
   }
 }
 
-function refuseUnlessOk(pre: PreflightResult): void {
+function refuseUnlessOk(pre: PreflightResult, notes: string[] = []): void {
   if (pre.ok) return;
   const view = presentPreflight(pre);
   throw new Refusal("Preflight refused this follow; nothing was sent. Fix the listed errors and call again.", {
     preflight: { ...view, reasons: view.reasons.filter((r) => r.severity !== "info") },
+    ...(notes.length ? { notes } : {}),
   });
 }
 
@@ -159,16 +160,30 @@ async function runFollow(
 ) {
   const account = needAgent(deps);
   const { copybook } = deps;
+  // a whole-book trader follow takes over the positions the trader holds now: check the caps in those markets too
+  let checkPools: Address[] | undefined;
+  const notes: string[] = [];
+  if (input.kind === "Trader" && !input.joinPools?.length) {
+    try {
+      checkPools = await deps.stats.openPositionPools(input.source as Address);
+    } catch {
+      notes.push(
+        "The trader's open markets could not be read from the dreamDEX indexer, so the caps were not checked against the positions they hold now. The follow still takes those over at the trader's next move there; check get_trader_stats or retry before sending.",
+      );
+    }
+  }
   const pre = await copybook.preflightFollow({
     account,
     kind: input.kind,
     source: input.source,
     policy: input.policy,
     joinPools: input.joinPools,
+    ...(checkPools ? { checkPools } : {}),
     tank: input.tank,
     walletChainId: copybook.deployments.chainId,
   });
-  refuseUnlessOk(pre);
+  refuseUnlessOk(pre, notes);
+  const checked = checkPools ? { checkedMarkets: checkPools } : {};
   const target =
     input.kind === "Theme"
       ? ({ kind: "Theme", themeId: input.source as bigint } as const)
@@ -182,6 +197,8 @@ async function runFollow(
       sent: false,
       follower: account,
       preflight: view,
+      ...checked,
+      ...(notes.length ? { notes } : {}),
       calls: [
         ...(approve.done
           ? []
@@ -217,6 +234,8 @@ async function runFollow(
     sent: true,
     follower: account,
     transactions: sent,
+    ...checked,
+    ...(notes.length ? { notes } : {}),
     followed: outcome.events.some((e) => e.name === "Followed"),
     events: outcome.events.map((e) => ({ name: e.name })),
     next: "Call get_follow to watch the book and see any state that needs a call to clear.",
@@ -440,7 +459,7 @@ export function buildTools(deps: Deps): ToolDef[] {
         write: true,
         description:
           "Follows a trader with the agent's own wallet: the hub mirrors their dreamDEX perp positions into this wallet's account. DRY-RUN BY DEFAULT: dryRun=true returns the preflight and the exact calls; dryRun=false sends them. " +
-          "Semantics: one source per wallet (use a dedicated wallet; unfollow before following another). With no markets list the follow mirrors the trader's whole book, including positions already open. " +
+          "Semantics: one source per wallet (use a dedicated wallet; unfollow before following another). With no markets list the follow mirrors the trader's whole book, including positions already open; preflight then reads the markets the trader holds now from the dreamDEX indexer (checkedMarkets) and checks the caps there, and says so in notes when it could not. " +
           "Exits are always copied; increases are gated (price band, per-position and whole-book caps, equity floor, gas tank, and the AI guard, which blocks new size from a trader rated Block). The AI guard applies to trader follows only. " +
           `${APPROVAL_NOTE} The tank (tankStt, at least 0.2 STT) pays for copy gas. If preflight finds an error nothing is sent and the reasons are returned. ${TESTNET}`,
         inputSchema: {

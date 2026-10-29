@@ -77,7 +77,7 @@ export function copyCardModel(v: CopyView, names: CardNames): CopyCardModel {
         ? `sent by a ${v.call ?? "direct"} call to the hub`
         : v.leader
           ? null
-          : "sent by the hub's handler; the move it answers is not in this block",
+          : "sent by the hub's handler in the move's block; the move's event was not matched",
     source,
     sourceOurs: ours,
     follower: shortHex(v.follower),

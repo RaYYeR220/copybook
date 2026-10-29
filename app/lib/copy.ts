@@ -174,7 +174,8 @@ export async function loadCopy(hash: string, logIndex: number | undefined, deps:
     limitPrice: copy.limitPrice,
     capped: copy.capped,
     leader,
-    sameBlock: via === "handler" && leader !== null,
+    // a handler copy is in its move's block by the platform's rule (see the tape); `leader` names the move when found
+    sameBlock: via === "handler",
     siblings: copies.filter((c) => c !== copy).map((c) => ({ logIndex: c.log.logIndex!, pool: getAddress(c.pool) })),
     complete,
   };

@@ -42,7 +42,9 @@ export async function generateMetadata(props: Props): Promise<Metadata> {
   const m = copyCardModel(r.v, r.names);
   const title = `${m.market} copy in block #${m.block}`;
   const description = m.sameBlock
-    ? `Copied in the same block as the move it answers: the move is tx #${m.leader!.index}, the copy tx #${m.copy.index}, in block #${m.block} on Somnia.`
+    ? m.leader
+      ? `Copied in the same block as the move it answers: the move is tx #${m.leader.index}, the copy tx #${m.copy.index}, in block #${m.block} on Somnia.`
+      : `Copied by the hub's handler in the same block as the move it answers, block #${m.block} on Somnia.`
     : `A Copybook copy in block #${m.block} on Somnia, ${m.sentBy ?? "sent by the hub"}.`;
   const image = { url: `/og/copy/${r.v.hash}?log=${r.v.logIndex}`, width: 1200, height: 630, alt: `${title}: ${m.move}` };
   return {
@@ -82,7 +84,7 @@ export default async function CopyPage(props: Props) {
         ? `${trigger}, matched by its topics and data in this block`
         : v.via === "call"
           ? "a direct call answers no move"
-          : "the event the handler carried is not in this block's logs",
+          : "the handler ran in its block; the event it carried was not matched among this block's logs",
     },
     {
       label: "The copy",
@@ -137,10 +139,10 @@ export default async function CopyPage(props: Props) {
           </SourceLedger>
           <PanelNote>
             {m.sameBlock
-              ? `Both transactions are in block #${m.block}: the move at position ${v.leader!.txIndex}, the copy at ${v.txIndex}. The hub subscribes to the source through Somnia's reactivity, so validators run its handler inside the block the move lands in.`
-              : v.via === "call"
-                ? `This copy came from a ${v.call ?? "direct"} call to the hub, not from a move: a follow opens its book in its own transaction, and catchUp or resync bring a book back to the source.`
-                : "The hub's handler sent this copy, but the move it carried is not among this block's logs, so no same-block claim is made."}
+              ? v.leader
+                ? `Both transactions are in block #${m.block}: the move at position ${v.leader.txIndex}, the copy at ${v.txIndex}. The hub subscribes to the source through Somnia's reactivity, so validators run its handler inside the block the move lands in.`
+                : `The hub's handler sent this copy, and Somnia's validators run a subscription's handler inside the block of the event that triggered it, so the move is in block #${m.block} too; its event was not matched among this block's logs.`
+              : `This copy came from a ${v.call ?? "direct"} call to the hub, not from a move: a follow opens its book in its own transaction, and catchUp or resync bring a book back to the source.`}
           </PanelNote>
         </Panel>
       </Col>

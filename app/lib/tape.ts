@@ -130,6 +130,10 @@ export function tapeRow(e: LoggedEvent, ctx: TapeContext): TapeRow | null {
       if (exit) text.push(t(" · "), { t: "aside", v: "exit, always copied" });
       else if (isFlip(e.fromSize, e.toSize)) text.push(t(" · "), { t: "aside", v: e.capped ? "flipped side, capped" : "flipped side" });
       else if (e.capped) text.push(t(" · "), { t: "aside", v: "capped by the follower's limits" });
+      // "same block" for every handler copy rests on the platform, not on a match: Somnia runs a reactive
+      // subscription's handler inside the block of the event that triggered it, and only the hub's own subscription
+      // can send a handler transaction (tx.origin is the hub). The /copy page goes further and names the move itself;
+      // a direct call (catchUp, follow, unfollow) is never marked same block.
       const same = e.via === "handler";
       return {
         ...base,

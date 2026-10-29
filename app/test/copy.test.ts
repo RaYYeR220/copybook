@@ -110,11 +110,12 @@ describe("a copy, read from the chain", () => {
     await expect(loadCopy(sameBlockOpen.copy.hash, undefined, down)).rejects.toThrow("node did not answer");
   });
 
-  it("claims no leader when the trigger is not in the block", async () => {
+  it("names no move when the trigger is not matched in the block, and still places a handler copy in its block", async () => {
     const v = await loadCopy(sameBlockOpen.copy.hash, undefined, replay({ logs: async () => [] }));
     expect(v!.via).toBe("handler");
     expect(v!.leader).toBeNull();
-    expect(v!.sameBlock).toBe(false);
+    // the platform runs a handler in its trigger's block: the claim rests on that, the move is named when found
+    expect(v!.sameBlock).toBe(true);
   });
 
   it("a call copy whose source the partial hub log does not name is returned but marked incomplete", async () => {

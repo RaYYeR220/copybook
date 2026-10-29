@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { AppMain, Col, Colophon, Kick, Panel, PanelNote } from "@/components/app/Panel";
 import { HubFeedProvider } from "@/components/app/HubFeed";
 import { FeedStatusLine, TapeRows, type TapeNames } from "@/components/app/LiveTape";
@@ -12,7 +13,8 @@ import { fmtInt, shortHex } from "@/lib/format";
 import { publicClient } from "@/lib/server/chain";
 import { config } from "@/lib/server/config";
 import { perpMarkets } from "@/lib/server/indexer";
-import { loadTheses } from "@/lib/server/theses";
+import { loadTheses, thesisNames } from "@/lib/server/theses";
+import type { MarketMeta } from "@/lib/tape";
 
 export const dynamic = "force-dynamic";
 
@@ -30,13 +32,38 @@ const RULES = [
   { label: "Network", value: "Somnia Hideki testnet" },
 ];
 
+/** The ThemeRegistry's theses with their minimums at live marks. */
+async function ThesesBody({ markets, marketsMissing }: { markets: Record<string, MarketMeta>; marketsMissing: boolean }) {
+  let theses;
+  try {
+    theses = await loadTheses();
+  } catch {
+    return (
+      <DataState kind="unavailable" title="The ThemeRegistry could not be read from the chain.">
+        Theses are read live from the contract; reload in a moment.
+      </DataState>
+    );
+  }
+  if (theses.length === 0) return <DataState kind="empty" title="No thesis has been published yet." />;
+  return (
+    <>
+      <ThesisList theses={theses} markets={markets} />
+      <PanelNote>
+        Minimums are the smallest allocation that opens every leg at the venue&apos;s marks as this page loaded.
+        {marketsMissing && " Market names are missing because the dreamDEX indexer did not answer; pools are shown by address."}
+      </PanelNote>
+    </>
+  );
+}
+
 export default async function Discover() {
-  const [theses, markets, head] = await Promise.allSettled([loadTheses(), perpMarkets(), publicClient.getBlockNumber()]);
+  // the theses' minimums read every leg's market: they stream in behind Suspense; names alone are cheap
+  const [theses, markets, head] = await Promise.allSettled([thesisNames(), perpMarkets(), publicClient.getBlockNumber()]);
   const marketMap = markets.status === "fulfilled" ? markets.value : {};
   const d = config.deployments;
   const names: TapeNames = {
     markets: marketMap,
-    theses: theses.status === "fulfilled" ? theses.value.map((t) => ({ id: t.id.toString(), name: t.name })) : [],
+    theses: theses.status === "fulfilled" ? theses.value : [],
     traders: { [config.demoLeader.toLowerCase()]: "demo leader" },
     wallets: config.owner ? { [config.owner.toLowerCase()]: "Copybook owner" } : {},
   };
@@ -59,21 +86,9 @@ export default async function Discover() {
           </Panel>
 
           <Panel id="theses-h" title="Theses" aside={<Kick>ThemeRegistry · on chain</Kick>} order={4} d={0.1}>
-            {theses.status === "rejected" ? (
-              <DataState kind="unavailable" title="The ThemeRegistry could not be read from the chain.">
-                Theses are read live from the contract; reload in a moment.
-              </DataState>
-            ) : theses.value.length === 0 ? (
-              <DataState kind="empty" title="No thesis has been published yet." />
-            ) : (
-              <>
-                <ThesisList theses={theses.value} markets={marketMap} />
-                <PanelNote>
-                  Minimums are the smallest allocation that opens every leg at the venue&apos;s marks as this page loaded.
-                  {markets.status === "rejected" && " Market names are missing because the dreamDEX indexer did not answer; pools are shown by address."}
-                </PanelNote>
-              </>
-            )}
+            <Suspense fallback={<DataState kind="loading" title="Reading the ThemeRegistry and each leg's market…" />}>
+              <ThesesBody markets={marketMap} marketsMissing={markets.status === "rejected"} />
+            </Suspense>
           </Panel>
         </Col>
 

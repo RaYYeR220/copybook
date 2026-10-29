@@ -28,6 +28,12 @@ export interface HubLogDeps {
   starts: Record<Contract, bigint>;
   /** Blocks per cached segment. */
   segmentBlocks?: bigint;
+  /**
+   * Blocks per cumulative checkpoint (a multiple of segmentBlocks). Checkpoint k holds every event from the
+   * contract's start to the end of its (k+1)-th span, built from checkpoint k-1 and its own segments and cached for
+   * good, so a cold process reads one checkpoint, at most a checkpoint's worth of segments, and the open tail.
+   */
+  checkpointBlocks?: bigint;
   /** A segment ending at least this far below the head is final and cached for good. */
   sealMargin?: bigint;
   /** Segments read at once. */
@@ -67,6 +73,8 @@ function limiter(n: number) {
  */
 export function createHubLog(deps: HubLogDeps) {
   const SEG = deps.segmentBlocks ?? 10_000n;
+  const CP = deps.checkpointBlocks ?? SEG * 10n;
+  if (CP % SEG !== 0n) throw new Error("checkpointBlocks must be a multiple of segmentBlocks");
   const MARGIN = deps.sealMargin ?? 64n;
   const run = limiter(deps.concurrency ?? 12);
   const address = (c: Contract) => (c === "hub" ? deps.hub : deps.gate);
@@ -97,6 +105,39 @@ export function createHubLog(deps: HubLogDeps) {
     if (!p) {
       const load = () => scanAnnotated(c, from, to);
       p = run(() => (deps.persist ? deps.persist(key, load) : load())).then(
+        (events) => {
+          sealed.set(key, events);
+          inflight.delete(key);
+          return events;
+        },
+        (err) => {
+          inflight.delete(key);
+          throw err;
+        },
+      );
+      inflight.set(key, p);
+    }
+    return p;
+  }
+
+  /** Every event of `c` from its start through the end of checkpoint `k`: checkpoint k-1 plus its own segments. */
+  function loadCheckpoint(c: Contract, k: bigint): Promise<LoggedEvent[]> {
+    const start = deps.starts[c];
+    const from = start + k * CP;
+    const end = from + CP - 1n;
+    const key = `ckpt:${c}:${address(c).toLowerCase()}:${start}-${end}:${VERSION}`;
+    const have = sealed.get(key);
+    if (have) return Promise.resolve(have);
+    let p = inflight.get(key);
+    if (!p) {
+      // not inside the limiter: it only waits on loads that are
+      const load = async () => {
+        const segs: Promise<LoggedEvent[]>[] = [];
+        for (let f = from; f <= end; f += SEG) segs.push(loadSealed(c, f, f + SEG - 1n));
+        const [prev, own] = await Promise.all([k > 0n ? loadCheckpoint(c, k - 1n) : Promise.resolve([] as LoggedEvent[]), Promise.all(segs)]);
+        return [...prev, ...own.flat()];
+      };
+      p = (deps.persist ? deps.persist(key, load) : load()).then(
         (events) => {
           sealed.set(key, events);
           inflight.delete(key);
@@ -147,6 +188,13 @@ export function createHubLog(deps: HubLogDeps) {
       if (start > head) continue;
       const sealedUpTo = head - MARGIN;
       let from = start;
+      // the newest sealed checkpoint, unless the read starts after it
+      const checkpoints = sealedUpTo >= start ? (sealedUpTo - start + 1n) / CP : 0n;
+      if (checkpoints > 0n) {
+        const end = start + checkpoints * CP - 1n;
+        if (end >= fromBlock) jobs.push({ range: { contract: c, from: start, to: end }, p: loadCheckpoint(c, checkpoints - 1n) });
+        from = end + 1n;
+      }
       for (; from + SEG - 1n <= sealedUpTo; from += SEG) {
         const to = from + SEG - 1n;
         if (to < fromBlock) continue;

@@ -1,0 +1,7 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "crons": [
+    { "path": "/api/history?limit=1&warm=daily", "schedule": "17 4 * * *" },
+    { "path": "/api/traders", "schedule": "37 4 * * *" }
+  ]
+}

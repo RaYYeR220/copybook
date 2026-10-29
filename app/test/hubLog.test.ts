@@ -177,4 +177,97 @@ describe("hub log", () => {
     await Promise.all([hl.read(), hl.read(), hl.read()]);
     expect(w.scans.sort()).toEqual(["hub:1000-1099", "hub:1100-1150"]);
   });
+
+  describe("checkpoints", () => {
+    // segments of 100 blocks, a checkpoint every 1,000: hub from 1000, gate from 1500, sealed up to head - 10
+    const store = () => {
+      const m = new Map<string, LoggedEvent[]>();
+      const gets: string[] = [];
+      const persist = async (key: string, load: () => Promise<LoggedEvent[]>) => {
+        gets.push(key);
+        if (!m.has(key)) m.set(key, await load());
+        return m.get(key)!;
+      };
+      return { m, gets, persist };
+    };
+    const hubScans = (w: { scans: string[] }) => w.scans.filter((x) => x.startsWith("hub:")).sort();
+    const gateScans = (w: { scans: string[] }) => w.scans.filter((x) => x.startsWith("gate:")).sort();
+
+    it("a cold instance reads one checkpoint, at most ten segments and the tail", async () => {
+      const st = store();
+      const evs = [followed(1005, 1), copied(1999, 2), copied(2000, 3), copied(2999, 4), copied(3050, 5), copied(3460, 6)];
+      const w1 = world({ head: 3465n, hub: evs, gate: [verdict(1600, 7)] });
+      const first = await createHubLog({ ...w1.deps, checkpointBlocks: 1000n, persist: st.persist }).read();
+      expect(first.events.map((e) => e.log.blockNumber)).toEqual([1005n, 1600n, 1999n, 2000n, 2999n, 3050n, 3460n]);
+      // building the store: every hub segment once (1000..3399 = 24) plus the tail
+      expect(hubScans(w1).length).toBe(25);
+      expect([...st.m.keys()].filter((k) => k.startsWith("ckpt:hub"))).toEqual([
+        `ckpt:hub:${HUB.toLowerCase()}:1000-1999:v1`,
+        `ckpt:hub:${HUB.toLowerCase()}:1000-2999:v1`,
+      ]);
+
+      // a fresh instance on the same store: only the open tails touch the chain
+      const w2 = world({ head: 3465n, hub: evs, gate: [verdict(1600, 7)] });
+      st.gets.length = 0;
+      const again = await createHubLog({ ...w2.deps, checkpointBlocks: 1000n, persist: st.persist }).read();
+      expect(w2.scans.sort()).toEqual(["gate:3400-3465", "hub:3400-3465"]);
+      const hubGets = st.gets.filter((k) => k.includes(HUB.toLowerCase()));
+      expect(hubGets.filter((k) => k.startsWith("ckpt:"))).toEqual([`ckpt:hub:${HUB.toLowerCase()}:1000-2999:v1`]);
+      expect(hubGets.filter((k) => k.startsWith("hub:")).length).toBe(4); // 3000..3399
+      expect(st.gets.filter((k) => k.startsWith("gate:")).length).toBeLessThanOrEqual(10);
+      expect(again.events).toEqual(first.events);
+      expect(again.complete).toBe(true);
+    });
+
+    it("a checkpoint ending exactly at the sealed edge is used, and the tail starts right after it", async () => {
+      const w = world({ head: 3009n, hub: [copied(2999, 1), copied(3005, 2)] });
+      const st = store();
+      const r = await createHubLog({ ...w.deps, checkpointBlocks: 1000n, persist: st.persist }).read();
+      expect(st.gets.filter((k) => k.startsWith("ckpt:hub"))).toContain(`ckpt:hub:${HUB.toLowerCase()}:1000-2999:v1`);
+      expect(hubScans(w).at(-1)).toBe("hub:3000-3009");
+      expect(r.events.map((e) => e.log.blockNumber)).toEqual([2999n, 3005n]);
+    });
+
+    it("one block short of a checkpoint's end, the previous checkpoint and nine segments carry it", async () => {
+      const w = world({ head: 3008n, hub: [copied(2950, 1)] });
+      const st = store();
+      const r = await createHubLog({ ...w.deps, checkpointBlocks: 1000n, persist: st.persist }).read();
+      const hubCkpts = [...new Set(st.gets.filter((k) => k.startsWith("ckpt:hub")))];
+      expect(hubCkpts).toEqual([`ckpt:hub:${HUB.toLowerCase()}:1000-1999:v1`]);
+      expect(hubScans(w)).toContain("hub:2900-3008"); // the segment 2900-2999 is not sealed yet: it is the tail
+      expect(hubScans(w)).toContain("hub:2800-2899");
+      expect(r.events.map((e) => e.log.blockNumber)).toEqual([2950n]);
+    });
+
+    it("a fromBlock past every checkpoint reads only the segments after it", async () => {
+      const w = world({ head: 3465n, hub: [copied(1500, 1), copied(3100, 2)] });
+      const st = store();
+      const r = await createHubLog({ ...w.deps, checkpointBlocks: 1000n, persist: st.persist }).read({ fromBlock: 3050n });
+      expect(st.gets.filter((k) => k.startsWith("ckpt:"))).toEqual([]);
+      expect(hubScans(w)).toEqual(["hub:3000-3099", "hub:3100-3199", "hub:3200-3299", "hub:3300-3399", "hub:3400-3465"]);
+      expect(gateScans(w)).toEqual(["gate:3000-3099", "gate:3100-3199", "gate:3200-3299", "gate:3300-3399", "gate:3400-3465"]);
+      expect(r.events.map((e) => e.log.blockNumber)).toEqual([3100n]);
+    });
+
+    it("a fromBlock inside a checkpoint reads the checkpoint and filters it", async () => {
+      const w = world({ head: 2015n, hub: [copied(1200, 1), copied(1700, 2)] });
+      const st = store();
+      const r = await createHubLog({ ...w.deps, checkpointBlocks: 1000n, persist: st.persist }).read({ fromBlock: 1500n });
+      expect(st.gets).toContain(`ckpt:hub:${HUB.toLowerCase()}:1000-1999:v1`);
+      expect(r.events.map((e) => e.log.blockNumber)).toEqual([1700n]);
+    });
+
+    it("a failed checkpoint is reported as its whole range and rebuilt on the next read", async () => {
+      let fail = true;
+      const w = world({ head: 2015n, hub: [copied(1200, 1)], fail: (c, from) => fail && c === "hub" && from === 1300n });
+      const hl = createHubLog({ ...w.deps, checkpointBlocks: 1000n });
+      const r = await hl.read();
+      expect(r.complete).toBe(false);
+      expect(r.missing).toEqual([{ contract: "hub", from: 1000n, to: 1999n }]);
+      fail = false;
+      const r2 = await hl.read();
+      expect(r2.complete).toBe(true);
+      expect(r2.events.map((e) => e.log.blockNumber)).toEqual([1200n]);
+    });
+  });
 });

@@ -205,15 +205,15 @@ function PolicyDrawer({ follow, who, joinPools, held, markets, reader, writer, t
         ...(follow.kind === "Trader" && joinPools && joinPools.length === 0 ? { checkPools: held } : {}),
         tank: MIN_TANK,
         ...(follow.kind === "Trader" ? { guardOn } : {}),
+        // an edit opens nothing: what would refuse an opening is a warning about new increases
+        mode: "edit",
       }
     : null;
   const key = input ? JSON.stringify(input, (_k, v) => (typeof v === "bigint" ? v.toString() : v)) : "";
   const pre = usePreflight(reader.copybook, input, key);
   const result = pre.status === "ready" ? pre.result : pre.status === "checking" || pre.status === "error" ? pre.last : undefined;
-  // a pause on new follows does not stop an existing follow's policy change
-  const relevant = result ? result.reasons.filter((r) => r.code !== "FOLLOWS_PAUSED") : [];
-  const shown = reasonsFor("policy", relevant).filter((r) => r.code !== "ALLOW_ALL_MIRRORS_OPEN_BOOK");
-  const ready = pre.status === "ready" && pre.key === key && !!parsed.policy && !blocks("policy", relevant);
+  const shown = result ? reasonsFor("policy", result.reasons) : [];
+  const ready = pre.status === "ready" && pre.key === key && !!parsed.policy && !blocks("policy", pre.result.reasons);
   const mine = txFor(tx, ["updatePolicy"]);
   const apply = (f: FormField | "tank", v: string) => f !== "tank" && f !== "markets" && setForm((x) => ({ ...x, [f]: v }));
   return (

@@ -440,13 +440,7 @@
     padding-right: 16px;
   }
 
-  /* a transaction sent before this page loaded, until it lands */
-.recalled {
-  grid-column: 1 / -1;
-  padding: 0 4px;
-}
-
-.banner {
+  .banner {
     grid-template-columns: 18px minmax(0, 1fr);
     padding: 12px 16px;
   }

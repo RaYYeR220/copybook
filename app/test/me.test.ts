@@ -136,6 +136,43 @@ describe("book vs theirs: trader follows", () => {
     expect(gateIncreases(base, { ...open, paused: true })[0]!.gate).toBeUndefined();
   });
 
+  it("replays catchUp in pool order: a second growing market that would pass the whole-book cap is held back", () => {
+    // BTC: the trader holds 0.001 ($80); ETH: 0.01 ($24); the follower is flat in both; cap $100
+    const book = traderBook({ scaleBps: 10_000, maxNotional: 1_000n * E }, [
+      { pool: BTC, market: btc, yours: pos(0n), theirs: pos(100_000n) },
+      { pool: ETH, market: eth, yours: pos(0n), theirs: pos(10n ** 16n) },
+    ]);
+    const rows = gateIncreases(book, { ...open, maxTotalNotional: 100n * E, synced: [] });
+    expect(rows[0]!.gate).toBeUndefined();
+    expect(rows[1]!.gate).toBe("TotalCap");
+    const offer = catchUpOffer(rows);
+    expect(offer).toEqual({ pools: [BTC], reducing: [], growing: [BTC] });
+    const banner = dashboardBanners({ status: status(), catchUp: offer, refusalsRead: true, names }).find((b) => b.code === "OUT_OF_STEP")!;
+    expect(banner.message).toContain("brings BTC-PERP up to the trader's size");
+    expect(banner.message).not.toContain("0xD6Cb");
+    // in the other order the first market wins the room
+    const reversed = gateIncreases([book[1]!, book[0]!], { ...open, maxTotalNotional: 100n * E, synced: [] });
+    expect(reversed.map((r) => r.gate)).toEqual([undefined, "TotalCap"]);
+  });
+
+  it("counts an earlier market at its size after its own exit: a reduction can make room", () => {
+    const book = traderBook({ scaleBps: 10_000, maxNotional: 1_000n * E }, [
+      // holds 0.002 BTC ($160), the trader 0.001 ($80): catchUp reduces it first
+      { pool: BTC, market: btc, yours: pos(200_000n), theirs: pos(100_000n) },
+      { pool: ETH, market: eth, yours: pos(0n), theirs: pos(10n ** 16n) },
+    ]);
+    const rows = gateIncreases(book, { ...open, maxTotalNotional: 110n * E, synced: [BTC] });
+    expect(rows[1]!.gate).toBeUndefined();
+    expect(catchUpOffer(rows)).toEqual({ pools: [BTC, ETH], reducing: [BTC], growing: [ETH] });
+  });
+
+  it("with the equity floor off, an empty tank is named before the whole-book cap, as _earlyGate does", () => {
+    const book = traderBook({ scaleBps: 10_000, maxNotional: 1_000n * E }, [{ pool: ETH, market: eth, yours: pos(0n), theirs: pos(10n ** 16n) }]);
+    expect(gateIncreases(book, { ...open, tank: 10n ** 16n, maxTotalNotional: E })[0]!.gate).toBe("TankEmpty");
+    // with a floor armed (and met), the cap comes first
+    expect(gateIncreases(book, { ...open, tank: 10n ** 16n, maxTotalNotional: E, equityFloor: 10n * E })[0]!.gate).toBe("TotalCap");
+  });
+
   it("a flip whose increase is refused is offered for its reduction only", () => {
     const rows = gateIncreases(traderBook({ scaleBps: 10_000, maxNotional: 100n * E }, [{ pool: BTC, market: btc, yours: pos(-50_000n), theirs: pos(50_000n) }]), { ...open, blocked: true });
     expect(rows[0]!.moves).toMatchObject({ reduce: true, increase: true });

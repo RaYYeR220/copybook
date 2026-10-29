@@ -12,6 +12,7 @@ import { Refusals } from "@/components/landing/Refusals";
 import { Theses } from "@/components/landing/Theses";
 import { RevealObserver } from "@/components/RevealObserver";
 import { APP_PATH } from "@/content/site";
+import { FIRST_PAINT_SCRIPT } from "@/lib/firstPaint";
 import styles from "./landing.module.css";
 
 const NAV: NavLink[] = [
@@ -49,7 +50,8 @@ export const viewport: Viewport = {
 
 export default function Landing() {
   return (
-    <div className={`${styles.page} ${heroFont.variable}`}>
+    <div className={`${styles.page} ${heroFont.variable}`} data-fonts="after-paint">
+      <script dangerouslySetInnerHTML={{ __html: FIRST_PAINT_SCRIPT }} />
       <a className="skip" href="#main">
         Skip to content
       </a>

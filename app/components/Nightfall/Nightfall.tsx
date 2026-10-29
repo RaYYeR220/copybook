@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { COPIES_AT, LEADER_AT, MERIDIAN_ANGLE, meridianPoint } from "@/lib/atlas";
-import { f1, prefersReducedMotion, whenIdle } from "@/lib/motion";
+import { afterFirstPaint, f1, prefersReducedMotion } from "@/lib/motion";
 import type { AtlasGeometry } from "./nightEngine";
 import styles from "./Nightfall.module.css";
 
@@ -104,7 +104,7 @@ export function NightfallScene({ plate, head, readout, leaderLabel, copyLabel, l
       stop();
       stop = engine.startNightfall({ ...els, reduced: prefersReducedMotion(), onLayout: setGeo });
     };
-    // below the fold: load the scene's engine when idle, or at once when the page opens on it
+    // below the fold: load the scene's engine after the first paint, or at once when the page opens on it
     const load = () =>
       void import("./nightEngine").then((m) => {
         if (gone) return;
@@ -112,7 +112,7 @@ export function NightfallScene({ plate, head, readout, leaderLabel, copyLabel, l
         start();
       });
     const near = els.track.getBoundingClientRect().top < window.innerHeight * 1.5;
-    const cancel = near ? (load(), () => {}) : whenIdle(load);
+    const cancel = near ? (load(), () => {}) : afterFirstPaint(load);
     motion.addEventListener("change", start);
     return () => {
       gone = true;

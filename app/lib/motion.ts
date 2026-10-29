@@ -38,6 +38,40 @@ export function whenIdle(fn: () => void, timeout = 1_500): () => void {
   return () => window.clearTimeout(id);
 }
 
+/**
+ * Runs `fn` when the browser is idle after the page's first contentful paint (or 3 s after load at the latest), so a
+ * canvas engine never competes with the first frame. Returns a cancel function.
+ */
+export function afterFirstPaint(fn: () => void): () => void {
+  let cancelIdle = () => {};
+  let started = false;
+  const go = () => {
+    if (started) return;
+    started = true;
+    cancelIdle = whenIdle(fn);
+  };
+  if (performance.getEntriesByName("first-contentful-paint").length > 0) {
+    go();
+    return () => cancelIdle();
+  }
+  const failsafe = window.setTimeout(go, 3_000);
+  let obs: PerformanceObserver | undefined;
+  try {
+    obs = new PerformanceObserver((list) => {
+      if (list.getEntries().some((e) => e.name === "first-contentful-paint")) go();
+    });
+    obs.observe({ type: "paint", buffered: true });
+  } catch {
+    go();
+  }
+  return () => {
+    started = true;
+    obs?.disconnect();
+    window.clearTimeout(failsafe);
+    cancelIdle();
+  };
+}
+
 export const prefersReducedMotion = () =>
   typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 

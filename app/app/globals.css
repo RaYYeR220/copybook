@@ -72,6 +72,20 @@
   --soft: 0;
 }
 
+/* The landing's first frame is drawn in the metric-matched fallbacks; the web fonts take over once it has painted
+   (lib/firstPaint.ts). Its headline has its own preloaded faces. */
+[data-fonts="after-paint"] {
+  --display: "Fraunces Fallback", Georgia, serif;
+  --body: "Figtree Fallback", system-ui, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+
+html[data-painted] [data-fonts="after-paint"] {
+  --display: var(--font-fraunces), Georgia, serif;
+  --body: var(--font-figtree), system-ui, sans-serif;
+  --mono: var(--font-fragment-mono), ui-monospace, monospace;
+}
+
 *,
 *::before,
 *::after {

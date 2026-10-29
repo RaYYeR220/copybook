@@ -59,7 +59,8 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" className={`${fraunces.variable} ${figtree.variable} ${fragmentMono.variable}`}>
+    // the landing marks <html data-painted> from an inline script (lib/firstPaint.ts) before React hydrates it
+    <html lang="en" className={`${fraunces.variable} ${figtree.variable} ${fragmentMono.variable}`} suppressHydrationWarning>
       <body>{children}</body>
     </html>
   );

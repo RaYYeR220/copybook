@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { prefersReducedMotion, whenIdle } from "@/lib/motion";
+import { afterFirstPaint, prefersReducedMotion } from "@/lib/motion";
 import { useFlockStore } from "./FlockState";
 import styles from "./Hero.module.css";
 
@@ -36,8 +36,8 @@ export function Flock({ leaderLabel }: { leaderLabel: string }) {
         onBirds: (birds) => store.set({ birds }),
       });
     };
-    // the flock is decoration: its engine loads and starts once the headline has painted and the page is idle
-    const cancel = whenIdle(() =>
+    // the flock is decoration: its engine loads and starts once the first frame has painted and the page is idle
+    const cancel = afterFirstPaint(() =>
       void import("./heroEngine").then((m) => {
         if (gone) return;
         engine = m;

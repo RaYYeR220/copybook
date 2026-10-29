@@ -90,7 +90,7 @@ const BEATS = [
     verb: "Copy",
     title: "Copied in the same block",
     pic: <TurnPic />,
-    body: "When the source’s position changes, Somnia validators run your copy in that same block. Exits are always copied. Anything refused is written on-chain with its reason.",
+    body: "When the source’s position changes, Somnia validators run your copy in that same block. Exits are never gated. Anything refused is written on-chain with its reason.",
     note: "The whole flock turns in one frame",
   },
 ];

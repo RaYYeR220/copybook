@@ -374,7 +374,7 @@ function Following({ who, data, names, markets, traders, pub, reader, writer, tx
           <Refusals counts={counts} />
         </Panel>
         <Colophon>
-          Hub <b>{shortHex(reader.deployments.hub)}</b> · RiskGate <b>{shortHex(reader.deployments.gate)}</b> · Somnia Hideki testnet · exits always copied
+          Hub <b>{shortHex(reader.deployments.hub)}</b> · RiskGate <b>{shortHex(reader.deployments.gate)}</b> · Somnia Hideki testnet (Tokyo) · exits never gated
         </Colophon>
       </Col>
     </AppMain>
@@ -442,7 +442,7 @@ function NotFollowing({ who, data, names, reader, writer, tx }: { who: Address; 
           <TapeRows names={names} label="Copybook events for this wallet, newest first" empty="This wallet has never followed through Copybook." />
         </Panel>
         <Colophon>
-          Hub <b>{shortHex(reader.deployments.hub)}</b> · Somnia Hideki testnet
+          Hub <b>{shortHex(reader.deployments.hub)}</b> · Somnia Hideki testnet (Tokyo)
         </Colophon>
       </Col>
     </AppMain>

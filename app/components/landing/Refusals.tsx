@@ -133,7 +133,7 @@ export function Refusals() {
           <div>
             <p className="kicker">Every refusal has a name</p>
             <h3 className={`h3 ${styles.reasonsTitle}`}>
-              Seven from your policy, <em>all on-chain.</em>
+              Seven from your policy, <em>each written on chain when it happens.</em>
             </h3>
           </div>
           <div>
@@ -148,7 +148,8 @@ export function Refusals() {
             <p className={n.caption}>Also on the record: market not allowed · venue rejected · leg failed · paused</p>
           </div>
         </div>
-        <p className={`${styles.exits} reveal`}>Exits are always copied — a refusal can stop you opening, never stop you closing.</p>
+        <p className={`${styles.exits} reveal`}>Exits are never gated — no cap, tank, pause or AI verdict holds back a close.</p>
+        <p className={`${styles.exitsNote} reveal`}>A close is one immediate-or-cancel order. If the book cannot fill it near the mark, it is recorded as BandUnfilled.</p>
       </Frame>
     </section>
   );

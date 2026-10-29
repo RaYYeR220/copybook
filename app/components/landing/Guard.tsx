@@ -162,7 +162,7 @@ export function Guard() {
                   BLOCK
                 </span>
                 <span>
-                  New size is refused with reason <b>AI risk verdict</b>. <b>Exits are never blocked.</b>
+                  New size is refused with reason <b>AI risk verdict</b>. <b>Exits are never gated.</b>
                 </span>
               </li>
             </ul>

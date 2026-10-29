@@ -150,7 +150,7 @@ export function Theses() {
               A thesis opens <em>whole.</em>
             </h2>
             <p className={`lead ${n.leadSm}`}>
-              Follow a basket of legs with weights. Every new leg opens in one transaction — or none do. Exits always go through.
+              Follow a basket of legs with weights. Every new leg opens in one transaction — or none do. Exits are never gated.
             </p>
             <p className={n.listHead}>Example thesis · {EXAMPLE.name}</p>
             <ul className={styles.legs} aria-label={`Example thesis legs: ${EXAMPLE.name}`}>

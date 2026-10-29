@@ -110,7 +110,7 @@ export default async function TraderPage({ params }: Params) {
           </Panel>
 
           <Colophon>
-            Source id <b>{shortHex(sourceIdOf("Trader", trader), 6, 4)}</b> · RiskGate <b>{shortHex(config.deployments.gate)}</b> · exits always copied
+            Source id <b>{shortHex(sourceIdOf("Trader", trader), 6, 4)}</b> · RiskGate <b>{shortHex(config.deployments.gate)}</b> · exits never gated
           </Colophon>
         </Col>
       </AppMain>

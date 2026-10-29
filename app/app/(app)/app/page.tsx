@@ -27,11 +27,11 @@ export const metadata: Metadata = {
 
 const RULES = [
   { label: "One wallet", value: "one source at a time" },
-  { label: "Exits", value: "always copied" },
+  { label: "Exits", value: "never gated" },
   { label: "New size", value: "inside your band and caps" },
   { label: "AI guard", value: "trader follows · on by default" },
   { label: "Copied price", value: "the limit, not the fill" },
-  { label: "Network", value: "Somnia Hideki testnet" },
+  { label: "Network", value: "Somnia Hideki testnet (Tokyo)" },
 ];
 
 /** The ThemeRegistry's theses with their minimums at live marks. */
@@ -85,7 +85,7 @@ export default async function Discover() {
             <SourceLedger>
               <Ledger size="md" rows={RULES} />
             </SourceLedger>
-            <PanelNote>Use a dedicated wallet: following mirrors the source&apos;s whole book, positions already open included.</PanelNote>
+            <PanelNote>Use a dedicated wallet: following mirrors the source&apos;s whole book, and already-open positions open via catchUp or at the trader&apos;s next move.</PanelNote>
           </Panel>
 
           <Panel id="theses-h" title="Theses" aside={<Kick>ThemeRegistry · on chain</Kick>} order={4} d={0.1}>
@@ -117,7 +117,7 @@ export default async function Discover() {
             <a href={addressUrl(d.hub)} className="lnk">
               <b>{shortHex(d.hub)}</b>
             </a>{" "}
-            · ThemeRegistry <b>{shortHex(d.themes)}</b> · RiskGate <b>{shortHex(d.gate)}</b> · Somnia Hideki testnet · exits always copied
+            · ThemeRegistry <b>{shortHex(d.themes)}</b> · RiskGate <b>{shortHex(d.gate)}</b> · Somnia Hideki testnet (Tokyo) · exits never gated
           </Colophon>
         </Col>
       </AppMain>

@@ -505,7 +505,7 @@ function TankStep(props: StepBodyProps) {
       </Block>
       <Notes>
         <li>
-          Below <b>{fmtStt(MIN_TANK_FOR_INCREASE)}</b> every increase is refused as Tank empty; exits still run.
+          Below <b>{fmtStt(MIN_TANK_FOR_INCREASE)}</b> every increase is refused as Tank empty; exits are never gated.
         </li>
         <li>While following, the tank keeps at least {fmtStt(MIN_TANK)}. Top it up or take out what is above that from your dashboard; after you unfollow, all of it comes out.</li>
         <li>How many runs it covers depends on the gas each run uses. Your dashboard estimates it from this follow&apos;s own charges once there are some.</li>
@@ -563,8 +563,10 @@ function FollowStep(props: StepBodyProps) {
           Copies land in <b>the same block</b> as the source&apos;s move: Somnia&apos;s validators run the hub&apos;s handler for it.
         </li>
         <li>
-          <b>Exits are always copied.</b> Increases pass your band and caps, the equity floor and the tank{source.kind === "Trader" ? ", and the AI guard" : ""}.
+          <b>Exits are never gated:</b> no cap, tank, pause or AI verdict holds back a close. A close is one immediate-or-cancel order; if the book cannot fill it near the mark,
+          it is recorded as BandUnfilled.
         </li>
+        <li>Increases pass your band and caps, the equity floor and the tank{source.kind === "Trader" ? ", and the AI guard" : ""}.</li>
         {source.kind === "Trader" ? (
           form.allowAll ? (
             <li>The whole book: every market the trader holds or trades is managed, including positions already open (at their next move there, or when you run catchUp).</li>
@@ -694,7 +696,7 @@ function DoneStep({ view, source, sourceName }: StepBodyProps & { sourceName: st
       {source.kind === "Trader" && view.review === "pending" && <Lead>A review of this trader is on its way; the guard uses the verdict as soon as it reaches the gate.</Lead>}
       {source.kind === "Trader" && view.review === "needed" && <Lead>The review was skipped: the guard has no verdict on this trader yet, so nothing stops its new size.</Lead>}
       {source.kind === "Trader" && view.guardOn === false && (
-        <Lead>The AI guard is off for this wallet: a Block verdict on this trader does not stop new size. Exits are copied either way.</Lead>
+        <Lead>The AI guard is off for this wallet: a Block verdict on this trader does not stop new size. Exits are never gated either way.</Lead>
       )}
       {view.noGrant && (
         <Lead>

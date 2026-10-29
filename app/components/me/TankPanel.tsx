@@ -158,7 +158,7 @@ export function TankPanel({
       </div>
       <PanelNote>
         Every handler run that reaches this wallet is billed to the tank. A run that copies or refuses logs its charge (TankCharged); a run with nothing to do is billed
-        without an event, so the tank lasts somewhat less than the estimate. Below {fmtStt(MIN_TANK_FOR_INCREASE)} every increase is refused; exits still run. The dashed mark on
+        without an event, so the tank lasts somewhat less than the estimate. Below {fmtStt(MIN_TANK_FOR_INCREASE)} every increase is refused; exits are never gated. The dashed mark on
         the dial is the 0.2 STT a following wallet keeps.
       </PanelNote>
     </>

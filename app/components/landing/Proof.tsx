@@ -60,7 +60,7 @@ export function Proof() {
             ]}
           />
           <p className={styles.row}>
-            <span>Somnia testnet · live run</span>
+            <span>Somnia Hideki testnet (Tokyo) · live run</span>
             <a className="lnk" href={links.leaderTx} target="_blank" rel="noopener noreferrer">
               Leader tx ↗
             </a>

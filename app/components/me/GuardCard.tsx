@@ -63,7 +63,7 @@ export function GuardCard({
         <div className={styles.confirm} role="group" aria-label={guardOn ? "Turn the guard off" : "Turn the guard on"}>
           <p className={styles.dlead}>
             {want
-              ? "With the guard on, a fresh BLOCK verdict on the trader you follow stops new size for this wallet; exits still run."
+              ? "With the guard on, a fresh BLOCK verdict on the trader you follow stops new size for this wallet; exits are never gated."
               : "With the guard off, a BLOCK verdict no longer stops new size for this wallet. It is this wallet's setting on the RiskGate, for this follow and any later one."}
           </p>
           <Call>

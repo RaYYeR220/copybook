@@ -252,7 +252,7 @@ export function FollowFlow({ pub, source: raw, markets, renderedAt }: Props) {
           />
         </Panel>
         <Colophon>
-          Hub <b>{shortHex(reader.deployments.hub)}</b> · operator registry <b>{shortHex(reader.deployments.operatorRegistry)}</b> · Somnia Hideki testnet · exits always copied
+          Hub <b>{shortHex(reader.deployments.hub)}</b> · operator registry <b>{shortHex(reader.deployments.operatorRegistry)}</b> · Somnia Hideki testnet (Tokyo) · exits never gated
         </Colophon>
       </Col>
     </AppMain>

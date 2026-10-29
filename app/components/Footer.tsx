@@ -28,7 +28,7 @@ export function Footer() {
         </a>
       </nav>
       <div className={styles.fine}>
-        <span>Hub {shortHex(hub)} · Somnia testnet</span>
+        <span>Hub {shortHex(hub)} · Somnia Hideki testnet (Tokyo)</span>
         <span>Every refusal is written on-chain with its reason</span>
         <span>© 2026 Copybook</span>
       </div>

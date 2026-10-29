@@ -87,7 +87,7 @@ function position(x: bigint, m: MarketMeta | undefined): string {
   return m ? `${fmtUnits(abs, m.decimals)} ${sideOf(x)}` : `${abs.toString()} units ${sideOf(x)}`;
 }
 
-/** Less exposure on the same side (or flat): an exit, which is always copied. */
+/** Less exposure on the same side (or flat): an exit, which is never gated. */
 export const isExit = (from: bigint, to: bigint) => {
   if (isFlip(from, to)) return false;
   const a = from < 0n ? -from : from;
@@ -127,7 +127,7 @@ export function tapeRow(e: LoggedEvent, ctx: TapeContext): TapeRow | null {
       const exit = isExit(e.fromSize, e.toSize);
       const text: Segment[] = [follower(ctx, e.follower), t(" copied "), source(ctx, e.sourceId), t(" · "), { t: "fig", v: `${position(e.fromSize, m)} → ${position(e.toSize, m)}` }];
       if (e.limitPrice > 0n) text.push(t(` · limit ${fmtPrice18(e.limitPrice)}`));
-      if (exit) text.push(t(" · "), { t: "aside", v: "exit, always copied" });
+      if (exit) text.push(t(" · "), { t: "aside", v: "exit, never gated" });
       else if (isFlip(e.fromSize, e.toSize)) text.push(t(" · "), { t: "aside", v: e.capped ? "flipped side, capped" : "flipped side" });
       else if (e.capped) text.push(t(" · "), { t: "aside", v: "capped by the follower's limits" });
       // "same block" for every handler copy rests on the platform, not on a match: Somnia runs a reactive

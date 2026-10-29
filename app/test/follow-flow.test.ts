@@ -19,6 +19,8 @@ const chain = (over: Partial<ChainReads> = {}): ChainReads => ({
   approved: false,
   follow: null,
   equity: 30n * E,
+  spot: 0n,
+  marginAllowance: 0n,
   balance: 3n * E,
   guardOn: true,
   tank: 0n,
@@ -89,6 +91,29 @@ describe("follow flow: what the chain already holds", () => {
     expect(flow({ reads: ready({ equity: -5n }) })).toMatchObject({ step: "margin", blocker: "no-margin" });
     expect(flow({ reads: ready({ equity: null }) })).toMatchObject({ step: "margin", blocker: "margin-unreadable" });
     expect(flow({ reads: ready({ equity: 0n }), local: { marginWaived: true } }).step).toBe("approve");
+  });
+
+  it("stops at margin when equity is short of the suggestion and spot USDso could cover more; never otherwise", () => {
+    // short, with USDso on spot: offered, and waivable
+    expect(flow({ marginTarget: 100n * E, reads: ready({ equity: 30n * E, spot: 50n * E }) })).toMatchObject({ step: "margin", blocker: "low-margin" });
+    expect(flow({ marginTarget: 100n * E, reads: ready({ equity: 30n * E, spot: 50n * E }), local: { marginWaived: true } }).step).toBe("approve");
+    // short, but nothing on spot (or unread): no dead end, the flow goes on
+    expect(flow({ marginTarget: 100n * E, reads: ready({ equity: 30n * E, spot: 0n }) }).step).toBe("approve");
+    expect(flow({ marginTarget: 100n * E, reads: ready({ equity: 30n * E, spot: null }) }).step).toBe("approve");
+    // at or above the suggestion, or with no suggestion at all
+    expect(flow({ marginTarget: 30n * E, reads: ready({ equity: 30n * E, spot: 50n * E }) }).step).toBe("approve");
+    expect(flow({ reads: ready({ equity: 30n * E, spot: 50n * E }) }).step).toBe("approve");
+    // an empty account is no-margin whatever spot holds
+    expect(flow({ marginTarget: 100n * E, reads: ready({ equity: 0n, spot: 50n * E }) }).blocker).toBe("no-margin");
+  });
+
+  it("a deposit that lands moves the flow on: the step is read back from the chain", () => {
+    const before = ready({ equity: 0n, spot: 25n * E, marginAllowance: 3n * E });
+    expect(flow({ marginTarget: 100n * E, reads: before }).blocker).toBe("no-margin");
+    // all of spot moved in: nothing left to offer, so the flow goes on even below the suggestion
+    expect(flow({ marginTarget: 100n * E, reads: ready({ equity: 25n * E, spot: 0n, marginAllowance: 0n }) }).step).toBe("approve");
+    // part of it: the step stays, now as "short", until the person goes on
+    expect(flow({ marginTarget: 100n * E, reads: ready({ equity: 3n * E, spot: 22n * E }) }).blocker).toBe("low-margin");
   });
 
   it("asks for the operator approval before the policy, and skips it once the chain has it", () => {

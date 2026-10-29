@@ -15,7 +15,7 @@ export function Refusals({ counts }: { counts: { reason: ReasonName; n: number }
           </li>
         ))}
       </ul>
-      <PanelNote>A refusal stops an opening, never a closing. Each one is a Refused event with its reason, in the feed above.</PanelNote>
+      <PanelNote>Exits are never gated: a close is refused only when the book cannot fill its immediate-or-cancel order near the mark (BandUnfilled). Each refusal is a Refused event with its reason, in the feed above.</PanelNote>
     </>
   );
 }

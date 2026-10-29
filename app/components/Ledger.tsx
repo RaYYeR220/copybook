@@ -16,12 +16,10 @@ export function Ledger({ rows, size = "lg", className }: { rows: LedgerRow[]; si
   return (
     <dl className={[styles.ledger, styles[size], className].filter(Boolean).join(" ")}>
       {rows.map((r) => (
+        // dt and dd sit directly in the group (a dl allows nothing else); the dotted leader is the group's ::before
         <div key={r.label} className={styles.group}>
-          <div className={styles.line}>
-            <dt className={styles.label}>{r.label}</dt>
-            <span className={styles.leader} aria-hidden="true" />
-            <dd className={styles.value}>{r.value}</dd>
-          </div>
+          <dt className={styles.label}>{r.label}</dt>
+          <dd className={styles.value}>{r.value}</dd>
           {r.note && <dd className={styles.note}>{r.note}</dd>}
         </div>
       ))}

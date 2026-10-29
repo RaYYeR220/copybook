@@ -123,7 +123,9 @@ export function createCopybook(config: CopybookConfig) {
         gas = (est * GAS_HEADROOM_NUM) / GAS_HEADROOM_DEN;
         if (gas > MAX_TX_GAS) gas = MAX_TX_GAS;
       }
-      const hash = await wallet.writeContract({ ...full, gas, account, chain: wallet.chain ?? null } as never);
+      // the wallet's own account object: a local key signs here and goes out raw; an address alone would ask the
+      // node to sign (eth_sendTransaction), which only a browser wallet answers
+      const hash = await wallet.writeContract({ ...full, gas, account: wallet.account!, chain: wallet.chain ?? null } as never);
       return { hash, wait: (o) => waitFor(hash, o?.timeoutMs) };
     } catch (e) {
       throw asCopybookError(e);

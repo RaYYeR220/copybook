@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { decodeFunctionData, encodeAbiParameters, encodeEventTopics, encodeErrorResult, keccak256, toHex, type Abi, type Hex } from "viem";
+import { privateKeyToAccount } from "viem/accounts";
 import { createCopybook } from "../src/client.ts";
 import { hubAbi } from "../src/abi/hub.ts";
 import { themesAbi } from "../src/abi/themes.ts";
@@ -163,6 +164,20 @@ describe("writes", () => {
     expect(d.args![0]).toBe(0);
     expect(d.args![1]).toBe(BigInt(TRADER));
     expect(d.args![3]).toEqual([ETH]);
+  });
+
+  it("signs with a local key itself and sends the raw transaction, never asking the node to sign", async () => {
+    const c = world();
+    const key = privateKeyToAccount(`0x${"11".repeat(32)}`);
+    const cb = createCopybook({ publicClient: c.publicClient, walletClient: c.localWallet(key), deployments });
+    await cb.follow({ target: { kind: "Theme", themeId: 1n }, policy: policy({ allocation: 200n * E }), tank: MIN_TANK });
+    const sent = c.sent[0]!;
+    expect(sent.raw).toBe(true);
+    expect(sent.from).toBe(key.address);
+    expect(sent.to.toLowerCase()).toBe(deployments.hub.toLowerCase());
+    expect(BigInt(sent.value!)).toBe(MIN_TANK);
+    expect(decodeFunctionData({ abi: hubAbi, data: sent.data }).functionName).toBe("follow");
+    expect(c.rpc.some((r) => r.method === "eth_sendTransaction")).toBe(false);
   });
 
   it("sends a theme follow with kind 1, the theme id and no markets", async () => {

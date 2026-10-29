@@ -5,6 +5,8 @@ import {
   decodeFunctionData,
   encodeFunctionResult,
   parseAbi,
+  parseTransaction,
+  recoverTransactionAddress,
   toHex,
   type Abi,
   type Address,
@@ -18,6 +20,7 @@ import { themesAbi } from "../src/abi/themes.ts";
 import { poolAbi } from "../src/market.ts";
 import { deploymentsFromJson } from "../src/deployments.ts";
 import type { Deployments } from "../src/types.ts";
+import type { LocalAccount } from "viem/accounts";
 
 export const hidekiJson = {
   chainId: 50383,
@@ -57,7 +60,8 @@ export class FakeChain {
   chainId = 50383;
   balance = 10n * 10n ** 18n;
   getLogsFailAbove: bigint | undefined;
-  sent: { to: Address; data: Hex; value?: Hex; gas?: Hex; from?: Address }[] = [];
+  /** Every transaction sent; `raw` marks one signed by the client and sent with eth_sendRawTransaction. */
+  sent: { to: Address; data: Hex; value?: Hex; gas?: Hex; from?: Address; raw?: boolean }[] = [];
   estimates: bigint = 2_000_000n;
   revertEstimateWith: Hex | undefined;
   receiptLogs: Record<string, unknown>[] = [];
@@ -100,6 +104,20 @@ export class FakeChain {
           throw Object.assign(new Error("execution reverted"), { code: 3, data: this.revertEstimateWith });
         }
         return toHex(this.estimates);
+      case "eth_getTransactionCount":
+        return "0x0";
+      case "eth_gasPrice":
+      case "eth_maxPriorityFeePerGas":
+        return "0x1";
+      case "eth_getBlockByNumber":
+        return { number: toHex(this.head), hash: `0x${"cd".repeat(32)}`, baseFeePerGas: "0x1", timestamp: "0x0", transactions: [] };
+      case "eth_sendRawTransaction": {
+        const signed = p[0] as `0x02${string}`;
+        const tx = parseTransaction(signed);
+        const from = await recoverTransactionAddress({ serializedTransaction: signed });
+        this.sent.push({ to: tx.to!, data: tx.data!, value: tx.value !== undefined ? toHex(tx.value) : undefined, gas: tx.gas !== undefined ? toHex(tx.gas) : undefined, from, raw: true });
+        return `0x${"ab".repeat(32)}`;
+      }
       case "eth_sendTransaction": {
         const tx = p[0] as { to: Address; data: Hex; value?: Hex; gas?: Hex; from?: Address };
         this.sent.push(tx);
@@ -149,6 +167,11 @@ export class FakeChain {
   }
 
   wallet(account: Address): WalletClient {
+    return createWalletClient({ account, transport: custom({ request: (a) => this.request(a as never) as never }) });
+  }
+
+  /** A wallet that signs with a local key, as a script or an agent holds one. */
+  localWallet(account: LocalAccount): WalletClient {
     return createWalletClient({ account, transport: custom({ request: (a) => this.request(a as never) as never }) });
   }
 }

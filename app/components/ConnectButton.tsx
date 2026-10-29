@@ -76,7 +76,14 @@ export function ConnectButton({ inline = false }: { inline?: boolean } = {}) {
       return (
         <div className={who}>
           <Button size="md" onClick={() => switchChain({ chainId: hideki.id })} disabled={switching}>
-            {switching ? "Check your wallet…" : `Switch to ${hideki.name}`}
+            {switching ? (
+              "Check your wallet…"
+            ) : (
+              <>
+                Switch <span className={styles.long}>to {hideki.name}</span>
+                <span className={styles.short}>network</span>
+              </>
+            )}
           </Button>
           <Button size="md" variant="quiet" onClick={addThenSwitch} className={styles.add}>
             Add {hideki.name} to wallet

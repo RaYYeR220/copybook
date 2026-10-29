@@ -96,10 +96,23 @@ button.chip:hover {
   text-align: right;
 }
 
+/* the switch's label: the full one by default, a short one in the bar on a phone */
+.short {
+  display: none;
+}
+
 /* on a phone the switch alone is enough: switching adds the network when the wallet lacks it */
 @media (max-width: 720px) {
   .net,
   .who .add {
     display: none;
+  }
+
+  .who:not(.inline) .long {
+    display: none;
+  }
+
+  .who:not(.inline) .short {
+    display: inline;
   }
 }

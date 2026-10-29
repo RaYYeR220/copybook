@@ -115,7 +115,7 @@ export function GuardCard({
           )}
         </p>
       </div>
-      <HubFeedProvider pub={pub} source={trader} cap={200}>
+      <HubFeedProvider pub={pub} source={trader} cap={200} live={false}>
         <VerdictHistory trader={trader} reviewed={v.reviewed} />
       </HubFeedProvider>
       <p className={styles.law}>

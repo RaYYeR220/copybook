@@ -2,6 +2,7 @@ import { decodeErrorResult, type Abi, type Hex } from "viem";
 import { engineErrorsAbi } from "./abi/engineErrors.ts";
 import { gateAbi } from "./abi/gate.ts";
 import { hubAbi } from "./abi/hub.ts";
+import { marginErrorsAbi } from "./abi/marginErrors.ts";
 import { themesAbi } from "./abi/themes.ts";
 
 const onlyErrors = (abi: readonly { type: string }[]) => abi.filter((x) => x.type === "error");
@@ -12,6 +13,7 @@ export const revertAbi = [
   ...onlyErrors(engineErrorsAbi),
   ...onlyErrors(themesAbi),
   ...onlyErrors(gateAbi),
+  ...marginErrorsAbi,
 ] as unknown as Abi;
 
 /** Plain-language cause for the reverts a user can hit; anything else falls back to the error's name. */
@@ -43,6 +45,13 @@ const MESSAGES: Record<string, string> = {
   Cooldown: "This trader was reviewed a moment ago; wait for the cooldown.",
   FeeTooLow: "The review fee is higher than the value sent.",
   InvalidPolicy: "The policy is outside the allowed ranges.",
+  ERC20InsufficientAllowance: "The margin bank may not pull that much USDso yet: approve the amount first.",
+  ERC20InsufficientBalance: "The wallet holds less USDso on spot than that.",
+  SafeERC20FailedOperation: "The USDso transfer into the margin bank failed.",
+  InvalidDepositOrWithdrawal: "The margin bank refused that deposit.",
+  InvalidAmount: "The margin bank refused that amount.",
+  ZeroAmount: "The amount must be above zero.",
+  ZeroDeposit: "The amount must be above zero.",
 };
 
 export type CopybookErrorCode =

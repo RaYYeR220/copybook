@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { decodeFunctionData, getAddress, parseAbi, type Hex } from "viem";
+import { decodeFunctionData, encodeErrorResult, getAddress, parseAbi, type Hex } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { createCopybook } from "../src/client.ts";
 import { CopybookError } from "../src/errors.ts";
+import { marginErrorsAbi } from "../src/abi/marginErrors.ts";
 import { USDSO, deployments } from "./fake.ts";
 import { E, ME, world } from "./world.ts";
 
@@ -88,6 +89,21 @@ describe("moving spot USDso into the perps account", () => {
 
     expect((await rejection(make(c).depositMargin(0n))).code).toBe("INVALID_INPUT");
     expect((await rejection(make(c).approveMargin(0n))).code).toBe("INVALID_INPUT");
+    expect(c.sent).toHaveLength(0);
+  });
+
+  it("a revert at the estimate is named when the venue's errors know it, and said plainly when not", async () => {
+    const c = world();
+    c.on(USDSO, "balanceOf", 25n * E);
+    c.on(USDSO, "allowance", 25n * E);
+    // the balance moved between the read and the estimate: USDso's own error comes back
+    c.revertEstimateWith = encodeErrorResult({ abi: marginErrorsAbi, errorName: "ERC20InsufficientBalance", args: [ME, 1n * E, 3n * E] });
+    const named = await rejection(make(c).depositMargin(3n * E));
+    expect(named).toMatchObject({ code: "REVERTED", revert: "ERC20InsufficientBalance", message: "The wallet holds less USDso on spot than that." });
+    // an error no ABI here declares
+    c.revertEstimateWith = "0xdeadbeef00000000000000000000000000000000000000000000000000000000";
+    expect(await rejection(make(c).depositMargin(3n * E))).toMatchObject({ code: "REVERTED", message: "The margin bank refused this deposit." });
+    expect(await rejection(make(c).approveMargin(3n * E))).toMatchObject({ code: "REVERTED", message: "USDso refused this approval." });
     expect(c.sent).toHaveLength(0);
   });
 

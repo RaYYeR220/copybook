@@ -14,7 +14,7 @@ import { gateAbi } from "./abi/gate.ts";
 import { hubAbi } from "./abi/hub.ts";
 import { themesAbi } from "./abi/themes.ts";
 import { GAS_HEADROOM_DEN, GAS_HEADROOM_NUM, MAX_TX_GAS, MIN_TANK, MIN_TANK_FOR_INCREASE, PLACE_ORDER_FOR_SELECTOR, THEME_DRIFT_BPS } from "./constants.ts";
-import { CopybookError, asCopybookError, revertAbi } from "./errors.ts";
+import { CopybookError, asCopybookError, revertAbi, revertDataOf } from "./errors.ts";
 import { decodeCopybookLogs, type CopybookEvent } from "./events.ts";
 import { getHubHistory, type HistoryOptions } from "./history.ts";
 import { isTradeable, minThemeAllocation, readMarket, simulateLeg, withHeadroom, type ThemeMinimum } from "./market.ts";
@@ -158,7 +158,21 @@ export function createCopybook(config: CopybookConfig) {
     if (allowance < amount) {
       throw new CopybookError("NEEDS_APPROVAL", `The margin bank may pull ${usdso(allowance)} USDso from this wallet; approve at least ${usdso(amount)} USDso first (approveMargin).`);
     }
-    return send({ address: deployments.marginBank, abi: reads.marginBankFundingAbi as Abi, functionName: "deposit", args: [amount] });
+    return plainRevert("The margin bank refused this deposit.", () =>
+      send({ address: deployments.marginBank, abi: reads.marginBankFundingAbi as Abi, functionName: "deposit", args: [amount] }),
+    );
+  }
+
+  /** A venue revert no ABI here names still reads as a refusal, in plain words, instead of a raw node error. */
+  async function plainRevert(message: string, run: () => Promise<WriteResult>): Promise<WriteResult> {
+    try {
+      return await run();
+    } catch (e) {
+      if (e instanceof CopybookError) throw e;
+      const text = `${(e as { shortMessage?: string }).shortMessage ?? ""} ${(e as Error).message ?? ""}`;
+      if (revertDataOf(e) !== undefined || /revert/i.test(text)) throw new CopybookError("REVERTED", message, { cause: e });
+      throw e;
+    }
   }
 
   const hub = { address: deployments.hub, abi: hubAbi as Abi } as const;
@@ -365,7 +379,8 @@ export function createCopybook(config: CopybookConfig) {
      */
     approveMargin: async (amount: bigint) => {
       if (amount <= ZERO) throw new CopybookError("INVALID_INPUT", "The approval must be above zero.");
-      return send({ address: await reads.marginToken(ctx), abi: reads.erc20Abi as Abi, functionName: "approve", args: [deployments.marginBank, amount] });
+      const token = await reads.marginToken(ctx);
+      return plainRevert("USDso refused this approval.", () => send({ address: token, abi: reads.erc20Abi as Abi, functionName: "approve", args: [deployments.marginBank, amount] }));
     },
     depositMargin,
     /** Pays for a validator review of a trader. Defaults to the gate's current fee. */

@@ -31,6 +31,13 @@ export interface WatchOptions {
   deliveredCapacity?: number;
   /** A subscription that has not answered after this long counts as failed and is retried. Default 15000. */
   subscribeTimeoutMs?: number;
+  /**
+   * First block to deliver from. The first connect reads [fromBlock, head], so a feed seeded from history up to
+   * block N passes N here and nothing between that read and the socket is missed. Default: the head at start.
+   */
+  fromBlock?: bigint;
+  /** Blocks per getLogs request when reading a range (the node's limit, if known). Default: the history default. */
+  chunkSize?: bigint;
   /** Replace the WebSocket transport (tests). */
   transport?: WatchTransport;
 }
@@ -43,6 +50,9 @@ export interface WatchHandle {
 
 /** How long the default transport waits for the node to accept a subscription. */
 const SUBSCRIBE_TIMEOUT_MS = 10_000;
+/** How long closing waits for the node to confirm an unsubscribe before closing the socket anyway. */
+const UNSUBSCRIBE_WAIT_MS = 2_000;
+let subscriptionSeq = 0;
 
 /** A socket that stays up this long counts as healthy: the retry backoff starts over. */
 const HEALTHY_MS = 30_000;
@@ -52,7 +62,11 @@ export function somniaWatchTransport(publicClient: PublicClient, wsUrl?: string)
   return {
     async subscribe({ addresses, onTick, onClose }) {
       // viem's own reconnect is off: the watcher owns reconnecting so it can read what the gap missed
-      const transport = webSocket(wsUrl, { reconnect: false, keepAlive: { interval: 15_000 } })({ chain: publicClient.chain, retryCount: 0 });
+      // A socket client of its own. viem caches socket clients by URL and by these options (not by transport key),
+      // so each subscription gets distinct reconnect options: attempts 0 (viem never reconnects by itself, the watcher
+      // does) and a delay that only serves as this subscription's id. No two subscriptions ever share a socket.
+      const reconnect = { attempts: 0, delay: ++subscriptionSeq };
+      const transport = webSocket(wsUrl, { key: "somniaWatch", reconnect, keepAlive: { interval: 15_000 } })({ chain: publicClient.chain, retryCount: 0 });
       const value = transport.value as unknown as {
         getRpcClient(): Promise<{ close(): void }>;
         subscribe(a: { params: unknown[]; onData: (d: unknown) => void; onError: (e: unknown) => void }): Promise<{ unsubscribe(): Promise<unknown> }>;
@@ -110,11 +124,8 @@ export function somniaWatchTransport(publicClient: PublicClient, wsUrl?: string)
         async close() {
           closed = true;
           if (!dropped) {
-            try {
-              await sub.unsubscribe();
-            } catch {
-              /* the socket may already be gone */
-            }
+            // a socket that stopped answering would hold the unsubscribe until viem's 10 s timeout: give it 2 s
+            await Promise.race([sub.unsubscribe().catch(() => undefined), new Promise((r) => setTimeout(r, UNSUBSCRIBE_WAIT_MS))]);
           }
           drop();
         },
@@ -185,7 +196,7 @@ export async function watchHub(opts: WatchOptions): Promise<WatchHandle> {
       const head = await publicClient.getBlockNumber({ cacheTime: 0 });
       const from = cursor ?? head;
       if (head < from) return;
-      const history = await getHubHistory({ publicClient, deployments }, { fromBlock: from, toBlock: head, follower, contracts });
+      const history = await getHubHistory({ publicClient, deployments }, { fromBlock: from, toBlock: head, follower, contracts, chunkSize: opts.chunkSize });
       for (const e of history.events) {
         if (stopped) return;
         const k = eventKey(e);
@@ -266,11 +277,15 @@ export async function watchHub(opts: WatchOptions): Promise<WatchHandle> {
     }, delay);
   }
 
-  // Start from the chain head: only events from here on are the watcher's to deliver.
-  try {
-    cursor = await publicClient.getBlockNumber({ cacheTime: 0 });
-  } catch (err) {
-    opts.onError?.(err);
+  // Start from fromBlock when the caller already holds history up to there, else from the chain head: only events
+  // from here on are the watcher's to deliver. The first connect reads [cursor, head].
+  if (opts.fromBlock !== undefined) cursor = opts.fromBlock;
+  else {
+    try {
+      cursor = await publicClient.getBlockNumber({ cacheTime: 0 });
+    } catch (err) {
+      opts.onError?.(err);
+    }
   }
   await connect(false);
 

@@ -240,6 +240,33 @@ describe("watchHub", () => {
     await h.stop();
   });
 
+  it("from a given block, the first connect delivers what landed between that block and the head", async () => {
+    // a feed seeded from history read up to 1_004 starts the watcher there: the events of 1_005..1_008 are not lost
+    const c = world();
+    c.head = 1_010n;
+    c.logs = [copied(ME, 1_003n, 0, 1n, "01"), copied(ME, 1_005n, 0, 2n, "02"), copied(ME, 1_008n, 0, 3n, "03")];
+    const sock = new FakeSocket();
+    const { h, got } = await start(c, sock, { fromBlock: 1_004n, chunkSize: 1_000n });
+    await wait(40);
+    expect(sizes(got)).toEqual([2n, 3n]);
+    expect(got.every((g) => g.source === "backfill")).toBe(true);
+    const first = c.rpc.find((r) => r.method === "eth_getLogs")!;
+    expect((first.params as { fromBlock: Hex }[])[0]!.fromBlock).toBe(toHex(1_004n));
+    expect(h.lastBlock).toBe(1_010n);
+    await h.stop();
+  });
+
+  it("without fromBlock it starts at the head and delivers nothing older", async () => {
+    const c = world();
+    c.head = 1_010n;
+    c.logs = [copied(ME, 1_005n, 0, 2n, "02")];
+    const sock = new FakeSocket();
+    const { h, got } = await start(c, sock);
+    await wait(40);
+    expect(got).toEqual([]);
+    await h.stop();
+  });
+
   it("forgets old keys past the delivered capacity but never repeats a recent one", async () => {
     const c = world();
     c.head = 1_000n;

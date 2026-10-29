@@ -77,6 +77,12 @@ describe("reads", () => {
     c.on(deployments.gate, "pendingOf", { nonce: 4n, requestedAt: BigInt(now - 3_600) });
     expect(await read(c).reviewPendingOf(TRADER)).toMatchObject({ nonce: 4n, replaceable: true });
   });
+
+  it("reads a follower's seat: its group and its index in that group", async () => {
+    const c = world();
+    c.on(deployments.hub, "seatOf", [1, 6]);
+    expect(await read(c).seatOf(ME)).toEqual({ group: 1, index: 6 });
+  });
 });
 
 describe("status: every stuck state names the call that clears it", () => {

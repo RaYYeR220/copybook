@@ -83,6 +83,12 @@ export async function pendingOf(c: ReadContext, follower: Address): Promise<Pend
   return { exitPending, flattenPending };
 }
 
+/** The follower's seat in its source's groups: which group's relay delivers to it, and its index in that group's list. */
+export async function seatOf(c: ReadContext, follower: Address): Promise<{ group: number; index: number }> {
+  const [group, index] = await c.publicClient.readContract({ ...hub(c), functionName: "seatOf", args: [follower] });
+  return { group: Number(group), index: Number(index) };
+}
+
 export async function themeSyncOf(c: ReadContext, follower: Address): Promise<ThemeSync> {
   const [syncedVersion, lastSyncComplete] = await c.publicClient.readContract({ ...hub(c), functionName: "themeSyncOf", args: [follower] });
   return { syncedVersion, lastSyncComplete };

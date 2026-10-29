@@ -273,6 +273,7 @@ export function createCopybook(config: CopybookConfig) {
     tankOf: (follower: Address) => reads.tankOf(ctx, follower),
     syncedPools: (follower: Address) => reads.syncedPools(ctx, follower),
     pendingOf: (follower: Address) => reads.pendingOf(ctx, follower),
+    seatOf: (follower: Address) => reads.seatOf(ctx, follower),
     themeSyncOf: (follower: Address) => reads.themeSyncOf(ctx, follower),
     gasParams: () => reads.gasParams(ctx),
     verdictOf: (trader: Address) => reads.verdictOf(ctx, trader),

@@ -8,6 +8,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   CHAINS,
+  checkAnchoredKey,
   checkPair,
   checkClaims,
   checkPreRegistration,
@@ -181,6 +182,34 @@ describe("checkPreRegistration", () => {
     assert.equal(checkPreRegistration(100, [101, 150, 200]), undefined);
     assert.match(checkPreRegistration(100, [150, 100, 99])!, /2 review request\(s\) at or before the anchor's block 100 \(first at 99\)/);
     assert.match(checkPreRegistration(100, [])!, /no review requests/);
+  });
+});
+
+describe("checkAnchoredKey", () => {
+  const commit = "a7c42c247a038b65d502826df7dc703a4cdcaa9a";
+  const key = new TextEncoder().encode('{"run":"v4"}\n');
+  // a hash no key file has
+  const hash = "0x" + "0".repeat(64);
+  it("verifies an anchor whose input is the commit followed by the keccak256 of the key as committed", async () => {
+    const { keccak256 } = await import("viem");
+    const data = `0x${commit}${keccak256(key).slice(2)}`;
+    const ok = checkAnchoredKey(data, commit, key);
+    assert.equal(ok.outcome, "verified");
+    assert.match(ok.note!, /as committed in a7c42c2 hashes to the anchored keccak256/);
+    assert.equal(checkAnchoredKey(data.toUpperCase().replace("0X", "0x"), commit, key).outcome, "verified");
+  });
+  it("fails a different key, a different commit or a malformed commit", async () => {
+    const { keccak256 } = await import("viem");
+    const data = `0x${commit}${keccak256(key).slice(2)}`;
+    assert.equal(checkAnchoredKey(data, commit, new TextEncoder().encode('{"run":"v5"}\n')).outcome, "failed");
+    assert.equal(checkAnchoredKey(`0x${commit}${hash.slice(2)}`, commit, key).outcome, "failed");
+    assert.equal(checkAnchoredKey(data, "5aed53bf2c556d82874cd537cd559f09d51b3d67", key).outcome, "failed");
+    assert.match(checkAnchoredKey(data, "a7c42c2", key).reason!, /no full commit hash/);
+  });
+  it("reports unverified, not failed, when git cannot show the key", () => {
+    const r = checkAnchoredKey(`0x${commit}${hash.slice(2)}`, commit, undefined, "spawn git ENOENT");
+    assert.equal(r.outcome, "unverified");
+    assert.match(r.reason!, /could not be read: spawn git ENOENT/);
   });
 });
 

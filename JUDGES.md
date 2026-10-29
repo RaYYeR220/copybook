@@ -77,7 +77,7 @@ block, position, sender, target, function, gas and events checked.
 | An AI agent following a thesis through the MCP server, dry run first | [MCP agent](docs/PROOF.md#mcp-agent) |
 | Contracts at the addresses in `deployments/`, with source verification | [Contracts](docs/PROOF.md#contracts) |
 | Gas per call | [Gas](docs/PROOF.md#gas) |
-| How faithfully the committee applies the rubric, with answer keys written on chain before the reviews | [Scorecard result](eval/SCORECARD.md#result), [pre-registration](eval/SCORECARD.md#pre-registration) |
+| How faithfully the committee applies the rubric, with answer keys written on chain before the reviews, including a held-out run on 20 fresh traders | [Held-out result](eval/SCORECARD.md#run-v4-result), [its pre-registration](eval/SCORECARD.md#pre-registration-of-run-v4), [all four runs](eval/SCORECARD.md#four-runs) |
 | Every claim in the README, the landing page and the MCP README, with its evidence | [docs/CLAIMS.md](docs/CLAIMS.md) |
 | Reproducible reports on the dreamDEX stack | [`feedback/`](feedback/) |
 | Demo video | https://youtu.be/HpLdCtyvta0 (2:22) |

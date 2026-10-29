@@ -6,6 +6,7 @@
 // transaction in deployments/*.json and eval/*/anchor.json, the landing's proof (app/content/proof.ts), and every
 // explorer link in the docs. Exit code 0 when everything verifies, 1 when anything fails, 2 when some transactions could
 // not be read because the RPC kept failing (those are reported as unverified, never as verified or failed).
+import { execFileSync } from "node:child_process";
 import { readFileSync, readdirSync, writeFileSync, existsSync, statSync, mkdirSync } from "node:fs";
 import { resolve, dirname, relative } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -390,6 +391,20 @@ export function checkPreRegistration(anchorBlock: number, requestBlocks: number[
   return early.length ? `${early.length} review request(s) at or before the anchor's block ${anchorBlock} (first at ${Math.min(...early)})` : undefined;
 }
 
+/**
+ * An anchor's input must be the commit it names followed by the keccak256 of the key file as committed there. `key` is
+ * the file's bytes from `git show <commit>:<path>`, or undefined when git could not produce them: then nothing is known
+ * (unverified), which is not the same as a mismatch (failed).
+ */
+export function checkAnchoredKey(data: string, commit: string, key: Uint8Array | undefined, why?: string): { outcome: Outcome; reason?: string; note?: string } {
+  if (!/^[0-9a-f]{40}$/i.test(commit)) return { outcome: "failed", reason: `the anchor names no full commit hash (${commit})` };
+  if (!key) return { outcome: "unverified", reason: `the key as committed in ${commit.slice(0, 7)} could not be read${why ? `: ${why}` : ""}` };
+  const hash = keccak256(key);
+  const expected = `0x${commit}${hash.slice(2)}`.toLowerCase();
+  if (data.toLowerCase() !== expected) return { outcome: "failed", reason: `the anchored data is not commit ${commit.slice(0, 7)} + the keccak256 of its key (${hash})` };
+  return { outcome: "verified", note: `the key file as committed in ${commit.slice(0, 7)} hashes to the anchored keccak256` };
+}
+
 /** A same-block copy: in the move's block, after it, sent by the hub (the Reactivity subscription's owner). */
 export function checkPair(move: Facts, copy: Facts, hub: string): string[] {
   const bad: string[] = [];
@@ -454,6 +469,8 @@ export interface LedgerRow extends TxSpec {
   review?: number;
   /** For an answer-key anchor: the reviews of its run, which must all be requested after it. */
   runNonces?: number[];
+  /** For an answer-key anchor: the commit it names and the key file's path in it. */
+  anchoredKey?: { commit: string; path: string };
 }
 export interface CheckedRow extends LedgerRow {
   result: Verification;
@@ -650,13 +667,19 @@ export function buildRows(sources: Sources, sweep = true): LedgerRow[] {
     }),
   );
   rows.push(...reviewRows(riskDeployment.reviews as Review[], riskDeployment.hideki.gate));
-  for (const rel of ["eval/anchor.json", "eval/v3/anchor.json"]) {
+  // run v2's anchor sits at the top of eval/, each later run's in its own folder (eval/v3/, eval/v4/, …)
+  const runDirs = readdirSync(resolve(ROOT, "eval"), { withFileTypes: true })
+    .filter((d) => d.isDirectory() && /^v\d+$/.test(d.name))
+    .map((d) => d.name)
+    .sort((a, b) => Number(a.slice(1)) - Number(b.slice(1)));
+  for (const rel of ["eval/anchor.json", ...runDirs.map((d) => `eval/${d}/anchor.json`)]) {
     if (!existsSync(resolve(ROOT, rel))) continue;
-    const a = readJson<{ run: string; commit: string; data: Hex; tx: Hex; block: number; from: string; status: string; gasUsed: number }>(rel);
+    const a = readJson<{ run: string; commit: string; key?: string; data: Hex; tx: Hex; block: number; from: string; status: string; gasUsed: number }>(rel);
     const results = rel.replace(/anchor\.json$/, "results.json");
     const runNonces = existsSync(resolve(ROOT, results)) ? readJson<{ rows: { nonce?: number }[] }>(results).rows.flatMap((r) => (r.nonce ? [r.nonce] : [])) : [];
     rows.push({
       runNonces,
+      anchoredKey: { commit: a.commit, path: a.key ?? rel.replace(/anchor\.json$/, "answer-key.json") },
       id: `anchor-${a.run}`,
       section: "anchors",
       run: "risk",
@@ -896,6 +919,21 @@ export async function runLedger(options: RunOptions = {}): Promise<number> {
     } else {
       anchorRow.note = `before all ${blocks.length} review requests of the run (reviews ${Math.min(...anchorRow.runNonces!)}–${Math.max(...anchorRow.runNonces!)}, the first at block ${first.toLocaleString("en-US")})`;
     }
+  }
+  // each anchor carries the commit and the keccak256 of the key file as committed there: recompute it from git
+  for (const anchorRow of checked.filter((r) => r.section === "anchors" && r.anchoredKey)) {
+    const { commit, path } = anchorRow.anchoredKey!;
+    let key: Uint8Array | undefined;
+    let why: string | undefined;
+    try {
+      key = execFileSync("git", ["show", `${commit}:${path}`], { cwd: ROOT, stdio: ["ignore", "pipe", "pipe"], maxBuffer: 64 << 20 });
+    } catch (e) {
+      why = e instanceof Error ? e.message.split("\n")[0] : String(e);
+    }
+    const k = checkAnchoredKey(anchorRow.expect?.input ?? "", commit, key, why);
+    if (k.outcome === "failed") anchorRow.result = { ...anchorRow.result, ok: false, outcome: "failed", reason: [anchorRow.result.reason, k.reason].filter(Boolean).join("; ") };
+    else if (k.outcome === "unverified" && anchorRow.result.outcome === "verified") anchorRow.result = { ...anchorRow.result, ok: false, outcome: "unverified", reason: k.reason };
+    if (k.note) anchorRow.note = [anchorRow.note, k.note].filter(Boolean).join("; ");
   }
 
   const pairs: PairResult[] = [];

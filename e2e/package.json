@@ -12,6 +12,7 @@
     "leader-bot": "tsx src/leader-bot.ts",
     "typecheck": "tsc --noEmit",
     "eval": "tsx src/eval.ts",
+    "eval:v4": "tsx src/eval-v4.ts",
     "eval:test": "tsx --test ../eval/rubric.test.ts",
     "proof": "tsx src/proof-ledger.ts",
     "test": "tsx --test test/proof-ledger.test.ts test/leader-bot.test.ts"

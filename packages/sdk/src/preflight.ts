@@ -401,6 +401,8 @@ const EDIT_MESSAGES: Partial<Record<PreflightCode, string>> = {
   ALLOCATION_BELOW_MINIMUM:
     "At this allocation this leg sizes below the market's minimum order: the next sync cannot open or grow it (Below minimum). Exits toward the new targets are never gated.",
   UNKNOWN_MARKET: "This market could not be read just now, so the new policy could not be checked against it.",
+  EQUITY_BELOW_FLOOR:
+    "The account's equity is already below this floor. updatePolicy accepts it, but the follow then stops at the source's next increase (or at anyone's poke) and closes every position it opened.",
 };
 
 function asEdit(r: PreflightReason): PreflightReason {

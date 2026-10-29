@@ -121,6 +121,16 @@ describe("preflightFollow (thesis)", () => {
     const r = await run(world(), { policy: policy({ allocation: 200n * E, equityFloor: 5_000n * E }) });
     expect(r.reasons.find((x) => x.code === "EQUITY_BELOW_FLOOR")).toMatchObject({ severity: "error", field: "equityFloor" });
   });
+
+  it("in edit mode, a floor above equity warns that the follow will stop and close, and does not block", async () => {
+    const r = await run(world(), { policy: policy({ allocation: 200n * E, equityFloor: 5_000n * E }), mode: "edit" });
+    const floor = r.reasons.find((x) => x.code === "EQUITY_BELOW_FLOOR");
+    expect(floor).toMatchObject({ severity: "warning", field: "equityFloor" });
+    expect(floor!.required).toBeDefined();
+    expect(floor!.message).toMatch(/updatePolicy accepts it/);
+    expect(floor!.message).toMatch(/closes every position it opened/);
+    expect(r.ok).toBe(true);
+  });
 });
 
 describe("preflightFollow (trader)", () => {

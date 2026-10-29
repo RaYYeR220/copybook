@@ -29,5 +29,35 @@
       "block": 35024262,
       "gasUsed": 21062
     }
-  }
+  },
+  "demoWallets": [
+    {
+      "address": "0x5397812d66F3233E0972b7AEB5e195a945504632",
+      "role": "owner"
+    },
+    {
+      "address": "0xA1d0CB85c869e534Fe1e0c22af3b238301157b5d",
+      "role": "demo leader"
+    },
+    {
+      "address": "0x7d736A88978e94E60494Ff91C49Ba838EDfb1932",
+      "role": "demo follower"
+    },
+    {
+      "address": "0xcee40D3C7709404Cf60916BFEa39925fcB1f09Ed",
+      "role": "demo thesis follower"
+    },
+    {
+      "address": "0xDe52dd7f81F67D2124ae0fBd8567f405cFAEeaAB",
+      "role": "demo follower"
+    },
+    {
+      "address": "0xCDE791006eA6E99e9A614Bc9d0995879E2Cc5E72",
+      "role": "demo agent"
+    },
+    {
+      "address": "0xA969Dd0B79Ca1d4571E45d97A8f4981805eBaEd3",
+      "role": "demo thesis creator"
+    }
+  ]
 }

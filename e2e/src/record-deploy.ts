@@ -2,7 +2,7 @@
 // Usage: tsx src/record-deploy.ts   (env: CHAIN_ID, default 50383; DEPLOYMENT_NAME, default hideki)
 // Chain id, margin bank, group size and owner come from the broadcast itself (the hub's constructor arguments),
 // so the record always matches what was deployed.
-import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { getAddress } from "viem";
@@ -68,5 +68,7 @@ const out = {
 };
 const file = resolve(root, `deployments/${name}.json`);
 mkdirSync(dirname(file), { recursive: true });
-writeFileSync(file, JSON.stringify(out, null, 2) + "\n");
+// the wallets Copybook runs are recorded by hand: keep them across a redeploy
+const kept = existsSync(file) ? (JSON.parse(readFileSync(file, "utf8")) as { demoWallets?: unknown }).demoWallets : undefined;
+writeFileSync(file, JSON.stringify(kept ? { ...out, demoWallets: kept } : out, null, 2) + "\n");
 console.log(`wrote ${file}`);

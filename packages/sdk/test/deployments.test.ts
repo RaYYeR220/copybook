@@ -1,7 +1,7 @@
 import { resolve } from "node:path";
 import { getAddress } from "viem";
 import { describe, expect, it } from "vitest";
-import { deploymentsFromJson } from "../src/deployments.ts";
+import { demoRole, deploymentsFromJson, isOurs } from "../src/deployments.ts";
 import { loadDeployments } from "../src/node.ts";
 import { hidekiJson, riskJson } from "./fake.ts";
 
@@ -26,5 +26,17 @@ describe("deployments", () => {
     expect(() => deploymentsFromJson({ ...hidekiJson, themes: undefined }, riskJson)).toThrow(/themes/);
     expect(() => deploymentsFromJson(hidekiJson, {})).toThrow(/hideki/);
     expect(() => deploymentsFromJson({ ...hidekiJson, engine: "nope" }, riskJson)).toThrow(/address/);
+  });
+
+  it("reads the wallets Copybook runs, with their roles, and knows its own addresses", () => {
+    const d = loadDeployments(resolve(import.meta.dirname, "../../../deployments"));
+    expect(d.demoWallets.length).toBeGreaterThan(0);
+    expect(demoRole(d, "0xa1d0cb85c869e534fe1e0c22af3b238301157b5d")).toBe("demo leader");
+    expect(isOurs(d, d.hub.toLowerCase())).toBe(true);
+    expect(isOurs(d, "0x7d736a88978e94e60494ff91c49ba838edfb1932")).toBe(true);
+    expect(isOurs(d, "0x1cf35c559bd4e1d45b738b83041855c8634e5a56")).toBe(false);
+    expect(deploymentsFromJson({ ...hidekiJson, demoWallets: undefined }, riskJson).demoWallets).toEqual([]);
+    expect(() => deploymentsFromJson({ ...hidekiJson, demoWallets: [{ address: "0x12", role: "x" }] }, riskJson)).toThrow(/demoWallets\[0\]/);
+    expect(() => deploymentsFromJson({ ...hidekiJson, demoWallets: [{ address: d.hub }] }, riskJson)).toThrow(/role/);
   });
 });

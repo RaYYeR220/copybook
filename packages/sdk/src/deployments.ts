@@ -1,6 +1,6 @@
 import { getAddress, isAddress } from "viem";
 import { DEFAULT_OPERATOR_REGISTRY } from "./constants.ts";
-import type { Deployments } from "./types.ts";
+import type { DemoWallet, Deployments } from "./types.ts";
 
 type Json = Record<string, unknown>;
 
@@ -40,5 +40,31 @@ export function deploymentsFromJson(hideki: unknown, risk: unknown): Deployments
     groupSize: Number(need(h, "groupSize", "hideki.json")),
     deployBlock: BigInt(need(h, "deployBlock", "hideki.json") as number | string),
     operatorRegistry,
+    demoWallets: demoWalletsFrom(h.demoWallets),
   };
+}
+
+function demoWalletsFrom(v: unknown): DemoWallet[] {
+  if (v === undefined) return [];
+  if (!Array.isArray(v)) throw new Error('hideki.json: "demoWallets" is not a list');
+  return v.map((w: Json, i) => {
+    const role = w?.role;
+    if (typeof role !== "string" || !role) throw new Error(`hideki.json: "demoWallets[${i}].role" is missing`);
+    return { address: addr(w?.address, `demoWallets[${i}].address`, "hideki.json"), role };
+  });
+}
+
+/**
+ * Whether `address` is Copybook's own: one of its contracts or a wallet it runs (`demoWallets`). Such an address is
+ * labelled "ours" wherever it shows and is never ranked as a trader.
+ */
+export function isOurs(d: Pick<Deployments, "hub" | "engine" | "themes" | "gate" | "demoWallets">, address: string): boolean {
+  const a = address.toLowerCase();
+  return [d.hub, d.engine, d.themes, d.gate, ...d.demoWallets.map((w) => w.address)].some((x) => x.toLowerCase() === a);
+}
+
+/** The role of a wallet Copybook runs, or undefined for anyone else. */
+export function demoRole(d: Pick<Deployments, "demoWallets">, address: string): string | undefined {
+  const a = address.toLowerCase();
+  return d.demoWallets.find((w) => w.address.toLowerCase() === a)?.role;
 }

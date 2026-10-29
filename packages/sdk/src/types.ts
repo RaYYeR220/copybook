@@ -136,4 +136,13 @@ export interface Deployments {
   deployBlock: bigint;
   /** The venue's operator registry; defaults to the Hideki2 one. */
   operatorRegistry: Address;
+  /** Every wallet Copybook itself controls (the owner, the demo leader, demo followers…) with its role. */
+  demoWallets: readonly DemoWallet[];
+}
+
+/** A wallet run by Copybook, never a user: listed so the app and tools can label it and leave it out of rankings. */
+export interface DemoWallet {
+  address: Address;
+  /** What it does: "owner", "demo leader", "demo follower", … */
+  role: string;
 }

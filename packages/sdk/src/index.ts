@@ -1,6 +1,6 @@
 export { createCopybook } from "./client.ts";
 export type { Copybook, CopybookConfig, FollowArgs, FollowTarget, FollowerIssue, FollowerStatus, ThemeDriftLeg, TxOutcome, WriteResult } from "./client.ts";
-export { deploymentsFromJson } from "./deployments.ts";
+export { deploymentsFromJson, demoRole, isOurs } from "./deployments.ts";
 export { decodeCopybookLog, decodeCopybookLogs, eventFollower } from "./events.ts";
 export type { CopybookEvent, LogMeta, RawLog } from "./events.ts";
 export { CopybookError, decodeRevert, revertAbi } from "./errors.ts";

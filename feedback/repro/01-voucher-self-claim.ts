@@ -7,12 +7,12 @@ import { hidekiTestnet } from "@somnia-chain/markets-sdk/chains";
 import { heading, rpc } from "./lib.ts";
 
 const bank = SOMNIA_HIDEKI_TESTNET_ADDRESSES.marginBank as Address;
-const markets = new SomniaMarkets({ chain: hidekiTestnet, addresses: SOMNIA_HIDEKI_TESTNET_ADDRESSES } as never);
+const markets = new SomniaMarkets({ chain: hidekiTestnet, addresses: SOMNIA_HIDEKI_TESTNET_ADDRESSES });
 const randomAddress = (): Address =>
   `0x${Array.from(crypto.getRandomValues(new Uint8Array(20)), (b) => b.toString(16).padStart(2, "0")).join("")}`;
 const CLAIM = toFunctionSelector("claim()"); // 0x4e71d92d
 
-heading("1. campaign (SDK getPerpVoucherCampaign)");
+heading(`1. campaign (SDK getPerpVoucherCampaign), as of ${new Date().toISOString()}`);
 const campaign = await markets.client.getPerpVoucherCampaign(bank);
 if (!campaign) throw new Error("no campaign on this bank");
 const now = BigInt(Math.floor(Date.now() / 1000));
@@ -41,7 +41,8 @@ for (const account of accounts) {
 }
 
 heading("3. is 0x3e31dcc2 in the SDK's contractErrorsAbi?");
-const known = contractErrorsAbi.filter((e: { type: string }) => e.type === "error") as { name: string; inputs: { type: string }[] }[];
+const abi: readonly { type: string; name: string; inputs: readonly { type: string }[] }[] = contractErrorsAbi;
+const known = abi.filter((e) => e.type === "error");
 const selectors = new Map(known.map((e) => [toFunctionSelector(`${e.name}(${e.inputs.map((i) => i.type).join(",")})`), e.name]));
 console.log(`${known.length} errors, 0x3e31dcc2 ->`, selectors.get("0x3e31dcc2") ?? "not present");
 console.log("toFunctionSelector('SelfClaimDisabled()') =", toFunctionSelector("SelfClaimDisabled()"));

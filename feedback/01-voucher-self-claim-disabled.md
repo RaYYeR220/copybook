@@ -16,7 +16,8 @@ The script does the following with `@somnia-chain/markets-sdk` 0.32.1 against th
 
 1. `client.getPerpVoucherCampaign(marginBank)` with `SOMNIA_HIDEKI_TESTNET_ADDRESSES.marginBank`
    (`0x478769E1177C0773c43A593DCCc4Ad15F15F1394`). It returns distributor
-   `0x2ACD9EFdA721450906bfE1bef3edE269636E42C4`, an open campaign window and 190,662 claims left.
+   `0x2ACD9EFdA721450906bfE1bef3edE269636E42C4`, an open campaign window and 189,873 claims left (as of
+   2026-10-29T12:43Z; the number falls as grants go out).
 2. `client.getPerpVoucherEligibility(marginBank, account)` for a random new address.
 3. Simulates the transaction `trader.claimPerpVoucher` sends: `eth_call` (and `eth_estimateGas`) of
    `claim()` (`0x4e71d92d`) on the distributor with `from` = that address.
@@ -61,15 +62,15 @@ on purpose (grants pushed by an operator instead):
 
 ## Evidence
 
-Requests and responses on 2026-10-29 (random new address `0x335fd9dd445613695b92c061c0cd6256817e9fc5`):
+Requests and responses as of 2026-10-29T12:43Z (random new address `0x6066eea1695fc235a4560b96909f80cd289b5d6c`):
 
 ```
 SDK getPerpVoucherEligibility: { eligible: true, grantAmount: 1000000000000000000000n }
 
--> {"jsonrpc":"2.0","id":1,"method":"eth_call","params":[{"from":"0x335fd9dd445613695b92c061c0cd6256817e9fc5","to":"0x2ACD9EFdA721450906bfE1bef3edE269636E42C4","data":"0x4e71d92d"},"latest"]}
+-> {"jsonrpc":"2.0","id":1,"method":"eth_call","params":[{"from":"0x6066eea1695fc235a4560b96909f80cd289b5d6c","to":"0x2ACD9EFdA721450906bfE1bef3edE269636E42C4","data":"0x4e71d92d"},"latest"]}
 <- {"jsonrpc":"2.0","id":1,"error":{"code":3,"message":"execution reverted","data":"0x3e31dcc2"}}
 
--> {"jsonrpc":"2.0","id":1,"method":"eth_estimateGas","params":[{"from":"0x335fd9dd445613695b92c061c0cd6256817e9fc5","to":"0x2ACD9EFdA721450906bfE1bef3edE269636E42C4","data":"0x4e71d92d"}]}
+-> {"jsonrpc":"2.0","id":1,"method":"eth_estimateGas","params":[{"from":"0x6066eea1695fc235a4560b96909f80cd289b5d6c","to":"0x2ACD9EFdA721450906bfE1bef3edE269636E42C4","data":"0x4e71d92d"}]}
 <- {"jsonrpc":"2.0","id":1,"error":{"code":3,"message":"execution reverted","data":"0x3e31dcc2"}}
 
 SDK decodeRevert: { errorName: undefined, data: '0x3e31dcc2' }
@@ -112,12 +113,18 @@ Docs checked (none mentions self-claims being off, a claim policy, or operator-p
 - `Trader.claimPerpVoucher` (throws list): https://unpkg.com/@somnia-chain/markets-sdk@0.32.1/src/trade.ts
 - Errors reference, which calls `contractErrorsAbi` "the generated ABI of every custom error the protocol
   contracts declare": https://unpkg.com/@somnia-chain/markets-sdk@0.32.1/docs/reference/errors.md
-- The docs site (https://prd.smk.somnia.host/docs/typescript/perps) is at 0.31.0 and has no voucher section yet.
+- The docs site's Perps page (https://prd.smk.somnia.host/docs/typescript/perps) has no "Credit vouchers"
+  or `claimPerpVoucher` section.
+
+The same run against `@somnia-chain/markets-sdk@0.32.2-canary.38575926931.ge4550933d36d` (the current `canary`
+tag) gives the same results: `eligible: true`, `errorName: undefined`, and 547 errors in `contractErrorsAbi`
+without `0x3e31dcc2`. npm `latest` is 0.32.1.
 
 ## Environment
 
-- SDK: `@somnia-chain/markets-sdk` 0.32.1 (npm `latest` on 2026-10-29), viem 2.57.12, Node 24.13.0
+- SDK: `@somnia-chain/markets-sdk` 0.32.1 (npm `latest` on 2026-10-29; the 0.32.2 canary behaves the same),
+  viem 2.57.12, Node 24.13.0
 - Network: Hideki testnet, chain 50383, RPC `https://api.hideki2.infra.testnet.somnia.network`
-  (`web3_clientVersion` `somnia-f9f7a5cd6b146b6-release`), block ~36.22M
+  (`web3_clientVersion` `somnia-f9f7a5cd6b146b6-release`), head block ~36.25M at 2026-10-29T12:43Z
 - Wallet: none for the reproduction (`eth_call` from a random address). The 2026-10-27 transactions came from
   the SDK's private-key signer (`privateKey` config) on new EOAs that held only STT.

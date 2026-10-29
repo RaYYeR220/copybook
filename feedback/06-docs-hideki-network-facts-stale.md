@@ -15,8 +15,10 @@ cd feedback/repro && npm ci && node 06-hideki-network-facts.ts
 1. Read the Hideki entries in the SDK docs: "Networks and endpoints", "Chains" and the `hidekiTestnet` chain
    definition.
 2. Measure the block time from block timestamps over 1,000 / 100,000 / 864,000 blocks and over the whole chain.
-3. Compare with the Tokyo explorer's own stats (`/tokyo/api/v2/stats`).
-4. Check for Multicall3 code at the canonical `0xcA11bde05977b3631167028862bE2a173976CA11`.
+3. Count blocks by wall clock over 20 s.
+4. Compare with the Tokyo explorer's own stats (`/tokyo/api/v2/stats`).
+5. Check for Multicall3 code at the canonical `0xcA11bde05977b3631167028862bE2a173976CA11` and at
+   `0x540B091b608f54E603c5dC19F6b2d955e1d2D131`, the address the Chains page names.
 
 ## Expected
 
@@ -24,11 +26,15 @@ The Hideki docs match the live network, which builders use to size block windows
 
 ## Actual
 
-| claim in the docs | where | live, 2026-10-29 |
+| claim in the docs | where | live, as of 2026-10-29T12:43Z |
 |---|---|---|
-| block time "10 ms"; "~100 blocks/s"; `blockTime: 10` | Networks and endpoints table, Chains table and text, `hidekiTestnet` JSDoc and definition | **100 ms** (~10 blocks/s): 100,000 blocks took 10,003 s, 864,000 blocks 86,427 s, and the whole chain averages 100.19 ms since block 1 (2026-09-17). The explorer reports `average_block_time: 100`. |
-| "Elwood, Hideki, and local carry no explorer"; "No public block explorer is known for Hideki" | Networks and endpoints; `hidekiTestnet` JSDoc (`blockExplorers` unset) | `https://explorer.testnet.somnia.network/tokyo` serves this chain (its stats show `total_blocks` 36,223,251 at the time of the run; the tx links in the other reports resolve there). |
-| Hideki's Multicall3 is at a non-canonical address (`0x540B…D131`); "`0xcA11bde0…` is unreachable for good" | Chains, "Absences are deliberate"; Chains walkthrough | The canonical `0xcA11bde0…CA11` holds the 3,808-byte Multicall3 runtime and answers `getBlockNumber()`. The Networks page and the chain definition say the same, so the Chains pages contradict them. |
+| block time "10 ms"; "~100 blocks/s"; `blockTime: 10` | Networks and endpoints table, Chains table and text, `hidekiTestnet` JSDoc and definition | **100 ms** (~10 blocks/s). From block timestamps: 100,000 blocks took 10,003 s, 864,000 blocks 86,427 s, and the whole chain averages 100.19 ms since block 1 (2026-09-17). By wall clock: 208 blocks in 21.06 s (101.3 ms, including RPC latency). The explorer reports `average_block_time: 100`. |
+| "Elwood, Hideki, and local carry no explorer"; "No public block explorer is known for Hideki" | Networks and endpoints; `hidekiTestnet` JSDoc (`blockExplorers` unset) | `https://explorer.testnet.somnia.network/tokyo` serves this chain: its stats show `total_blocks` 36,246,296, and the tx links in the other reports resolve there. |
+| Hideki's Multicall3 is at a non-canonical address (`0x540B…D131`); "`0xcA11bde0…` is unreachable for good" | Chains, "Absences are deliberate"; Chains walkthrough | The canonical `0xcA11bde0…CA11` holds the 3,808-byte Multicall3 runtime and answers `getBlockNumber()`. `eth_getCode(0x540B091b608f54E603c5dC19F6b2d955e1d2D131)` is `"0x"`. The Networks page and the chain definition agree with the live chain, so the Chains pages contradict them. |
+
+Context: the stale lines read like descriptions of Hideki v1. The chain definition's own JSDoc records the
+2026-09-17 regenesis ("hideki v2"), after which Multicall3 moved to the canonical address. The block-time
+figure may come from the same period.
 
 What this costs a perps builder on Hideki:
 
@@ -47,18 +53,26 @@ What this costs a perps builder on Hideki:
 { id: 50383, blockTime: 10, blockExplorers: null,
   multicall3: { address: '0xcA11bde05977b3631167028862bE2a173976CA11', blockCreated: 1 } }
 
-## block time from block timestamps (seconds)
-1000 blocks before 36223223: 100 s  ->  100 ms per block
-100000 blocks before 36223223: 10003 s  ->  100.03 ms per block
-864000 blocks before 36223223: 86427 s  ->  100.031 ms per block
-36223222 blocks before 36223223: 3629103 s  ->  100.187 ms per block
+## block time from block timestamps (seconds), 2026-10-29T12:43:28.271Z
+1000 blocks before 36246056: 100 s  ->  100 ms per block
+100000 blocks before 36246056: 10003 s  ->  100.03 ms per block
+864000 blocks before 36246056: 86427 s  ->  100.031 ms per block
+36246055 blocks before 36246056: 3631387 s  ->  100.187 ms per block
+
+## block time by wall clock (20 s)
+2026-10-29T12:43:52.075Z: 208 blocks in 21.06 s -> 101.3 ms per block
 
 ## the Tokyo explorer serves this chain and reports the same cadence
-{ total_blocks: '36223251', average_block_time_ms: 100 }
+{ total_blocks: '36246296', average_block_time_ms: 100 }
 
 ## Multicall3 at the canonical address
 code at 0xcA11bde05977b3631167028862bE2a173976CA11: 3808 bytes
-Multicall3.getBlockNumber() -> 36223261
+Multicall3.getBlockNumber() -> 36246311
+
+## the non-canonical address the Chains page names for Hideki
+eth_getCode(0x540B091b608f54E603c5dC19F6b2d955e1d2D131):
+  -> {"jsonrpc":"2.0","id":1,"method":"eth_getCode","params":["0x540B091b608f54E603c5dC19F6b2d955e1d2D131","latest"]}
+  <- {"jsonrpc":"2.0","id":1,"result":"0x"}
 ```
 
 Docs checked:

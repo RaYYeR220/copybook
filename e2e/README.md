@@ -51,19 +51,21 @@ cd ../e2e && npm ci                      # links packages/stats as @copybook/sta
 
 ## 2. Deploy
 
-`forge script` cannot talk to a Hideki node directly:
-
-- the node keeps no historical state, so a state read pinned to a block number fails ("unable to load
-  historical state");
-- it rejects EIP-1898 block objects (`{"blockNumber": ...}`) with `-32602`;
-- it answers `eth_getStorageAt` on an empty slot with `"0x"` instead of a 32-byte zero word.
+`forge script` cannot talk to a Hideki node directly. The node refuses state reads addressed by block
+hash. A bare hash gets `-1` "unable to load historical state", and an EIP-1898 object (`{"blockHash": ...}`
+or `{"blockNumber": ...}`) gets `-32602`. Reads by block number work, historical ones included. Forge pins
+its fork by block hash, so its first state read fails. Details are in
+[`feedback/02`](../feedback/02-rpc-block-hash-state-reads.md).
 
 `npm run rpc-shim` starts a local JSON-RPC proxy on `127.0.0.1:8547` that sends every state read to
-`latest` and pads empty storage words. It is for broadcasting from your own machine only.
+`latest`. It also pads the node's `"0x"` answer for an empty storage slot into a 32-byte zero word (see
+[`feedback/03`](../feedback/03-rpc-empty-storage-slot.md)). Foundry copes with that one on its own, so the
+padding is only a safeguard. The shim is for broadcasting from your own machine only.
 
-Forge's local gas estimate is also about 10x below what Somnia charges (contract creation costs about
-4,900 gas per deployed byte there), so the script runs with `--skip-simulation`: each transaction is
-estimated by the node itself.
+Forge's local gas estimate is also about 10x below what Somnia charges, so the script runs with
+`--skip-simulation`: each transaction is estimated by the node itself. Contract creation costs 3,125 gas
+per deployed byte on Somnia, and the hub's deploy used 75,383,438 gas for 22,395 bytes of runtime, about
+3,366 per byte with its constructor.
 
 ```sh
 cd e2e && npm run rpc-shim                     # terminal 1, leave it running

@@ -8,7 +8,7 @@ import { heading, rpc } from "./lib.ts";
 
 const pk = generatePrivateKey(); // throwaway, in memory only
 const signer = privateKeyToAccount(pk);
-const markets = new SomniaMarkets({ chain: hidekiTestnet, addresses: SOMNIA_HIDEKI_TESTNET_ADDRESSES, privateKey: pk } as never);
+const markets = new SomniaMarkets({ chain: hidekiTestnet, addresses: SOMNIA_HIDEKI_TESTNET_ADDRESSES, privateKey: pk });
 const ADDR = SOMNIA_HIDEKI_TESTNET_ADDRESSES;
 const OPERATOR_REGISTRY = "0x6B2FbfeD328FF5F20C0BE7D3C3437613aFFE8D3a"; // dreamDEX OperatorPermissionsRegistry on Hideki
 

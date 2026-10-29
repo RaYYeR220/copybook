@@ -1,6 +1,7 @@
-// 02: state reads addressed by block hash fail on Hideki, so Foundry's `forge script` and `cast run` cannot run.
+// 02: state reads addressed by block hash fail on Hideki, so Foundry (forge script/test, cast run) cannot fork it.
 // Read-only. Run: node 02-rpc-block-hash-reads.ts
-import { heading, rpc } from "./lib.ts";
+import { createPublicClient, http, type Hash } from "viem";
+import { heading, rpc, RPC } from "./lib.ts";
 
 const BANK = "0x478769E1177C0773c43A593DCCc4Ad15F15F1394"; // dreamDEX MarginBank on Hideki
 const GET_CREDIT_GRANTER = "0x6a5c0a70"; // MarginBank.getCreditGranter()
@@ -8,7 +9,7 @@ const GET_CREDIT_GRANTER = "0x6a5c0a70"; // MarginBank.getCreditGranter()
 const latest = await rpc("eth_getBlockByNumber", ["latest", false], { quiet: true });
 const number: string = latest.result.number;
 const hash: string = latest.result.hash;
-console.log(`block ${BigInt(number)} = ${hash}`);
+console.log(`block ${BigInt(number)} = ${hash} (${new Date().toISOString()})`);
 
 const forms: [string, unknown][] = [
   ["hex number", number],
@@ -44,4 +45,23 @@ const HUB = "0xdF73BBbB6517B712BBeD9bfAe6253A5E1FCDE154"; // deployed in block 3
 for (const n of [35024248n, 35024249n]) {
   const r = await rpc("eth_getCode", [HUB, `0x${n.toString(16)}`], { quiet: true });
   console.log(`eth_getCode at ${n}: ${String(r.result).length > 2 ? `${(String(r.result).length - 2) / 2} bytes` : r.result}`);
+}
+
+heading("viem 2.57.12: the typed blockHash parameter of each state action");
+const client = createPublicClient({ transport: http(RPC) });
+const blockHash = hash as Hash;
+const viemCalls: [string, () => Promise<unknown>][] = [
+  ["getBalance({ blockHash })", () => client.getBalance({ address: BANK, blockHash })],
+  ["getCode({ blockHash })", () => client.getCode({ address: BANK, blockHash })],
+  ["getTransactionCount({ blockHash })", () => client.getTransactionCount({ address: BANK, blockHash })],
+  ["getStorageAt({ blockHash })", () => client.getStorageAt({ address: BANK, slot: "0x0", blockHash })],
+  ["getBalance({ blockNumber })", () => client.getBalance({ address: BANK, blockNumber: BigInt(number) })],
+];
+for (const [label, call] of viemCalls) {
+  try {
+    console.log(`${label}: ok ->`, await call());
+  } catch (e) {
+    const err = e as { shortMessage?: string; details?: string };
+    console.log(`${label}: threw "${String(err.shortMessage).split(/\r?\n/)[0]}" (details: ${err.details})`);
+  }
 }

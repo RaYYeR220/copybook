@@ -21,10 +21,21 @@ cd feedback/repro && npm ci && node 04-sdk-unfunded-signer.ts
 
 ## Expected
 
-The errors reference says `RpcError` covers the case where "the node refused the transaction (nonce too low,
-insufficient funds)". The `RpcError` JSDoc adds that "a call that *did* reach the chain and was rejected by a
-contract is a `ContractRevertError` instead". An unfunded signer should therefore get an `RpcError` whose
-message says the account cannot pay for gas.
+The SDK's own docs describe this case and say it is an `RpcError`.
+
+`docs/how-to/handle-errors.md`:
+
+> From the local-signer and session-key executors, a plain `RpcError` from a write means the node refused the
+> transaction or nothing was sent. Fix the cause (for example a stale nonce or an unfunded account), then send
+> again.
+
+`docs/NATIVE.md`, "Read the node's message, not viem's", uses this exact refusal as its example. Somnia
+reports mempool rejections as `-32000` with a `MempoolStatusCode` byte in `data`, and an unfunded sender shows
+up as `"account does not exist"`. `src/native/errors.ts` decodes that byte (`SomniaMempoolStatus.accountDoesNotExist = 2`),
+and `src/txSend.ts` already has `isNodeRefusal(e)`, defined as `getSomniaRpcError(e)?.mempoolStatus != null`.
+
+So an unfunded signer should get an `RpcError` (a node refusal that a retry after funding fixes), with the
+node's message "account does not exist".
 
 ## Actual
 
@@ -32,20 +43,27 @@ Both writes throw `ContractRevertError` with `errorName: undefined`, `data: "0x0
 `@somnia-chain/markets-sdk: setOperatorApprovalGlobal reverted: Missing or invalid parameters.` (`claim reverted: …`
 for the voucher). No contract was called. The cause chain holds the node's refusal: `-32000 account does not exist`.
 
-Two things combine:
+The code path (from reading the 0.32.1 source):
 
-- The node refuses a transaction from a never-funded account with `-32000 "account does not exist"` and
-  `data: "0x02"`. Ethereum nodes say "insufficient funds for gas * price + value" here.
-- The SDK's `isRevert()` (`src/revert.ts`) treats any hex `data` found in the cause chain as revert data, so the
-  refusal becomes a `ContractRevertError` with `data: "0x02"`.
+- `executor/local.ts` sends with `decorateError: (e, method) => Revert.toSdkError(e, method, context)`.
+- `revert.ts` `toSdkError` calls `isRevert(caught)` before anything else.
+- `isRevert` → `findRevertData` returns the first hex `data` in the cause chain, and here that is the mempool
+  status byte `"0x02"`.
+- So the refusal becomes `decodeRevert(...)`, a `ContractRevertError` carrying `data: "0x02"`.
 
-A new bot that forgot to fund its key is told its approval "reverted" because of "invalid parameters". The
-`RpcError` docs say to check for `ContractRevertError` first when branching. Code that does so treats this as a
-contract rejection that "fails again unless state changes", and never prompts the user to fund the key.
+By the same reading, every refusal that carries a status byte takes this path:
+`insufficientBalance` `0x03`, `nonceTooSmall` `0x04`, `gasPriceBelowBaseFee` `0x0c`, and the rest.
+
+Effect: a new bot that forgot to fund its key is told its approval "reverted" because of "invalid parameters".
+Code that branches the way the docs suggest (check for `ContractRevertError` first) treats it as a contract
+rejection that "fails again unless state changes", and never prompts the user to fund the key.
+
+A possible fix: in `toSdkError`, return an `RpcError` when `getSomniaRpcError(caught)?.mempoolStatus != null`
+(the existing `isNodeRefusal`), before the `isRevert` check.
 
 ## Evidence
 
-2026-10-29, signer `0x70364bfb6DfF017bFc45261f62BBE870e59A370f` (balance `0x0`):
+As of 2026-10-29T12:43Z, signer `0x285a15cAD9559af17fb051CE0dcCBC237EE48908` (balance `0x0`):
 
 ```
 trader.setOperatorApprovalGlobal: {
@@ -72,15 +90,18 @@ eth_sendRawTransaction (0-value transfer, same key):
   <- {"jsonrpc":"2.0","id":1,"error":{"code":-32000,"message":"account does not exist","data":"0x02"}}
 ```
 
-Docs checked:
+Docs and source checked (SDK 0.32.1):
 
-- Errors reference, the `RpcError` and `ContractRevertError` rows:
-  https://unpkg.com/@somnia-chain/markets-sdk@0.32.1/docs/reference/errors.md
 - Handle errors and reverts: https://unpkg.com/@somnia-chain/markets-sdk@0.32.1/docs/how-to/handle-errors.md
-- `RpcError` JSDoc ("For a write, the node can also have answered with a refusal (nonce too low, insufficient
-  funds)"): https://unpkg.com/@somnia-chain/markets-sdk@0.32.1/src/errors.ts
-- Somnia JSON-RPC API, error codes: https://docs.somnia.network/developer/json-rpc-api. It does not list
-  "account does not exist".
+- Native RPC, "Read the node's message, not viem's": https://unpkg.com/@somnia-chain/markets-sdk@0.32.1/docs/NATIVE.md
+- Errors reference (`RpcError`: "the node refused the transaction (nonce too low, insufficient funds)"):
+  https://unpkg.com/@somnia-chain/markets-sdk@0.32.1/docs/reference/errors.md
+- `SomniaMempoolStatus` / `getSomniaRpcError`: https://unpkg.com/@somnia-chain/markets-sdk@0.32.1/src/native/errors.ts
+- `isNodeRefusal`: https://unpkg.com/@somnia-chain/markets-sdk@0.32.1/src/txSend.ts
+- `toSdkError` / `isRevert` / `findRevertData`: https://unpkg.com/@somnia-chain/markets-sdk@0.32.1/src/revert.ts
+- `decorateError`: https://unpkg.com/@somnia-chain/markets-sdk@0.32.1/src/executor/local.ts
+- Minor: Somnia's JSON-RPC page lists common `-32000` transaction errors ("insufficient balance", …), but not
+  "account does not exist" (https://docs.somnia.network/developer/json-rpc-api, "Error Codes").
 
 ## Environment
 

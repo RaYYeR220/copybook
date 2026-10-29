@@ -33,8 +33,8 @@ on chain with its reason.
    [@BazydloMis57623](https://x.com/BazydloMis57623) on X with your Hideki address (why:
    [Try it in 5 minutes](README.md#try-it-in-5-minutes)). [Thesis 2](https://copybook-eosin.vercel.app/thesis/2) opens
    both legs in your follow transaction. During judging (until 2026-11-21)
-   [the demo leader](https://copybook-eosin.vercel.app/t/0xA1d0CB85c869e534Fe1e0c22af3b238301157b5d) trades a small
-   BTC position about every 25 minutes, and each move is copied in its block. Check the verdict on the trader page
+   [the demo leader](https://copybook-eosin.vercel.app/t/0xA1d0CB85c869e534Fe1e0c22af3b238301157b5d) trades a small BTC or ETH
+   position about every 25 minutes, and each move is copied in its block. Check the verdict on the trader page
    first: if it is BLOCK, turn the guard off in the follow flow to see copies (exits are never gated either way).
 3. Watch it land on `/me`, or open copies already recorded:
    - [one handler run, two followers](https://copybook-eosin.vercel.app/copy/0x9b950e40fe79338890174ef0e9d4ed7cc2bf5733e6d1df04b049f74b916e9e3c):
@@ -103,16 +103,16 @@ cd e2e && npm ci && npm run proof
 | [`packages/mcp`](packages/mcp/README.md) | 7 read tools and 7 write tools, dry run by default |
 | [`app/`](app/) | Next.js 15; chain reads in `app/lib/server/chain.ts`, the follow flow in `app/components/follow/` |
 
-Tests, run in a fresh clone on 2026-10-29, all passing:
+Tests, run on 2026-10-29, all passing:
 
 | Suite | Command | Tests |
 | --- | --- | --- |
 | Contracts (unit and invariant) | `cd contracts && npm ci && forge test` | 257 |
-| App | `npm test -w @copybook/app` | 317 |
-| SDK | `npm test -w @copybook/sdk` | 88, plus 4 live ones run with `COPYBOOK_LIVE=1` |
+| App | `npm test -w @copybook/app` | 333 |
+| SDK | `npm test -w @copybook/sdk` | 96, plus 5 live ones run with `COPYBOOK_LIVE=1` |
 | MCP server | `npm test -w @copybook/mcp` | 56 |
 | Trader statistics | `npm test -w @copybook/stats` | 35 |
-| Proof ledger | `cd e2e && npm test` | 21 |
+| Proof ledger and demo-leader bot | `cd e2e && npm test` | 38 |
 | AI-guard rubric | `cd e2e && npm run eval:test` | 8 |
 
 ## 4. Communication

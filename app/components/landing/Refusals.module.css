@@ -82,6 +82,15 @@
   background: var(--gold);
 }
 
+.exitsNote {
+  margin: 16px auto 0;
+  max-width: 40em;
+  text-align: center;
+  font: 400 11.5px/1.7 var(--mono);
+  letter-spacing: 0.04em;
+  color: var(--night-4);
+}
+
 @media (max-width: 980px) {
   .reasons {
     grid-template-columns: 1fr;

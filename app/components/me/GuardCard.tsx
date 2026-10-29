@@ -63,7 +63,7 @@ export function GuardCard({
         <div className={styles.confirm} role="group" aria-label={guardOn ? "Turn the guard off" : "Turn the guard on"}>
           <p className={styles.dlead}>
             {want
-              ? "With the guard on, a fresh BLOCK verdict on the trader you follow stops new size for this wallet; exits still run."
+              ? "With the guard on, a fresh BLOCK verdict on the trader you follow stops new size for this wallet; exits are never gated."
               : "With the guard off, a BLOCK verdict no longer stops new size for this wallet. It is this wallet's setting on the RiskGate, for this follow and any later one."}
           </p>
           <Call>
@@ -95,7 +95,7 @@ export function GuardCard({
     return (
       <div className={g.body}>
         <p className={`${styles.law} ${styles.lawFirst}`}>
-          <b>A thesis follow is never gated.</b> The guard reads the validators&apos; verdict on a trader; a thesis has none, so copies and rebalances run whatever the switch says.
+          <b>The AI guard never applies to a thesis.</b> The guard reads the validators&apos; verdict on a trader; a thesis has none, so copies and rebalances run whatever the switch says.
           It stays this wallet&apos;s setting for any trader it follows later.
         </p>
         {toggle}

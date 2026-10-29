@@ -25,7 +25,7 @@ export function Hero() {
         <div className={styles.col}>
           <p className={`${styles.eyebrow} rise`} style={delay(0.05)} data-flock-clear>
             <Gull className={styles.eyebrowGull} />
-            dreamDEX perps · Somnia testnet
+            dreamDEX perps · Somnia Hideki <span className={styles.wideOnly}>testnet </span>(Tokyo)
           </p>
           <h1 className={`${styles.h1} rise`} style={delay(0.1)} id="hero-h" data-flock-clear>
             Follow a trader

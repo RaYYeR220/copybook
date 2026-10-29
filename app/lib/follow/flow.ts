@@ -44,6 +44,10 @@ export interface ChainReads {
   follow: { sourceId: Hex; kind: SourceKindName; ref: bigint } | null;
   /** Perps account equity (18-decimal USD); null when the margin bank could not be read. */
   equity: bigint | null;
+  /** USDso in the wallet itself, outside the perps account; null when it could not be read. */
+  spot: bigint | null;
+  /** How much USDso the margin bank may pull for a deposit; null when it could not be read. */
+  marginAllowance: bigint | null;
   /** STT in the wallet, wei. */
   balance: bigint;
   guardOn: boolean;
@@ -57,7 +61,7 @@ export type ReadsState = { status: "idle" } | { status: "loading"; address?: Add
 
 /** The person's choices on this page. A reload clears them; everything else comes back from the chain. */
 export interface LocalChoices {
-  /** Continue although the perps account shows no equity (or could not be read). */
+  /** Continue although the perps account shows no equity, less than suggested, or could not be read. */
   marginWaived: boolean;
   /** The policy step was confirmed with a preflight that had no error. */
   policyDone: boolean;
@@ -79,6 +83,8 @@ export interface FlowInput {
   local: LocalChoices;
   now: number;
   risk: RiskParams;
+  /** The margin the follow should start with (see `marginTarget`); undefined when unknown. */
+  marginTarget?: bigint;
 }
 
 export type Blocker =
@@ -88,6 +94,8 @@ export type Blocker =
   /** The wallet follows a different source. */
   | "following-other"
   | "no-margin"
+  /** Equity below the suggested margin while the wallet holds USDso on spot that could cover more of it. */
+  | "low-margin"
   | "margin-unreadable";
 
 export type StepState = "done" | "current" | "todo" | "skipped";
@@ -180,6 +188,8 @@ export function deriveFlow(input: FlowInput): FlowView {
   if (!local.marginWaived) {
     if (data.equity === null) return view("margin", { blocker: "margin-unreadable" });
     if (data.equity <= 0n) return view("margin", { blocker: "no-margin" });
+    // short of the suggested margin: offered only when there is spot USDso to move in, never a dead end
+    if (input.marginTarget !== undefined && data.equity < input.marginTarget && data.spot !== null && data.spot > 0n) return view("margin", { blocker: "low-margin" });
   }
   if (!data.approved) return view("approve");
   if (!local.policyDone) return view("policy");

@@ -145,7 +145,7 @@ export default async function ThesisPage({ params }: Params) {
             </SourceActs>
             <PanelNote>
               A thesis follow sizes every leg from your allocation, short legs included. A rebalance resizes followers&apos; legs in the rebalance&apos;s own block; catchUp finishes any the
-              handler had to defer. Between versions the legs drift with prices until you resync. Exits are always copied; the AI guard applies to trader follows only.
+              handler had to defer. Between versions the legs drift with prices until you resync. Exits are never gated; the AI guard applies to trader follows only.
             </PanelNote>
           </Panel>
         </Col>

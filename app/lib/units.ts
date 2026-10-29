@@ -66,6 +66,9 @@ export function fmtFixed(n: number, dp = 2): string {
 /** Native STT from wei. */
 export const fmtStt = (wei: bigint) => `${fmtUnits(wei, 18, 4)} STT`;
 
+/** USDso (18 decimals) as a token amount: `25 USDso`, `3.5 USDso`. */
+export const fmtUsdso = (x: bigint) => `${fmtUnits(x, 18, 4)} USDso`;
+
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const p2 = (n: number) => String(n).padStart(2, "0");
 

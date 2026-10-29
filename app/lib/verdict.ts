@@ -7,7 +7,7 @@ export interface VerdictView {
   tier: TierName;
   reviewed: boolean;
   reviewedAt?: number;
-  /** A BLOCK inside its TTL: guarded followers get no new size from this trader (exits still run). */
+  /** A BLOCK inside its TTL: guarded followers get no new size from this trader (exits are never gated). */
   blocking: boolean;
   /** A BLOCK past its TTL. */
   expired: boolean;

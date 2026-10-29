@@ -29,7 +29,9 @@ import { fmtStt, fmtUsd18 } from "@/lib/units";
 import { hideki } from "@/lib/wallet/hideki";
 import { Banners } from "./Banners";
 import { BookTable } from "./BookTable";
+import { followMarginTarget } from "@/lib/follow/margin";
 import { GuardCard } from "./GuardCard";
+import { MarginPanel } from "./MarginPanel";
 import { Refusals } from "./Refusals";
 import { SourceCard, type Drawer } from "./SourceCard";
 import { TankPanel } from "./TankPanel";
@@ -337,6 +339,16 @@ function Following({ who, data, names, markets, traders, pub, reader, writer, tx
         <Panel id="guard-h" title="AI guard" aside={<Kick>Validators&apos; verdict · on chain</Kick>} order={2} d={0.08}>
           <GuardCard kind={follow.kind} trader={trader} verdict={data.verdict} guardOn={st.guardOn} pub={pub} now={now} writer={writer} tx={tx} />
         </Panel>
+        <Panel id="margin-h" title="Perps margin" aside={<Kick>dreamDEX perps account</Kick>} order={5} d={0.1}>
+          <MarginPanel
+            equity={data.equity}
+            funding={data.funding}
+            target={followMarginTarget(follow.kind, follow.policy, st.theme?.legs)}
+            bank={reader.deployments.marginBank}
+            writer={writer}
+            tx={tx}
+          />
+        </Panel>
         <Panel id="gas-h" title="Gas tank" aside={<Kick>Pays for every run</Kick>} order={5} d={0.12}>
           <TankPanel tank={st.tank} stats={stats} sinceKnown={since !== undefined} following writer={writer} tx={tx} balance={data.balance} />
         </Panel>
@@ -362,7 +374,7 @@ function Following({ who, data, names, markets, traders, pub, reader, writer, tx
           <Refusals counts={counts} />
         </Panel>
         <Colophon>
-          Hub <b>{shortHex(reader.deployments.hub)}</b> · RiskGate <b>{shortHex(reader.deployments.gate)}</b> · Somnia Hideki testnet · exits always copied
+          Hub <b>{shortHex(reader.deployments.hub)}</b> · RiskGate <b>{shortHex(reader.deployments.gate)}</b> · Somnia Hideki testnet (Tokyo) · exits never gated
         </Colophon>
       </Col>
     </AppMain>
@@ -376,7 +388,6 @@ function NotFollowing({ who, data, names, reader, writer, tx }: { who: Address; 
   const rows: LedgerRow[] = [
     { label: "Gas tank", value: <b>{fmtStt(st.tank)}</b>, note: st.tank > 0n ? "left from an earlier follow: all of it can come out" : undefined },
     { label: "Operator grant", value: data.approved === undefined ? "unread" : data.approved ? "global" : "none", note: data.approved ? "it outlives a follow until you revoke it" : undefined },
-    { label: "Perps equity", value: data.equity !== null ? fmtUsd18(data.equity) : "unread" },
     { label: "AI guard", value: st.guardOn ? "On" : "Off", note: "applies to the next trader this wallet follows" },
   ];
   return (
@@ -421,13 +432,16 @@ function NotFollowing({ who, data, names, reader, writer, tx }: { who: Address; 
             <TxLine tx={mine} recalled={tx.recalled} />
           </div>
         </Panel>
+        <Panel id="margin-h" title="Perps margin" aside={<Kick>dreamDEX perps account</Kick>} order={2} d={0.04}>
+          <MarginPanel equity={data.equity} funding={data.funding} bank={reader.deployments.marginBank} writer={writer} tx={tx} />
+        </Panel>
       </Col>
       <Col>
         <Panel id="feed-h" title="This wallet's history" aside={<FeedStatusLine extra="newest first" />} order={2} d={0.06}>
           <TapeRows names={names} label="Copybook events for this wallet, newest first" empty="This wallet has never followed through Copybook." />
         </Panel>
         <Colophon>
-          Hub <b>{shortHex(reader.deployments.hub)}</b> · Somnia Hideki testnet
+          Hub <b>{shortHex(reader.deployments.hub)}</b> · Somnia Hideki testnet (Tokyo)
         </Colophon>
       </Col>
     </AppMain>

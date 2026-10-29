@@ -1,5 +1,6 @@
 import {
   encodeFunctionData,
+  formatUnits,
   getAddress,
   parseAbi,
   type Abi,
@@ -13,7 +14,7 @@ import { gateAbi } from "./abi/gate.ts";
 import { hubAbi } from "./abi/hub.ts";
 import { themesAbi } from "./abi/themes.ts";
 import { GAS_HEADROOM_DEN, GAS_HEADROOM_NUM, MAX_TX_GAS, MIN_TANK, MIN_TANK_FOR_INCREASE, PLACE_ORDER_FOR_SELECTOR, THEME_DRIFT_BPS } from "./constants.ts";
-import { CopybookError, asCopybookError, revertAbi } from "./errors.ts";
+import { CopybookError, asCopybookError, revertAbi, revertDataOf } from "./errors.ts";
 import { decodeCopybookLogs, type CopybookEvent } from "./events.ts";
 import { getHubHistory, type HistoryOptions } from "./history.ts";
 import { isTradeable, minThemeAllocation, readMarket, simulateLeg, withHeadroom, type ThemeMinimum } from "./market.ts";
@@ -94,6 +95,8 @@ export interface FollowerStatus {
 }
 
 const ZERO = 0n;
+/** An 18-decimal USDso amount as plain digits, for messages. */
+const usdso = (x: bigint) => formatUnits(x, 18);
 
 /** The typed client. Everything the app and the MCP server do with the contracts goes through here. */
 export function createCopybook(config: CopybookConfig) {
@@ -111,7 +114,7 @@ export function createCopybook(config: CopybookConfig) {
     const wallet = walletClient!;
     const chainId = await wallet.getChainId();
     if (chainId !== deployments.chainId) {
-      throw new CopybookError("WRONG_CHAIN", `The wallet is on chain ${chainId}; Copybook runs on chain ${deployments.chainId} (Somnia Hideki2 testnet).`);
+      throw new CopybookError("WRONG_CHAIN", `The wallet is on chain ${chainId}; Copybook runs on Somnia Hideki testnet (Tokyo), chain ${deployments.chainId}.`);
     }
     const full = { ...call, abi: [...call.abi, ...revertAbi] as Abi };
     try {
@@ -138,6 +141,38 @@ export function createCopybook(config: CopybookConfig) {
       throw new CopybookError("TX_FAILED", `Transaction ${hash} reverted on chain.`);
     }
     return { hash, receipt, events: decodeCopybookLogs(receipt.logs, deployments) };
+  }
+
+  /**
+   * The deposit half of moving USDso into the perps account: `deposit(amount)` on the margin bank, which pulls the
+   * USDso from the wallet. Balance and allowance are read first, so a deposit the bank would refuse names its cause
+   * before anything is signed.
+   */
+  async function depositMargin(amount: bigint): Promise<WriteResult> {
+    if (amount <= ZERO) throw new CopybookError("INVALID_INPUT", "The deposit must be above zero.");
+    const account = requireAccount();
+    const { spot, allowance } = await reads.marginFunding(ctx, account);
+    if (spot < amount) {
+      throw new CopybookError("INSUFFICIENT_FUNDS", `This wallet holds ${usdso(spot)} USDso on spot, less than the ${usdso(amount)} to deposit.`);
+    }
+    if (allowance < amount) {
+      throw new CopybookError("NEEDS_APPROVAL", `The margin bank may pull ${usdso(allowance)} USDso from this wallet; approve at least ${usdso(amount)} USDso first (approveMargin).`);
+    }
+    return plainRevert("The margin bank refused this deposit.", () =>
+      send({ address: deployments.marginBank, abi: reads.marginBankFundingAbi as Abi, functionName: "deposit", args: [amount] }),
+    );
+  }
+
+  /** A venue revert no ABI here names still reads as a refusal, in plain words, instead of a raw node error. */
+  async function plainRevert(message: string, run: () => Promise<WriteResult>): Promise<WriteResult> {
+    try {
+      return await run();
+    } catch (e) {
+      if (e instanceof CopybookError) throw e;
+      const text = `${(e as { shortMessage?: string }).shortMessage ?? ""} ${(e as Error).message ?? ""}`;
+      if (revertDataOf(e) !== undefined || /revert/i.test(text)) throw new CopybookError("REVERTED", message, { cause: e });
+      throw e;
+    }
   }
 
   const hub = { address: deployments.hub, abi: hubAbi as Abi } as const;
@@ -191,7 +226,7 @@ export function createCopybook(config: CopybookConfig) {
       issues.push({
         code: "TANK_EMPTY",
         severity: "error",
-        message: "The gas tank is nearly empty, so every increase is refused (exits still run). Fund it.",
+        message: "The gas tank is nearly empty, so every increase is refused (exits are never gated). Fund it.",
         action: { method: "fundTank", args: [MIN_TANK] },
       });
     } else if (tank < MIN_TANK) {
@@ -290,6 +325,14 @@ export function createCopybook(config: CopybookConfig) {
     /** The perps account's equity (18-decimal USD), as the margin bank reports it. */
     accountEquity: (account: Address): Promise<bigint> => reads.accountEquity(ctx, account),
     isOperatorApproved: (owner: Address) => reads.isOperatorApproved(ctx, owner),
+    /** USDso, the margin bank's collateral, as the bank names it. */
+    marginToken: () => reads.marginToken(ctx),
+    /** USDso in the wallet itself, outside the perps account (18 decimals). */
+    spotUsdsoBalance: (account: Address) => reads.spotUsdsoBalance(ctx, account),
+    /** How much USDso the margin bank may pull from the wallet for a deposit. */
+    marginAllowance: (account: Address) => reads.marginAllowance(ctx, account),
+    /** The token, the spot USDso and the bank's allowance in one read. */
+    marginFunding: (account: Address): Promise<reads.MarginFunding> => reads.marginFunding(ctx, account),
     status,
     themeMinimum,
     preflightFollow: (input: PreflightInput): Promise<PreflightResult> => preflightFollow(ctx, input),
@@ -329,6 +372,17 @@ export function createCopybook(config: CopybookConfig) {
     resume: () => send({ ...hub, functionName: "resume" }),
     resync: () => send({ ...hub, functionName: "resync" }),
     setGuard: (on: boolean) => send({ ...gate, functionName: "setGuard", args: [on] }),
+    /**
+     * Moving spot USDso into the perps account takes two writes, as dreamDEX's own SDK sends them: `approveMargin(amount)` lets
+     * the margin bank pull exactly that much (skip it while `marginAllowance` covers the deposit), then
+     * `depositMargin(amount)` moves it in and the account's equity rises by it.
+     */
+    approveMargin: async (amount: bigint) => {
+      if (amount <= ZERO) throw new CopybookError("INVALID_INPUT", "The approval must be above zero.");
+      const token = await reads.marginToken(ctx);
+      return plainRevert("USDso refused this approval.", () => send({ address: token, abi: reads.erc20Abi as Abi, functionName: "approve", args: [deployments.marginBank, amount] }));
+    },
+    depositMargin,
     /** Pays for a validator review of a trader. Defaults to the gate's current fee. */
     requestReview: async (trader: Address, value?: bigint) => send({ ...gate, functionName: "requestReview", args: [trader], value: value ?? (await reads.reviewFee(ctx)) }),
     createTheme: (name: string, uri: string, legs: readonly Leg[]) =>

@@ -65,11 +65,11 @@ describe("tape rows", () => {
     expect(tapeRow(copy({ log: meta(undefined, H1) }), ctx)).toBeNull();
   });
 
-  it("an exit reads as an exit, always copied", () => {
+  it("an exit reads as an exit, never gated", () => {
     const r = tapeRow(copy({ fromSize: 50000n, toSize: 0n }), ctx)!;
     expect(r.kind).toBe("exit");
     expect(plain(r.text)).toContain("0.0005 long → 0");
-    expect(r.text.at(-1)).toEqual({ t: "aside", v: "exit, always copied" });
+    expect(r.text.at(-1)).toEqual({ t: "aside", v: "exit, never gated" });
     expect(isExit(-50000n, -80000n)).toBe(false);
   });
 

@@ -25,6 +25,7 @@ export {
 } from "./market.ts";
 export type { LegSimulation, ThemeMinimum } from "./market.ts";
 export { sourceIdOf } from "./reads.ts";
+export type { MarginFunding, PerpPosition } from "./reads.ts";
 export * from "./constants.ts";
 export * from "./types.ts";
 export { hubAbi } from "./abi/hub.ts";

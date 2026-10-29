@@ -106,7 +106,7 @@ export async function preflightFollow(c: ReadContext, input: PreflightInput): Pr
     add({
       code: "WRONG_CHAIN",
       severity: "error",
-      message: `The wallet is on chain ${input.walletChainId}; Copybook runs on chain ${c.deployments.chainId} (Somnia Hideki2 testnet). Switch networks first.`,
+      message: `The wallet is on chain ${input.walletChainId}; Copybook runs on Somnia Hideki testnet (Tokyo), chain ${c.deployments.chainId}. Switch networks first.`,
     });
   }
   if (!account) {
@@ -252,7 +252,8 @@ export async function preflightFollow(c: ReadContext, input: PreflightInput): Pr
         add({
           code: "ALLOW_ALL_MIRRORS_OPEN_BOOK",
           severity: "info",
-          message: "With no market list the follow mirrors the trader's whole book, including positions already open, and manages every market the trader trades.",
+          message:
+            "With no market list the follow mirrors the trader's whole book and manages every market the trader trades. A position the trader already holds opens here at their next move in that market, or via catchUp.",
         });
       }
       const [verdict, guardOn] = await Promise.all([
@@ -263,7 +264,7 @@ export async function preflightFollow(c: ReadContext, input: PreflightInput): Pr
         add({
           code: "TRADER_BLOCKED",
           severity: "warning",
-          message: "The AI risk review rates this trader Block. With the guard on, this wallet gets no new size from them until the verdict expires or the guard is turned off. Exits are still copied.",
+          message: "The AI risk review rates this trader Block. With the guard on, this wallet gets no new size from them until the verdict expires or the guard is turned off. Exits are never gated.",
         });
       }
       // a market list is checked as named; allowAll is checked in the markets the caller says the trader holds now

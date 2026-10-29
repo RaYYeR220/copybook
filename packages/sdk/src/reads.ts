@@ -193,6 +193,70 @@ export async function accountEquity(c: ReadContext, account: Address): Promise<b
   return equity;
 }
 
+/**
+ * The margin bank's slice that funds a perps account. The bank has no bare collateral getter: dreamDEX's SDK
+ * (`@somnia-chain/markets-sdk` 0.32.1, `bankCollateral` in writer.ts) reads it from `getSystemConfig`, and its
+ * `depositMargin` (perp/margin.ts) is an ERC-20 `approve` of the bank followed by `deposit(amount)` on the bank,
+ * which pulls the tokens from the wallet. The e2e run funds fresh wallets this way (e2e/src/live.ts, `setup`).
+ */
+export const marginBankFundingAbi = parseAbi([
+  "function getSystemConfig() view returns ((address marginBank, address collateralToken, address perpPoolFactory, address liquidationEngine, address insuranceFund, address feeRecipient, uint16 maxLeverageLimit, bool fullyWired))",
+  "function deposit(uint256 amount)",
+]);
+export const erc20Abi = parseAbi([
+  "function balanceOf(address account) view returns (uint256)",
+  "function allowance(address owner, address spender) view returns (uint256)",
+  "function approve(address spender, uint256 amount) returns (bool)",
+]);
+
+// the bank's collateral is fixed at its deployment, so one read per bank and public client is enough
+const collateralCache = new WeakMap<object, Map<string, Promise<Address>>>();
+
+/** USDso: the token the margin bank takes as collateral, read from the bank itself (`getSystemConfig`). */
+export function marginToken(c: ReadContext): Promise<Address> {
+  let byBank = collateralCache.get(c.publicClient);
+  if (!byBank) collateralCache.set(c.publicClient, (byBank = new Map()));
+  const key = c.deployments.marginBank.toLowerCase();
+  let hit = byBank.get(key);
+  if (!hit) {
+    hit = c.publicClient
+      .readContract({ address: c.deployments.marginBank, abi: marginBankFundingAbi, functionName: "getSystemConfig" })
+      .then((cfg) => getAddress(cfg.collateralToken));
+    // a failed read is not remembered: the next call asks the bank again
+    hit.catch(() => byBank!.delete(key));
+    byBank.set(key, hit);
+  }
+  return hit;
+}
+
+/** What a wallet needs to move USDso into its perps account: the token, the USDso it holds on spot, and the bank's allowance. */
+export interface MarginFunding {
+  token: Address;
+  /** USDso in the wallet itself (18 decimals), outside the perps account. */
+  spot: bigint;
+  /** How much USDso the margin bank may pull from the wallet. */
+  allowance: bigint;
+}
+
+export async function spotUsdsoBalance(c: ReadContext, account: Address): Promise<bigint> {
+  const token = await marginToken(c);
+  return c.publicClient.readContract({ address: token, abi: erc20Abi, functionName: "balanceOf", args: [account] });
+}
+
+export async function marginAllowance(c: ReadContext, account: Address): Promise<bigint> {
+  const token = await marginToken(c);
+  return c.publicClient.readContract({ address: token, abi: erc20Abi, functionName: "allowance", args: [account, c.deployments.marginBank] });
+}
+
+export async function marginFunding(c: ReadContext, account: Address): Promise<MarginFunding> {
+  const token = await marginToken(c);
+  const [spot, allowance] = await Promise.all([
+    c.publicClient.readContract({ address: token, abi: erc20Abi, functionName: "balanceOf", args: [account] }),
+    c.publicClient.readContract({ address: token, abi: erc20Abi, functionName: "allowance", args: [account, c.deployments.marginBank] }),
+  ]);
+  return { token, spot, allowance };
+}
+
 /** Whether the follower has granted the hub the global `placeOrderFor` approval the perps honour. */
 export const isOperatorApproved = (c: ReadContext, owner: Address): Promise<boolean> =>
   c.publicClient.readContract({

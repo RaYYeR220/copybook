@@ -75,7 +75,7 @@ export default async function NewThesis() {
           <ThesisBuilder pub={config.publicConfig} markets={markets} registered={registered} bank={bank} rules={rules} />
         )}
         <Colophon>
-          ThemeRegistry <b>{shortHex(themes)}</b> · margin bank <b>{bank ? shortHex(bank) : "unread"}</b> · Somnia Hideki testnet
+          ThemeRegistry <b>{shortHex(themes)}</b> · margin bank <b>{bank ? shortHex(bank) : "unread"}</b> · Somnia Hideki testnet (Tokyo)
         </Colophon>
       </Col>
     </AppMain>

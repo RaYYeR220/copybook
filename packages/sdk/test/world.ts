@@ -1,5 +1,5 @@
 import { getAddress, type Address } from "viem";
-import { FakeChain, deployments } from "./fake.ts";
+import { FakeChain, USDSO, deployments } from "./fake.ts";
 import type { Policy } from "../src/types.ts";
 
 export const E = 10n ** 18n;
@@ -44,6 +44,10 @@ export function world(): FakeChain {
   c.on(operatorRegistry, "isGloballyApproved", true);
   c.on(marginBank, "getAccountHealth", [1_000n * E, 0n, 0n, 0n]);
   c.on(marginBank, "getPosition", { size: 0n, avgEntryPrice: 0n, entryFundingIndex: 0n, lastUpdatedTimestampNs: 0n });
+  const z = "0x0000000000000000000000000000000000000000";
+  c.on(marginBank, "getSystemConfig", { marginBank, collateralToken: USDSO, perpPoolFactory: z, liquidationEngine: z, insuranceFund: z, feeRecipient: z, maxLeverageLimit: 20, fullyWired: true });
+  c.on(USDSO, "balanceOf", 0n);
+  c.on(USDSO, "allowance", 0n);
   c.market(BTC, { mark: 60_000n * E, tick: E / 10n, minQty: 13n * 10n ** 13n, lot: 10n ** 13n, oneBase: E });
   c.market(ETH, { mark: 3_000n * E, tick: E / 100n, minQty: 4n * 10n ** 15n, lot: 10n ** 15n, oneBase: E });
   return c;

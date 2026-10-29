@@ -173,7 +173,7 @@ export default async function CopyPage(props: Props) {
         )}
 
         <Colophon>
-          Hub <b>{shortHex(config.deployments.hub)}</b> · log #{fmtInt(v.logIndex)} · Somnia Hideki testnet
+          Hub <b>{shortHex(config.deployments.hub)}</b> · log #{fmtInt(v.logIndex)} · Somnia Hideki testnet (Tokyo)
         </Colophon>
       </Col>
     </AppMain>

@@ -29,7 +29,7 @@ export function depsFromEnv(env: Env = process.env as Env): Deps {
   const rpc = env.COPYBOOK_RPC_URL ?? DEFAULT_RPC;
   const chain = defineChain({
     id: deployments.chainId,
-    name: "Somnia Hideki2 testnet",
+    name: "Somnia Hideki testnet (Tokyo)",
     nativeCurrency: { name: "Somnia Test Token", symbol: "STT", decimals: 18 },
     rpcUrls: { default: { http: [rpc] } },
   });

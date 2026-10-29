@@ -24,7 +24,7 @@ const DEFAULT_LOOKBACK = 50_000n;
 /** Extra places asked for, so dropping copy wallets after the ranking still leaves n when it can (as the app does). */
 const RANK_SLACK = 3;
 
-const TESTNET = "Copybook runs on the Somnia Hideki2 testnet (chain 50383); amounts are testnet tokens with no market value.";
+const TESTNET = "Copybook runs on the Somnia Hideki testnet (Tokyo), chain 50383; amounts are testnet tokens with no market value.";
 
 function defineTool<S extends ZodRawShape>(
   def: { name: string; title: string; description: string; write?: boolean; inputSchema: S },
@@ -324,7 +324,7 @@ export function buildTools(deps: Deps): ToolDef[] {
         title: "Get RiskGate verdict",
         description:
           "The on-chain AI risk review (RiskGate) of a trader: tier None, Ok, Caution or Block, when it was reviewed, and whether a Block hold is active right now. " +
-          "A Block hold only matters to wallets that follow this trader with the AI guard on: they get no new size from the trader (exits are always copied) until it expires. Tier None means never reviewed. " +
+          "A Block hold only matters to wallets that follow this trader with the AI guard on: they get no new size from the trader (exits are never gated) until it expires. Tier None means never reviewed. " +
           "Also reports a pending review and the fee for requesting one.",
         inputSchema: { trader: addressField("The trader's wallet") },
       },
@@ -485,8 +485,9 @@ export function buildTools(deps: Deps): ToolDef[] {
         write: true,
         description:
           "Follows a trader with the agent's own wallet: the hub mirrors their dreamDEX perp positions into this wallet's account. DRY-RUN BY DEFAULT: dryRun=true returns the preflight and the exact calls; dryRun=false sends them. " +
-          "Semantics: one source per wallet (use a dedicated wallet; unfollow before following another). With no markets list the follow mirrors the trader's whole book, including positions already open; preflight then reads the markets the trader holds now from the dreamDEX indexer (checkedMarkets) and checks the caps there, and says so in notes when it could not. " +
-          "Exits are always copied; increases are gated (price band, per-position and whole-book caps, equity floor, gas tank, and the AI guard, which blocks new size from a trader rated Block). The AI guard applies to trader follows only. " +
+          "Semantics: one source per wallet (use a dedicated wallet; unfollow before following another). With no markets list the follow mirrors the trader's whole book, and a position the trader already holds is opened in this wallet at their next move in that market or via catchUp; preflight then reads the markets the trader holds now from the dreamDEX indexer (checkedMarkets) and checks the caps there, and says so in notes when it could not. " +
+          "Exits are never gated: no cap, tank, pause or AI verdict holds back a close. A close is one immediate-or-cancel order and is recorded as BandUnfilled if the book cannot fill it near the mark. " +
+          "Increases are gated (price band, per-position and whole-book caps, equity floor, gas tank, and the AI guard, which blocks new size from a trader rated Block). The AI guard applies to trader follows only. " +
           `${APPROVAL_NOTE} The tank (tankStt, at least 0.2 STT) pays for copy gas. If preflight finds an error nothing is sent and the reasons are returned. ${TESTNET}`,
         inputSchema: {
           trader: addressField("The trader to follow"),
@@ -519,7 +520,7 @@ export function buildTools(deps: Deps): ToolDef[] {
         description:
           "Follows a thesis with the agent's own wallet: the hub opens the whole basket in one block, weights applied to allocationUsdso. DRY-RUN BY DEFAULT: dryRun=true returns the preflight and the exact calls; dryRun=false sends them. " +
           "The basket opens all legs or none: an allocation below any leg's venue minimum, or a per-position cap below one order, is refused by preflight with the least value that clears it (see get_thesis). " +
-          "One source per wallet. Between thesis versions the hub leaves the book alone, so it can drift until resync. The AI guard does not apply to thesis follows. Exits are always copied; increases are gated by the band, caps, equity floor and tank. " +
+          "One source per wallet. Between thesis versions the hub leaves the book alone, so it can drift until resync. The AI guard does not apply to thesis follows. Exits are never gated (a close is one immediate-or-cancel order, recorded as BandUnfilled if the book cannot fill it near the mark); increases are gated by the band, caps, equity floor and tank. " +
           `${APPROVAL_NOTE} The tank (tankStt, at least 0.2 STT) pays for copy gas. ${TESTNET}`,
         inputSchema: {
           themeId: z.union([z.string(), z.number()]).describe("Thesis id from list_theses"),

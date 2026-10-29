@@ -12,6 +12,7 @@ import { DREAMDEX_URL } from "@/content/site";
 import { askValidators, type AskPhase } from "@/lib/ask";
 import { txUrl } from "@/lib/explorer";
 import type { ChainReads, FlowView, LocalChoices, ReadsState } from "@/lib/follow/flow";
+import { initialMove, type MarginTarget } from "@/lib/follow/margin";
 import type { FormField, ParsedPolicy, PolicyFormValues } from "@/lib/follow/policyForm";
 import { blocks, reasonsFor } from "@/lib/follow/reasons";
 import { takeovers, type HeldPosition, type Takeover } from "@/lib/follow/takeover";
@@ -22,6 +23,7 @@ import { fmtStt, fmtUnits, fmtUsd18 } from "@/lib/units";
 import { hideki } from "@/lib/wallet/hideki";
 import type { FollowSource } from "./FollowFlow";
 import { txFor, type PreflightState, type useReader, type useTx } from "./hooks";
+import { FundsHelp, MoveUsdso } from "./MoveUsdso";
 import { Acts, Block, Call, Field, Hint, Lead, Notes, ReasonList, Segmented, TxLine } from "./parts";
 import { PolicyFields } from "./PolicyFields";
 import styles from "./Flow.module.css";
@@ -54,6 +56,8 @@ export interface StepBodyProps {
   guardOn: boolean;
   refetch: () => void;
   now: number;
+  /** The margin the follow should start with; undefined when unknown. */
+  target?: MarginTarget;
 }
 
 const usd = (x: bigint) => fmtUsd18(x);
@@ -232,34 +236,7 @@ function StepContent(props: StepBodyProps) {
       );
 
     case "margin":
-      return (
-        <div className={styles.body}>
-          {view.blocker === "margin-unreadable" ? (
-            <Lead>The dreamDEX margin bank did not answer, so this wallet&apos;s perps equity is unknown right now, which is not the same as empty.</Lead>
-          ) : (
-            <>
-              <Lead>
-                Copies are orders in this wallet&apos;s dreamDEX perps account, and it holds no margin: equity reads <b>{data?.equity !== null && data ? fmtUsd18(data.equity) : "—"}</b>. Until
-                margin arrives the venue refuses every copy, and each refusal still costs the tank a run.
-              </Lead>
-              <Lead>
-                On dreamDEX, move USDso from Spot to Perps with the <b>Perps ⇆ Spot</b> transfer, then check again here.
-              </Lead>
-            </>
-          )}
-          <Acts>
-            <Button size="md" onClick={refetch}>
-              Check again
-            </Button>
-            <Button size="md" variant="secondary" href={DREAMDEX_URL} target="_blank">
-              Open dreamDEX ↗
-            </Button>
-            <Button size="md" variant="quiet" onClick={() => setLocal((l) => ({ ...l, marginWaived: true }))}>
-              Continue without margin
-            </Button>
-          </Acts>
-        </div>
-      );
+      return <MarginStep {...props} />;
 
     case "approve":
       return <ApproveStep {...props} />;
@@ -276,6 +253,72 @@ function StepContent(props: StepBodyProps) {
     case "done":
       return <DoneStep {...props} sourceName={sourceName} />;
   }
+}
+
+/** What the suggested margin covers, as the margin step says it. */
+const targetText = (t: MarginTarget) =>
+  t.basis === "trader-cap" ? "one position at the default cap per position, held without leverage, takes" : "the basket at the suggested allocation, held without leverage, takes";
+
+/**
+ * The perps account's margin. With USDso on spot the step moves it in (approve, then deposit); with none it says
+ * where testnet funds come from. Either way the person can go on: the step only says what the venue will do.
+ */
+function MarginStep({ view, data, reader, writer, tx, setLocal, refetch, target }: StepBodyProps) {
+  const equity = data?.equity ?? null;
+  const spot = data?.spot ?? null;
+  const unreadable = view.blocker === "margin-unreadable";
+  const low = view.blocker === "low-margin" && equity !== null && target !== undefined;
+  const moving = !unreadable && spot !== null && spot > 0n;
+  return (
+    <div className={styles.body}>
+      {unreadable ? (
+        <Lead>The dreamDEX margin bank did not answer, so this wallet&apos;s perps equity is unknown right now, which is not the same as empty.</Lead>
+      ) : low ? (
+        <Lead>
+          Copies are orders in this wallet&apos;s dreamDEX perps account. It holds <b>{fmtUsd18(equity)}</b>; {targetText(target)} <b>{fmtUsd18(target.amount)}</b>. Move more
+          in from spot, or go on with what is there.
+        </Lead>
+      ) : (
+        <>
+          <Lead>
+            Copies are orders in this wallet&apos;s dreamDEX perps account, and it holds no margin: equity reads <b>{equity !== null ? fmtUsd18(equity) : "—"}</b>. Until margin
+            arrives the venue refuses every copy, and each refusal still costs the tank a run.
+          </Lead>
+          {moving && (
+            <Lead>
+              Move USDso in from spot here{target ? (
+                <>
+                  : {targetText(target)} <b>{fmtUsd18(target.amount)}</b>
+                </>
+              ) : null}
+              .
+            </Lead>
+          )}
+        </>
+      )}
+      {!unreadable &&
+        (spot === null ? (
+          <p className={styles.checking}>This wallet&apos;s USDso could not be read. Check again, or move it on dreamDEX with the Perps ⇆ Spot transfer.</p>
+        ) : spot > 0n ? (
+          <MoveUsdso id="move-usdso" spot={spot} allowance={data?.marginAllowance ?? null} initial={initialMove(equity, target?.amount, spot, data?.marginAllowance ?? null)} bank={reader.deployments.marginBank} writer={writer} tx={tx} />
+        ) : (
+          <FundsHelp />
+        ))}
+      <Acts>
+        <Button size="md" variant={moving ? "quiet" : "primary"} disabled={tx.busy} onClick={refetch}>
+          Check again
+        </Button>
+        {(unreadable || spot === null) && (
+          <Button size="md" variant="secondary" href={DREAMDEX_URL} target="_blank">
+            Open dreamDEX ↗
+          </Button>
+        )}
+        <Button size="md" variant="quiet" disabled={tx.busy} onClick={() => setLocal((l) => ({ ...l, marginWaived: true }))}>
+          {low ? `Continue with ${fmtUsd18(equity)}` : "Continue without margin"}
+        </Button>
+      </Acts>
+    </div>
+  );
 }
 
 function ApproveStep({ reader, writer, tx }: StepBodyProps) {
@@ -462,7 +505,7 @@ function TankStep(props: StepBodyProps) {
       </Block>
       <Notes>
         <li>
-          Below <b>{fmtStt(MIN_TANK_FOR_INCREASE)}</b> every increase is refused as Tank empty; exits still run.
+          Below <b>{fmtStt(MIN_TANK_FOR_INCREASE)}</b> every increase is refused as Tank empty; exits are never gated.
         </li>
         <li>While following, the tank keeps at least {fmtStt(MIN_TANK)}. Top it up or take out what is above that from your dashboard; after you unfollow, all of it comes out.</li>
         <li>How many runs it covers depends on the gas each run uses. Your dashboard estimates it from this follow&apos;s own charges once there are some.</li>
@@ -520,8 +563,10 @@ function FollowStep(props: StepBodyProps) {
           Copies land in <b>the same block</b> as the source&apos;s move: Somnia&apos;s validators run the hub&apos;s handler for it.
         </li>
         <li>
-          <b>Exits are always copied.</b> Increases pass your band and caps, the equity floor and the tank{source.kind === "Trader" ? ", and the AI guard" : ""}.
+          <b>Exits are never gated:</b> no cap, tank, pause or AI verdict holds back a close. A close is one immediate-or-cancel order; if the book cannot fill it near the mark,
+          it is recorded as BandUnfilled.
         </li>
+        <li>Increases pass your band and caps, the equity floor and the tank{source.kind === "Trader" ? ", and the AI guard" : ""}.</li>
         {source.kind === "Trader" ? (
           form.allowAll ? (
             <li>The whole book: every market the trader holds or trades is managed, including positions already open (at their next move there, or when you run catchUp).</li>
@@ -531,7 +576,7 @@ function FollowStep(props: StepBodyProps) {
         ) : (
           <>
             <li>The basket opens in this transaction, every leg or none. A rebalance resizes your legs in its own block; between versions the legs drift with prices until you resync.</li>
-            <li>The AI guard applies to trader follows only: a thesis is never gated.</li>
+            <li>The AI guard applies to trader follows only: it never applies to a thesis.</li>
           </>
         )}
         <li>A copy&apos;s recorded price is its order&apos;s limit, not the fill. This is a testnet: STT and USDso have no value.</li>
@@ -651,7 +696,7 @@ function DoneStep({ view, source, sourceName }: StepBodyProps & { sourceName: st
       {source.kind === "Trader" && view.review === "pending" && <Lead>A review of this trader is on its way; the guard uses the verdict as soon as it reaches the gate.</Lead>}
       {source.kind === "Trader" && view.review === "needed" && <Lead>The review was skipped: the guard has no verdict on this trader yet, so nothing stops its new size.</Lead>}
       {source.kind === "Trader" && view.guardOn === false && (
-        <Lead>The AI guard is off for this wallet: a Block verdict on this trader does not stop new size. Exits are copied either way.</Lead>
+        <Lead>The AI guard is off for this wallet: a Block verdict on this trader does not stop new size. Exits are never gated either way.</Lead>
       )}
       {view.noGrant && (
         <Lead>

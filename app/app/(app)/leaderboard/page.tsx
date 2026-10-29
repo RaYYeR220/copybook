@@ -248,7 +248,7 @@ export default async function Leaderboard({ searchParams }: Props) {
           </dl>
         </Panel>
         <Colophon>
-          Hub <b>{shortHex(config.deployments.hub)}</b> · ThemeRegistry <b>{shortHex(config.deployments.themes)}</b> · Somnia Hideki testnet
+          Hub <b>{shortHex(config.deployments.hub)}</b> · ThemeRegistry <b>{shortHex(config.deployments.themes)}</b> · Somnia Hideki testnet (Tokyo)
         </Colophon>
       </Col>
     </AppMain>

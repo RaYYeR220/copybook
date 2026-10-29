@@ -11,6 +11,7 @@ import { SourceLedger, SourceLine, SourceTitle, SourceTop } from "@/components/a
 import { useNow } from "@/components/app/HoldClock";
 import { addressUrl } from "@/lib/explorer";
 import { NO_CHOICES, STEP_LABEL, deriveFlow, type ChainReads, type LocalChoices, type ReadsState, type StepId } from "@/lib/follow/flow";
+import { marginTarget } from "@/lib/follow/margin";
 import { defaultPolicyForm, parsePolicyForm, parseTank, type FormField, type PolicyFormValues } from "@/lib/follow/policyForm";
 import { readFollowState } from "@/lib/follow/read";
 import { fmtInt, shortHex } from "@/lib/format";
@@ -114,6 +115,7 @@ export function FollowFlow({ pub, source: raw, markets, renderedAt }: Props) {
   });
   const mine = mineQ.data ?? (mineQ.isError ? null : undefined);
 
+  const target = useMemo(() => marginTarget(source), [source]);
   const view = deriveFlow({
     kind: source.kind,
     sourceId,
@@ -123,6 +125,7 @@ export function FollowFlow({ pub, source: raw, markets, renderedAt }: Props) {
     local,
     now,
     risk: pub.risk,
+    marginTarget: target?.amount,
   });
   const data = reads.status === "ready" ? reads.data : undefined;
   const guardOn = local.guardWanted ?? data?.guardOn ?? true;
@@ -245,10 +248,11 @@ export function FollowFlow({ pub, source: raw, markets, renderedAt }: Props) {
             guardOn={guardOn}
             refetch={refetch}
             now={now}
+            target={target}
           />
         </Panel>
         <Colophon>
-          Hub <b>{shortHex(reader.deployments.hub)}</b> · operator registry <b>{shortHex(reader.deployments.operatorRegistry)}</b> · Somnia Hideki testnet · exits always copied
+          Hub <b>{shortHex(reader.deployments.hub)}</b> · operator registry <b>{shortHex(reader.deployments.operatorRegistry)}</b> · Somnia Hideki testnet (Tokyo) · exits never gated
         </Colophon>
       </Col>
     </AppMain>
@@ -263,7 +267,7 @@ function SourceFacts({ source, data, now, pub }: { source: FollowSource; data: C
       rows.push({ label: "Opens from", value: <b>{fmtUsd18(source.minimum.allocation, "up")}</b>, note: "every leg opens at the marks as this page loaded" });
       rows.push({ label: "With headroom", value: fmtUsd18(source.minimum.recommended, "up") });
     } else rows.push({ label: "Opens from", value: "unknown", note: "a leg's market could not be read; the form checks it live" });
-    rows.push({ label: "AI guard", value: "not applied", note: "theses are never gated" });
+    rows.push({ label: "AI guard", value: "not applied", note: "the AI guard never applies to a thesis" });
   } else if (data?.verdict) {
     const v = verdictView(data.verdict, now, pub.risk);
     rows.push({

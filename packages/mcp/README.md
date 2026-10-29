@@ -61,7 +61,8 @@ Write (registered only when `COPYBOOK_AGENT_KEY` is set; all dry-run by default)
 | --- | --- |
 | `follow_trader {trader, scaleBps?, maxNotionalUsdso, maxTotalNotionalUsdso?, bandBps?, equityFloorUsdso?, markets?, tankStt, dryRun?}` | Mirror a trader into the agent's wallet. |
 | `follow_thesis {themeId, allocationUsdso, maxNotionalUsdso, ..., tankStt, dryRun?}` | Open a thesis basket in one block. |
-| `unfollow {flatten, dryRun?}` | Stop and take the tank back; `flatten` also closes positions. |
+| `unfollow {flatten, dryRun?}` | Stop; `flatten` also closes positions. The tank stays on the hub until `withdraw_tank`. |
+| `withdraw_tank {amountStt?, dryRun?}` | Take STT out of the gas tank: by default all of it once unfollowed, or what is above the 0.2 STT floor while following. |
 | `revoke_operator {dryRun?}` | Withdraw the hub's operator approval (refused while the wallet follows something). |
 | `request_review {trader, dryRun?}` | Pay the fee for a fresh RiskGate review. |
 | `create_thesis {name, legs, uri?, dryRun?}` | Publish a new basket. |

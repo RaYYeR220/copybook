@@ -34,6 +34,8 @@ function fakeDeps(over: { agent?: boolean; pre?: PreflightResult; copybook?: Rec
     approveOperator: vi.fn(async () => tx("0xaaa")),
     follow: vi.fn(async () => tx("0xbbb", [{ name: "Followed" }])),
     unfollow: vi.fn(async () => tx("0xccc")),
+    withdrawTank: vi.fn(async () => tx("0xfff")),
+    tankOf: vi.fn(async () => E18 / 2n),
     requestReview: vi.fn(async () => tx("0xddd")),
     createTheme: vi.fn(async () => tx("0xeee", [{ name: "ThemeCreated", themeId: 7n }])),
     followOf: vi.fn(async () => null),
@@ -165,6 +167,7 @@ describe("write tools without a key", () => {
     ["follow_thesis", { themeId: 1, allocationUsdso: "200", ...policyArgs }],
     ["unfollow", { flatten: true }],
     ["revoke_operator", {}],
+    ["withdraw_tank", {}],
     ["request_review", { trader: TRADER }],
     ["create_thesis", { name: "x", legs: [{ pool: POOL, weightBps: 5000 }] }],
   ] as const;
@@ -174,7 +177,7 @@ describe("write tools without a key", () => {
     const { isError, body } = await call(deps, name, { ...args, dryRun: false });
     expect(isError).toBe(true);
     expect(body.reason).toMatch(/COPYBOOK_AGENT_KEY/);
-    for (const m of ["approveOperator", "follow", "unfollow", "requestReview", "createTheme"] as const) {
+    for (const m of ["approveOperator", "follow", "unfollow", "withdrawTank", "requestReview", "createTheme"] as const) {
       expect(copybook[m]).not.toHaveBeenCalled();
     }
     expect(copybook.preflightFollow).not.toHaveBeenCalled();
@@ -196,7 +199,8 @@ describe("write tools without a key", () => {
     const all = await names(true);
     expect(all).toEqual(expect.arrayContaining(["follow_trader", "follow_thesis", "unfollow", "request_review", "create_thesis", ...readOnly]));
     expect(all).toContain("revoke_operator");
-    expect(all).toHaveLength(13);
+    expect(all).toContain("withdraw_tank");
+    expect(all).toHaveLength(14);
   });
 });
 
@@ -308,6 +312,38 @@ describe("unfollow", () => {
     const live = await call(deps, "unfollow", { flatten: false, dryRun: false });
     expect(copybook.unfollow).toHaveBeenCalledWith(false);
     expect(live.body.sent).toBe(true);
+  });
+});
+
+describe("withdraw_tank", () => {
+  const following = { follower: AGENT, kind: "Trader", trader: TRADER, policy: { scaleBps: 1, allocation: 0n, maxNotional: E18, maxTotalNotional: 0n, bandBps: 1, equityFloor: 0n }, paused: false };
+
+  it("takes the whole tank once the wallet follows nothing, dry-run first", async () => {
+    const { deps, copybook } = fakeDeps();
+    const dry = await call(deps, "withdraw_tank", {});
+    expect(dry.body).toMatchObject({ dryRun: true, sent: false, tankStt: "0.5", calls: [{ function: "withdrawTank", amountStt: "0.5" }] });
+    expect(copybook.withdrawTank).not.toHaveBeenCalled();
+    const live = await call(deps, "withdraw_tank", { dryRun: false });
+    expect(copybook.withdrawTank).toHaveBeenCalledWith(E18 / 2n);
+    expect(live.body).toMatchObject({ sent: true, withdrawnStt: "0.5", tankLeftStt: "0" });
+  });
+
+  it("keeps the floor while following and refuses more than can come out", async () => {
+    const { deps, copybook } = fakeDeps({ copybook: { followOf: vi.fn(async () => following) } });
+    const dry = await call(deps, "withdraw_tank", {});
+    expect(dry.body.calls[0].amountStt).toBe("0.3");
+    const over = await call(deps, "withdraw_tank", { amountStt: "0.31", dryRun: false });
+    expect(over.isError).toBe(true);
+    expect(over.body.reason).toMatch(/At most 0.3 STT/);
+    expect(copybook.withdrawTank).not.toHaveBeenCalled();
+  });
+
+  it("refuses an empty tank", async () => {
+    const { deps, copybook } = fakeDeps({ copybook: { tankOf: vi.fn(async () => 0n) } });
+    const r = await call(deps, "withdraw_tank", { dryRun: false });
+    expect(r.isError).toBe(true);
+    expect(r.body.reason).toMatch(/empty/);
+    expect(copybook.withdrawTank).not.toHaveBeenCalled();
   });
 });
 

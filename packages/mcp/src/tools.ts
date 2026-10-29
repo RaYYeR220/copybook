@@ -1,6 +1,7 @@
 import {
   CopybookError,
   MAX_JOIN_POOLS,
+  MIN_TANK,
   PLACE_ORDER_FOR_SELECTOR,
   isTradeable,
   type Follow,
@@ -501,7 +502,8 @@ export function buildTools(deps: Deps): ToolDef[] {
         title: "Unfollow",
         write: true,
         description:
-          "Stops the agent wallet's follow and returns its gas tank. flatten=true also closes the positions the follow built (recommended); flatten=false leaves them open, unmanaged, in the wallet's account. " +
+          "Stops the agent wallet's follow. flatten=true also closes the positions the follow built (recommended); flatten=false leaves them open, unmanaged, in the wallet's account. " +
+          "The gas tank stays on the hub after unfollow; withdraw_tank takes it back, all of it. " +
           "If the closes do not all run, get_follow shows STOP_CLOSES_PENDING with the poke call that finishes them. DRY-RUN BY DEFAULT.",
         inputSchema: {
           flatten: z.boolean().describe("Close the follow's positions as part of stopping. Required, no default."),
@@ -516,7 +518,51 @@ export function buildTools(deps: Deps): ToolDef[] {
         if (dryRun) return { dryRun: true, sent: false, follower: account, following: presentFollow(follow), calls: [call] };
         const sent: string[] = [];
         const out = await sequence("Unfollow failed", sent, () => step(sent, "unfollow", () => copybook.unfollow(flatten)));
-        return { dryRun: false, sent: true, transactions: sent, events: out.events.map((e) => ({ name: e.name })), next: "Call get_follow to confirm nothing is pending." };
+        return {
+          dryRun: false,
+          sent: true,
+          transactions: sent,
+          events: out.events.map((e) => ({ name: e.name })),
+          next: "Call get_follow to confirm nothing is pending, then withdraw_tank to take the gas tank back.",
+        };
+      },
+    ),
+
+    defineTool(
+      {
+        name: "withdraw_tank",
+        title: "Withdraw from the gas tank",
+        write: true,
+        description:
+          "Takes STT out of the agent wallet's gas tank on the hub, back to the wallet. Without amountStt it withdraws all that can come out now: the whole tank once the wallet follows nothing, " +
+          `or what is above the ${fmt(MIN_TANK)} STT floor a following wallet keeps. DRY-RUN BY DEFAULT.`,
+        inputSchema: {
+          amountStt: sttField("How much to withdraw; omit for all that can come out now").optional(),
+          dryRun: dryRunField,
+        },
+      },
+      async ({ amountStt, dryRun }) => {
+        const account = needAgent(deps);
+        const [tank, follow] = await Promise.all([copybook.tankOf(account), copybook.followOf(account)]);
+        const floor = follow ? MIN_TANK : 0n;
+        const free = tank > floor ? tank - floor : 0n;
+        if (free === 0n) {
+          throw new Refusal(
+            follow
+              ? `The tank holds ${fmt(tank)} STT and a following wallet keeps ${fmt(MIN_TANK)} STT in it; nothing can come out until it holds more or the wallet unfollows.`
+              : "The tank is empty; nothing to withdraw.",
+          );
+        }
+        const amount = amountStt === undefined ? free : parseDecimal(amountStt, "amountStt");
+        if (amount === 0n) throw new InputError("amountStt must be above 0.");
+        if (amount > free) {
+          throw new Refusal(`At most ${fmt(free)} STT can come out now (tank ${fmt(tank)} STT${follow ? `, ${fmt(MIN_TANK)} STT kept while following` : ""}).`);
+        }
+        const call = { step: "withdrawTank", to: copybook.deployments.hub, function: "withdrawTank", args: [amount.toString()], amountStt: fmt(amount) };
+        if (dryRun) return { dryRun: true, sent: false, wallet: account, tankStt: fmt(tank), calls: [call] };
+        const sent: string[] = [];
+        await sequence("Withdraw failed", sent, () => step(sent, "withdrawTank", () => copybook.withdrawTank(amount)));
+        return { dryRun: false, sent: true, transactions: sent, withdrawnStt: fmt(amount), tankLeftStt: fmt(tank - amount) };
       },
     ),
 

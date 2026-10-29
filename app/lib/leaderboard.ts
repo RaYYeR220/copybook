@@ -22,11 +22,14 @@ export interface BoardRow {
   followersNow: number;
   /** Distinct wallets that ever followed it. */
   followersEver: number;
-  /** `Copied` events that grew a position. */
+  /**
+   * Increases copied. A trader: `Copied` events that grew a position. A thesis: syncs (one per follower per
+   * transaction) whose increases went through with nothing refused.
+   */
   copied: number;
-  /** `Refused` events, every reason. */
+  /** A trader: `Refused` events, every reason. A thesis: syncs with any refusal in them. */
   refused: number;
-  /** `Copied` events that shrank or closed a position. */
+  /** `Copied` events that shrank or closed a position (events, for both kinds). */
   exits: number;
   /** copied + refused: the n of the fidelity. */
   decisions: number;
@@ -34,6 +37,7 @@ export interface BoardRow {
   fidelityBps: number | null;
   /** 0 < decisions < FEW_EVENTS. */
   few: boolean;
+  /** Refusals by reason: events for a trader; for a thesis, the syncs each reason appeared in. */
   refusedBy: Partial<Record<ReasonName, number>>;
   /** Block of this source's newest event. */
   lastBlock?: bigint;
@@ -43,6 +47,11 @@ export interface BoardRow {
  * Every source the log names (and `extra`, e.g. theses nobody followed yet), with followers replayed from Followed and
  * Unfollowed in chain order, and the hub's answers to its moves: increases copied, refusals, exits. `events` must be in
  * chain order.
+ *
+ * A trader's decisions are events: each Copied increase and each Refused. A thesis decides per follower per
+ * transaction, its increases opening as one set: a sync whose increases were copied with nothing refused is one copied
+ * decision, and a sync with any refusal in it (a gate on the set, a leg below the minimum, a leg the venue failed,
+ * or an exit the venue left unfilled) is one refused decision, even when some leg moved in it.
  */
 export function boardRows(events: readonly CopybookEvent[], extra: readonly { sourceId: Hex; kind: SourceKindName; ref: bigint }[]): BoardRow[] {
   const rows = new Map<string, BoardRow>();
@@ -58,6 +67,14 @@ export function boardRows(events: readonly CopybookEvent[], extra: readonly { so
   for (const e of events) if (e.name === "Followed") row(e.sourceId, e.kind, e.ref);
   for (const x of extra) row(x.sourceId, x.kind, x.ref);
 
+  // a thesis sync, keyed by source, transaction and follower
+  const syncs = new Map<string, { row: BoardRow; increased: boolean; reasons: Set<ReasonName> }>();
+  const sync = (r: BoardRow, e: CopybookEvent & { follower: string }) => {
+    const k = `${r.sourceId.toLowerCase()}|${e.log.transactionHash ?? `${e.log.blockNumber}:${e.log.logIndex}`}|${e.follower.toLowerCase()}`;
+    let s = syncs.get(k);
+    if (!s) syncs.set(k, (s = { row: r, increased: false, reasons: new Set() }));
+    return s;
+  };
   const following = new Map<string, string>(); // follower → source it follows now
   const ever = new Map<string, Set<string>>();
   for (const e of events) {
@@ -73,13 +90,24 @@ export function boardRows(events: readonly CopybookEvent[], extra: readonly { so
     }
     if (!r) continue; // a copy for a source whose follow the log did not reach
     if (e.name === "Copied") {
-      if (isIncrease(e.fromSize, e.toSize)) r.copied++;
-      else r.exits++;
+      const up = isIncrease(e.fromSize, e.toSize);
+      if (!up) r.exits++;
+      else if (r.kind === "Theme") sync(r, e).increased = true;
+      else r.copied++;
     } else if (e.name === "Refused") {
-      r.refused++;
-      r.refusedBy[e.reason] = (r.refusedBy[e.reason] ?? 0) + 1;
+      if (r.kind === "Theme") sync(r, e).reasons.add(e.reason);
+      else {
+        r.refused++;
+        r.refusedBy[e.reason] = (r.refusedBy[e.reason] ?? 0) + 1;
+      }
     }
     if (e.name === "Followed" || e.name === "Unfollowed" || e.name === "Copied" || e.name === "Refused") r.lastBlock = e.log.blockNumber ?? r.lastBlock;
+  }
+  for (const s of syncs.values()) {
+    if (s.reasons.size > 0) {
+      s.row.refused++;
+      for (const reason of s.reasons) s.row.refusedBy[reason] = (s.row.refusedBy[reason] ?? 0) + 1;
+    } else if (s.increased) s.row.copied++;
   }
   for (const [k, r] of rows) {
     r.followersEver = ever.get(k)?.size ?? 0;

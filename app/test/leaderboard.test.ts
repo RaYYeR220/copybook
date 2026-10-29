@@ -90,6 +90,45 @@ describe("leaderboard rows from the hub's log", () => {
   });
 });
 
+describe("a thesis decides per sync, not per leg", () => {
+  const tx = (h: number) => `0x${h.toString(16).padStart(64, "0")}` as Hex;
+  const at = (hash: Hex, block: number, logIndex: number) => ({ address: BTC, blockNumber: BigInt(block), transactionHash: hash, transactionIndex: 0, logIndex, topics: [], data: "0x" as Hex });
+  const ETH = getAddress("0xd6cb1dd58580b84d76068ac21594219ce03aeddf");
+  const leg = (pool: Address, from: bigint, to: bigint, hash: Hex, block: number, i: number, follower = F3): CopybookEvent => ({ name: "Copied", follower, sourceId: TH, pool, fromSize: from, toSize: to, limitPrice: 1n, capped: false, log: at(hash, block, i) });
+  const gate = (reason: ReasonName, pool: Address, hash: Hex, block: number, i: number, follower = F3): CopybookEvent => ({ name: "Refused", follower, sourceId: TH, pool, reason, venueError: "0x", log: at(hash, block, i) });
+  const ZERO = "0x0000000000000000000000000000000000000000" as Address;
+  const follow = followed(F3, TH, 1, "Theme", 1n);
+
+  it("a 2-leg thesis: one sync opened both legs, one was held back at the gate: 1 of 2", () => {
+    const r = boardRows([follow, leg(BTC, 0n, 49_000n, tx(0xa1), 10, 1), leg(ETH, 0n, -16_900_000_000_000_000n, tx(0xa1), 10, 2), gate("TotalCap", ZERO, tx(0xb1), 20, 1)], [])[0];
+    expect([r.copied, r.refused, r.decisions]).toEqual([1, 1, 2]);
+    expect(fidelityText(r)).toBe("50% · 1 of 2");
+    expect(r.refusedBy).toEqual({ TotalCap: 1 });
+  });
+
+  it("a sync with both a copied leg and a refusal counts as refused, once", () => {
+    // whatever moved in it, a sync with a refusal in it is one refused decision, its reasons counted once
+    const r = boardRows([follow, leg(BTC, 49_000n, 69_000n, tx(0xc1), 30, 1), gate("LegFailed", ETH, tx(0xc1), 30, 2), gate("LegFailed", ETH, tx(0xc1), 30, 3)], [])[0];
+    expect([r.copied, r.refused]).toEqual([0, 1]);
+    expect(r.refusedBy).toEqual({ LegFailed: 1 });
+  });
+
+  it("two followers in one rebalance transaction are two decisions", () => {
+    const r = boardRows(
+      [follow, followed(F1, TH, 2, "Theme", 1n), leg(BTC, 0n, 1n, tx(0xd1), 40, 1), leg(BTC, 0n, 1n, tx(0xd1), 40, 2, F1)],
+      [],
+    )[0];
+    expect([r.copied, r.refused]).toEqual([2, 0]);
+  });
+
+  it("exits stay events, and a trader still counts each event", () => {
+    const th = boardRows([follow, leg(BTC, 49_000n, 0n, tx(0xe1), 50, 1), leg(ETH, -16n, 0n, tx(0xe1), 50, 2)], [])[0];
+    expect([th.exits, th.decisions]).toEqual([2, 0]);
+    const t = boardRows([followed(F1, T, 1), copied(T, 0n, 1n, 2), refused(T, "BandUnfilled", 3)], [])[0];
+    expect([t.copied, t.refused]).toEqual([1, 1]);
+  });
+});
+
 describe("ranking", () => {
   const mk = (sourceId: Hex, now: number, ever: number, copied: number, refused: number) => ({
     sourceId,
@@ -140,10 +179,22 @@ describe("on the recorded hub log (Hideki2, deployment to block 35,913,285)", ()
     const { followersOf } = await import("@/lib/followers");
     const rec = fromJsonSafe<{ events: CopybookEvent[] }>((await import("./fixtures/hub-log.json")).default);
     const rows = boardRows(rec.events, []);
-    const copies = rec.events.filter((e) => e.name === "Copied").length;
-    const refusals = rec.events.filter((e) => e.name === "Refused").length;
-    expect(rows.reduce((s, r) => s + r.copied + r.exits, 0)).toBe(copies);
-    expect(rows.reduce((s, r) => s + r.refused, 0)).toBe(refusals);
+    const kindOf = new Map(rows.map((r) => [r.sourceId.toLowerCase(), r.kind]));
+    const of = (kind: string) => rec.events.filter((e) => "sourceId" in e && kindOf.get(e.sourceId.toLowerCase()) === kind);
+    const traders = rows.filter((r) => r.kind === "Trader");
+    const theses = rows.filter((r) => r.kind === "Theme");
+    // a trader: every event once
+    expect(traders.reduce((s, r) => s + r.copied + r.exits, 0)).toBe(of("Trader").filter((e) => e.name === "Copied").length);
+    expect(traders.reduce((s, r) => s + r.refused, 0)).toBe(of("Trader").filter((e) => e.name === "Refused").length);
+    // a thesis: exits as events, decisions one per (transaction, follower) with an increase or a refusal
+    const tev = of("Theme");
+    expect(theses.reduce((s, r) => s + r.exits, 0)).toBe(tev.filter((e) => e.name === "Copied" && !isIncrease(e.fromSize, e.toSize)).length);
+    const decided = new Set(
+      tev
+        .filter((e) => (e.name === "Copied" && isIncrease(e.fromSize, e.toSize)) || e.name === "Refused")
+        .map((e) => `${e.log.transactionHash}|${(e as { follower: string }).follower.toLowerCase()}`),
+    );
+    expect(theses.reduce((s, r) => s + r.decisions, 0)).toBe(decided.size);
     for (const r of rows) expect(r.followersNow).toBe(followersOf(rec.events, r.sourceId).current.length);
     const leader = rows.find((r) => r.sourceId === T)!;
     expect(leader.kind).toBe("Trader");

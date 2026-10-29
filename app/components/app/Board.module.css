@@ -144,3 +144,14 @@ table.board td {
   color: var(--gold);
   letter-spacing: 0.08em;
 }
+
+.rankM {
+  display: none;
+}
+
+@media (max-width: 720px) {
+  .rankM {
+    display: inline;
+    color: var(--bone-2);
+  }
+}

@@ -28,16 +28,20 @@ type Props = { searchParams: Promise<{ by?: string }> };
 
 const traderOf = (ref: bigint): Address => getAddress(`0x${ref.toString(16).padStart(40, "0")}`);
 
-function Source({ r, names, owner }: { r: BoardRow; names: Map<string, { name: string; creator: Address }>; owner?: Address }) {
+/** On phones the rank column folds away: the rank (or that there is none) rides on the kind line. */
+const RankMark = ({ rank }: { rank: number | null }) => <span className={b.rankM}>{rank === null ? "unranked · " : `#${rank} · `}</span>;
+
+function Source({ r, rank, names, owner }: { r: BoardRow; rank: number | null; names: Map<string, { name: string; creator: Address }>; owner?: Address }) {
   if (r.kind === "Trader") {
     const a = traderOf(r.ref);
-    const demo = a === config.demoLeader;
+    const demo = a.toLowerCase() === config.demoLeader.toLowerCase();
     return (
       <>
         <Link href={`/t/${a}`} className={t.addr} title={a} prefetch={false}>
           {shortHex(a)}
         </Link>
         <span className={b.kind}>
+          <RankMark rank={rank} />
           trader{demo && <span className={b.ours}>demo leader · ours</span>}
         </span>
       </>
@@ -51,6 +55,7 @@ function Source({ r, names, owner }: { r: BoardRow; names: Map<string, { name: s
         {th?.name ?? `Thesis #${r.ref}`}
       </Link>
       <span className={b.kind}>
+        <RankMark rank={rank} />
         thesis #{r.ref.toString()}
         {ours && <span className={b.ours}>ours</span>}
       </span>
@@ -100,7 +105,7 @@ export default async function Leaderboard({ searchParams }: Props) {
                 size="md"
                 rows={[
                   { label: "Window", value: `#${fmtInt(log.fromBlock)} → #${fmtInt(log.toBlock)}`, note: "from the hub's deployment to the newest block read" },
-                  { label: "Hub events", value: <b>{fmtInt(log.events.length)}</b>, note: log.complete ? "the whole log" : "part of the log; the rest is still being read" },
+                  { label: "Hub and gate events", value: <b>{fmtInt(log.events.length)}</b>, note: log.complete ? "the whole log" : "part of the log; the rest is still being read" },
                   { label: "Sources", value: `${traders} trader${traders === 1 ? "" : "s"} · ${rows.length - traders} thes${rows.length - traders === 1 ? "is" : "es"}` },
                 ]}
               />
@@ -155,7 +160,7 @@ export default async function Leaderboard({ searchParams }: Props) {
                     <tr key={r.sourceId} data-source={r.kind} data-few={r.few ? "" : undefined}>
                       <td className={t.rank}>{rank ?? "·"}</td>
                       <td className={t.name}>
-                        <Source r={r} names={names} owner={config.owner} />
+                        <Source r={r} rank={rank} names={names} owner={config.owner} />
                       </td>
                       <td className={t.num} data-label="Following">
                         <b>{fmtInt(r.followersNow)}</b>
@@ -191,7 +196,7 @@ export default async function Leaderboard({ searchParams }: Props) {
           <dl className={b.notes} aria-label="What each column counts">
             <div>
               <dt>#</dt>
-              <dd>By followers every source is ranked. By copy fidelity only a source with at least {FEW_EVENTS} increases tried is; the rest follow unranked.</dd>
+              <dd>By followers every source is ranked. By copy fidelity only a source with at least {FEW_EVENTS} decisions (Copied + Refused) is; the rest follow, unranked.</dd>
             </div>
             <div>
               <dt>Source</dt>
@@ -205,18 +210,29 @@ export default async function Leaderboard({ searchParams }: Props) {
             </div>
             <div>
               <dt>Copied</dt>
-              <dd>Copied events that grew a follower&apos;s position: opened it, added to it, or put it on the other side.</dd>
+              <dd>
+                A trader: Copied events that grew a follower&apos;s position (opened it, added to it, or put it on the other side). A thesis: syncs, one per follower per
+                transaction, whose increases went through with nothing refused; its legs open as one set, so a sync is one decision however many legs moved.
+              </dd>
             </div>
             <div>
               <dt>Refused</dt>
               <dd>
-                Refused events, every reason, named under the count. Exits are never gated, but the venue can still leave one unfilled or reject it (Band, Venue rejected), and the event does
-                not say which half of a sync it came from: those count here too, so fidelity can only read low, never high. A partly filled increase is one Copied and one Band.
+                A trader: Refused events, every reason, named under the count. A thesis: syncs with any refusal in them, each reason counted once per sync; a sync with a refusal counts as
+                refused even when some leg moved in it.
               </dd>
             </div>
             <div>
               <dt>Fidelity</dt>
               <dd>Copied ÷ (Copied + Refused), floored to a tenth of a percent, always with both counts. Fewer than {FEW_EVENTS} is flagged few events.</dd>
+            </div>
+            <div>
+              <dt>How it leans</dt>
+              <dd>
+                A trader&apos;s figure reads low where a refusal was an exit the venue left unfilled or rejected (Band, Venue rejected: the event does not say which half of a sync it came
+                from), and where a partly filled increase counts once each way. A thesis&apos;s reads low where the only refusal in a sync was such an exit. For both, a follower the
+                handler deferred for gas (Deferred) is not counted until catchUp answers it.
+              </dd>
             </div>
             <div>
               <dt>Exits</dt>

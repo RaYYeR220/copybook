@@ -1,3 +1,4 @@
+import { createServer } from "node:http";
 import { afterEach, describe, expect, it } from "vitest";
 import { createPublicClient, http, type Address, type PublicClient } from "viem";
 import { WebSocketServer, type WebSocket } from "ws";
@@ -66,6 +67,28 @@ describe("somniaWatchTransport (real sockets)", () => {
     expect(await until(() => server!.sockets[0]!.readyState !== 1)).toBe(true);
     expect(server.sockets[1]!.readyState).toBe(1);
     await b.close();
+  });
+
+  it("a socket that never opens fails the subscription in time, and is closed if it opens late", async () => {
+    // an HTTP server that holds the WebSocket upgrade, then completes it late
+    const wss = new WebSocketServer({ noServer: true });
+    const opened: WebSocket[] = [];
+    wss.on("connection", (ws) => opened.push(ws));
+    const http = createServer();
+    http.on("upgrade", (req, socket, head) => setTimeout(() => wss.handleUpgrade(req, socket, head, (ws) => wss.emit("connection", ws, req)), 600));
+    await new Promise<void>((r) => http.listen(0, "127.0.0.1", () => r()));
+    const url = `ws://127.0.0.1:${(http.address() as { port: number }).port}`;
+    try {
+      const t = somniaWatchTransport(publicClient, url, { timeoutMs: 200 });
+      const t0 = Date.now();
+      await expect(t.subscribe({ addresses: ADDR, onTick: () => {}, onClose: () => {} })).rejects.toThrow(/did not open within 200 ms/);
+      expect(Date.now() - t0).toBeLessThan(500);
+      // the upgrade completes later: that socket is closed, not left open
+      expect(await until(() => opened.length === 1 && opened[0]!.readyState !== 1, 3_000)).toBe(true);
+    } finally {
+      for (const s of opened) s.terminate();
+      await new Promise<void>((r) => http.close(() => r()));
+    }
   });
 
   it("closing does not wait on a node that never confirms the unsubscribe", async () => {

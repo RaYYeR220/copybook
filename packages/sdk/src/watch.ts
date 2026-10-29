@@ -58,7 +58,8 @@ let subscriptionSeq = 0;
 const HEALTHY_MS = 30_000;
 
 /** The default transport: viem's WebSocket transport speaking Somnia's `somnia_watch` subscription. */
-export function somniaWatchTransport(publicClient: PublicClient, wsUrl?: string): WatchTransport {
+export function somniaWatchTransport(publicClient: PublicClient, wsUrl?: string, opts: { timeoutMs?: number } = {}): WatchTransport {
+  const timeoutMs = opts.timeoutMs ?? SUBSCRIBE_TIMEOUT_MS;
   return {
     async subscribe({ addresses, onTick, onClose }) {
       // viem's own reconnect is off: the watcher owns reconnecting so it can read what the gap missed
@@ -74,7 +75,18 @@ export function somniaWatchTransport(publicClient: PublicClient, wsUrl?: string)
       // The socket client this subscription runs on. viem keeps one per URL until it is closed explicitly; a dead one
       // left in that cache would take the next subscription and never answer it, so it is closed (and evicted) the
       // moment its socket dies, and only this one is ever closed here.
-      const client = await value.getRpcClient();
+      // A socket that never opens would hold this forever: give up after the timeout, and close it if it opens later.
+      const opening = value.getRpcClient();
+      let openTimer: ReturnType<typeof setTimeout> | undefined;
+      const client = await Promise.race([
+        opening,
+        new Promise<never>((_, reject) => {
+          openTimer = setTimeout(() => {
+            void opening.then((late) => late.close(), () => undefined);
+            reject(new Error(`the somnia_watch socket did not open within ${timeoutMs} ms`));
+          }, timeoutMs);
+        }),
+      ]).finally(() => clearTimeout(openTimer));
       let closed = false;
       let dropped = false;
       const drop = () => {
@@ -91,8 +103,8 @@ export function somniaWatchTransport(publicClient: PublicClient, wsUrl?: string)
         const timer = setTimeout(() => {
           closed = true;
           drop();
-          reject(new Error(`somnia_watch did not answer within ${SUBSCRIBE_TIMEOUT_MS} ms`));
-        }, SUBSCRIBE_TIMEOUT_MS);
+          reject(new Error(`somnia_watch did not answer within ${timeoutMs} ms`));
+        }, timeoutMs);
         value
           .subscribe({
             params: ["somnia_watch", { address: addresses, eth_calls: [], push_changes_only: false }],

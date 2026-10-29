@@ -139,7 +139,25 @@ function Checking({ preflight }: { preflight: PreflightState }) {
 
 const lastResult = (p: PreflightState) => (p.status === "ready" ? p.result : p.status === "checking" || p.status === "error" ? p.last : undefined);
 
+/**
+ * The current step. A transaction sent before the page loaded (remembered across the reload) shows above whichever
+ * step the chain puts the flow on, until it lands; the steps' own lines show only what this page sent.
+ */
 export function StepBody(props: StepBodyProps) {
+  const recalled = txFor(props.tx, [], true);
+  return (
+    <>
+      {recalled.phase !== "idle" && (
+        <div className={styles.recalled} data-recalled="">
+          <TxLine tx={recalled} recalled />
+        </div>
+      )}
+      <StepContent {...props} />
+    </>
+  );
+}
+
+function StepContent(props: StepBodyProps) {
   const { view, source, data, reads, setLocal, refetch } = props;
   const sourceName = source.kind === "Trader" ? `trader ${shortHex(source.trader)}` : `thesis “${source.name}”`;
 
@@ -262,7 +280,7 @@ export function StepBody(props: StepBodyProps) {
 
 function ApproveStep({ reader, writer, tx }: StepBodyProps) {
   const d = reader.deployments;
-  const mine = txFor(tx, ["approve"], true);
+  const mine = txFor(tx, ["approve"]);
   return (
     <div className={styles.body}>
       <Lead>
@@ -388,7 +406,7 @@ function PolicyStep(props: StepBodyProps) {
 
 function GuardStep({ reader, writer, tx, local, setLocal }: StepBodyProps) {
   const want = local.guardWanted ?? true;
-  const mine = txFor(tx, ["guard"], true);
+  const mine = txFor(tx, ["guard"]);
   return (
     <div className={styles.body}>
       <Lead>
@@ -474,7 +492,7 @@ function FollowStep(props: StepBodyProps) {
   const shown = result ? reasonsFor("follow", result.reasons) : [];
   const policy = parsed.policy;
   const ready = preflight.status === "ready" && preflight.key === preflightKey && !!policy && tank !== null && !blocks("follow", preflight.result.reasons);
-  const mine = txFor(tx, ["follow"], true);
+  const mine = txFor(tx, ["follow"]);
   const marketText =
     source.kind === "Trader"
       ? form.allowAll

@@ -508,6 +508,10 @@
 }
 
 /* ---------- transaction status ---------- */
+/* a transaction sent before this page loaded, above whichever step is current */
+.recalled {
+  padding: 2px 20px 0;
+}
 .tx {
   display: flex;
   flex-wrap: wrap;
@@ -614,6 +618,10 @@
 
   .body {
     padding: 14px 16px 18px;
+  }
+
+  .recalled {
+    padding: 2px 16px 0;
   }
 
   .scope {

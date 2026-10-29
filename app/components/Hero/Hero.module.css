@@ -229,6 +229,11 @@
     padding: 7px 12px;
   }
 
+  /* the eyebrow keeps to one line on a phone: "Somnia Hideki (Tokyo)" */
+  .wideOnly {
+    display: none;
+  }
+
   .h1 {
     font-size: 48px;
     margin-top: 18px;
@@ -271,5 +276,14 @@
 
   .narrow {
     display: inline;
+  }
+}
+
+/* the narrowest phones: a tighter eyebrow still fits on one line */
+@media (max-width: 380px) {
+  .eyebrow {
+    gap: 8px;
+    padding: 7px 10px;
+    letter-spacing: 0.05em;
   }
 }

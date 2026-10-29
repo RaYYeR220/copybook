@@ -27,7 +27,7 @@ out of every ranking. The traders the AI guard reviewed are real dreamDEX accoun
 | demo agent (MCP) | `0xCDE791006eA6E99e9A614Bc9d0995879E2Cc5E72` |
 
 The demo leader moves only when we trade it, so its followers get a copy only then. During judging (until
-2026-11-08) a bot of ours trades it: a small BTC position about every 25 minutes.
+2026-11-21) a bot of ours trades it: a small BTC or ETH position about every 25 minutes.
 
 ## What is mocked
 

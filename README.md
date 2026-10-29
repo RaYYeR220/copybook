@@ -116,7 +116,7 @@ trades in that wallet.
    - **A thesis.** Open [thesis 2](https://copybook-eosin.vercel.app/thesis/2) and follow it with at least the
      allocation the page shows. Both legs open in your follow transaction.
    - **The demo leader.** Open [its page](https://copybook-eosin.vercel.app/t/0xA1d0CB85c869e534Fe1e0c22af3b238301157b5d)
-     (marked ours) and follow it. During judging (until 2026-11-08) it trades a small BTC position about every 25
+     (marked ours) and follow it. During judging (until 2026-11-21) it trades a small BTC or ETH position about every 25
      minutes, and each move is copied in its block. Check the verdict on its page first: if it is BLOCK, turn the
      guard off in the follow flow to see copies (exits are never gated either way).
    - **Any trader on Discover.** Scale and cap the copy to your margin.

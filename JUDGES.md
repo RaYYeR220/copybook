@@ -32,7 +32,7 @@ on chain with its reason.
 2. Follow a source with a funded testnet wallet. For STT and USDso, message
    [@BazydloMis57623](https://x.com/BazydloMis57623) on X with your Hideki address (why:
    [Try it in 5 minutes](README.md#try-it-in-5-minutes)). [Thesis 2](https://copybook-eosin.vercel.app/thesis/2) opens
-   both legs in your follow transaction. During judging (until 2026-11-08)
+   both legs in your follow transaction. During judging (until 2026-11-21)
    [the demo leader](https://copybook-eosin.vercel.app/t/0xA1d0CB85c869e534Fe1e0c22af3b238301157b5d) trades a small
    BTC position about every 25 minutes, and each move is copied in its block. Check the verdict on the trader page
    first: if it is BLOCK, turn the guard off in the follow flow to see copies (exits are never gated either way).

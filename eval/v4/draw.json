@@ -1,0 +1,49 @@
+{
+  "run": "v4",
+  "about": "How run v4's sample was drawn and how to draw it again. Written after the run: the anchored key (eval/v4/answer-key.json) is unchanged.",
+  "drawnOn": "dfceabc (the parent of the anchored key commit a7c42c2)",
+  "now": {
+    "recorded": false,
+    "note": "The draw's clock (the end of its 30-day window) was not written down. It was read after the reviewer's settings (frozen.readAt 2026-10-29T22:39:03.061Z) and before the first account was screened; the key was written at 2026-10-29T22:41:57.987Z."
+  },
+  "windowDays": 30,
+  "rowCap": 2000,
+  "maxScreened": 100,
+  "replay": {
+    "command": "COPYBOOK_ENV=<env file> npm run eval:v4 replay 2026-10-29T22:39:04Z",
+    "at": "2026-10-29T22:39:04.000Z",
+    "how": "every timestamp filter the draw sends to the indexer is also bounded above by 1793313544 (2026-10-29T22:39:04.000Z); the exclusions come from deployments/risk.json, deployments/hideki.json, eval/answer-key.json and eval/v3/answer-key.json as committed in dfceabc, and from the env file's own wallets",
+    "ranAt": "2026-10-29T23:29:56.693Z",
+    "screened": 53,
+    "sameScreenedAccounts": true,
+    "samePicks": true,
+    "excluded": {
+      "earlierRuns": 60,
+      "ours": 18,
+      "total": 77
+    },
+    "pools": [
+      {
+        "name": "2+ liquidations in the latest 1000 liquidation rows",
+        "size": 59
+      },
+      {
+        "name": "1 liquidation in the latest 1000 liquidation rows",
+        "size": 220
+      },
+      {
+        "name": "fewest rows in the latest 1000 position changes",
+        "size": 48
+      },
+      {
+        "name": "largest single realized gains",
+        "size": 25
+      },
+      {
+        "name": "latest position changes",
+        "size": 48
+      }
+    ],
+    "screenedLinesThatDiffer": 0
+  }
+}

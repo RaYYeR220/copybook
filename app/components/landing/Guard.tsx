@@ -170,7 +170,7 @@ export function Guard() {
             <div className={styles.record}>
               <div>
                 <span className={styles.k}>increase</span>
-                <span>BTC-PERP +0.0010 → refused · AI risk verdict</span>
+                <span>BTC-PERP +0.0003 → refused · AI risk verdict</span>
               </div>
               <div>
                 <span className={styles.k}>exit</span>

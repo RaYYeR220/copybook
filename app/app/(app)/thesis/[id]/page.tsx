@@ -18,7 +18,8 @@ import { shortHex } from "@/lib/format";
 import { config } from "@/lib/server/config";
 import { perpMarkets } from "@/lib/server/indexer";
 import { registeredPools, registryBank, registryRules } from "@/lib/server/registry";
-import { isOwner, loadThesis, type Thesis } from "@/lib/server/theses";
+import { loadThesis, type Thesis } from "@/lib/server/theses";
+import { ourWallet } from "@/lib/ours";
 import { decimalsOf, grossBps, legSide, netBps, pctOfBps } from "@/lib/thesis";
 import { toJsonSafe } from "@/lib/json";
 import { fmtPrice18, fmtUnits, fmtUsd18 } from "@/lib/units";
@@ -80,7 +81,7 @@ export default async function ThesisPage({ params }: Params) {
   const writeUp = thesis.uri ? safeUri(thesis.uri) : null;
   const legs = legRows(thesis, markets);
   const min = thesis.minimum;
-  const byOwner = config.owner ? isOwner(thesis.creator, config.owner) : false;
+  const creatorRole = ourWallet(config.deployments, thesis.creator);
   const net = netBps(thesis.legs);
   const ledger: LedgerRow[] = [
     { label: "Legs", value: `${thesis.legs.length} · gross ${pctOfBps(grossBps(thesis.legs))} · net ${pctOfBps(Math.abs(net))} ${net >= 0 ? "long" : "short"}` },
@@ -97,7 +98,7 @@ export default async function ThesisPage({ params }: Params) {
     markets,
     theses: [{ id: id.toString(), name: thesis.name }],
     traders: { [config.demoLeader.toLowerCase()]: "demo leader" },
-    wallets: config.owner ? { [config.owner.toLowerCase()]: "Copybook owner" } : {},
+    wallets: config.walletLabels,
   };
 
   return (
@@ -112,7 +113,7 @@ export default async function ThesisPage({ params }: Params) {
               <a href={addressUrl(thesis.creator)} target="_blank" rel="noopener noreferrer" title={thesis.creator}>
                 {shortHex(thesis.creator)}
               </a>
-              {byOwner && <span> · Copybook&apos;s owner wallet</span>}
+              {creatorRole && <span> · {creatorRole}</span>}
               <span> · ThemeRegistry</span>
               {writeUp && (
                 <>

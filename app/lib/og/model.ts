@@ -12,7 +12,8 @@ export interface CardNames {
   markets: Record<string, MarketMeta>;
   theses: Record<string, string>;
   demoLeader: Address;
-  owner?: Address;
+  /** lower-case addresses of the wallets Copybook runs (hideki.json's demoWallets) */
+  ours: readonly string[];
 }
 
 const lc = (a: string) => a.toLowerCase();
@@ -171,7 +172,7 @@ export function thesisCardModel(x: {
     name: x.name,
     version: x.version,
     creator: shortHex(x.creator),
-    ours: !!x.names.owner && lc(x.creator) === lc(x.names.owner),
+    ours: x.names.ours.includes(lc(x.creator)),
     legs: x.legs.slice(0, MAX_DRAWN).map((l) => ({ market: market(x.names, l.pool), ...legSide(l.weightBps), share: Math.abs(l.weightBps) / top })),
     more: Math.max(0, x.legs.length - MAX_DRAWN),
     gross: pctOfBps(grossBps(x.legs)),

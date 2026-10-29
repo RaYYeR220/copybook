@@ -11,7 +11,7 @@ import { loadThesis, thesisNames } from "./theses";
 /** Market symbols, thesis names and our own wallets, for naming things on a card. A source that does not answer names nothing. */
 export async function cardNames(): Promise<CardNames> {
   const [markets, theses] = await Promise.all([perpMarkets().catch(() => ({})), thesisNames().catch(() => [])]);
-  return { markets, theses: Object.fromEntries(theses.map((t) => [t.id, t.name])), demoLeader: config.demoLeader, owner: config.owner };
+  return { markets, theses: Object.fromEntries(theses.map((t) => [t.id, t.name])), demoLeader: config.demoLeader, ours: Object.keys(config.walletLabels) };
 }
 
 /** Wallets following a source now, replayed from the hub's log; a floor while the log is still being read. */

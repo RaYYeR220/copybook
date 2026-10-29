@@ -47,7 +47,7 @@ export default async function TraderPage({ params }: Params) {
     markets: markets.status === "fulfilled" ? markets.value : {},
     theses: [],
     traders: { [config.demoLeader.toLowerCase()]: "demo leader" },
-    wallets: config.owner ? { [config.owner.toLowerCase()]: "Copybook owner" } : {},
+    wallets: config.walletLabels,
   };
 
   return (

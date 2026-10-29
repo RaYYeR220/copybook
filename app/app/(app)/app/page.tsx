@@ -68,7 +68,7 @@ export default async function Discover() {
     markets: marketMap,
     theses: theses.status === "fulfilled" ? theses.value : [],
     traders: { [config.demoLeader.toLowerCase()]: "demo leader" },
-    wallets: config.owner ? { [config.owner.toLowerCase()]: "Copybook owner" } : {},
+    wallets: config.walletLabels,
   };
 
   return (

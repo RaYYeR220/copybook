@@ -31,7 +31,7 @@ const traderOf = (ref: bigint): Address => getAddress(`0x${ref.toString(16).padS
 /** On phones the rank column folds away: the rank (or that there is none) rides on the kind line. */
 const RankMark = ({ rank }: { rank: number | null }) => <span className={b.rankM}>{rank === null ? "unranked · " : `#${rank} · `}</span>;
 
-function Source({ r, rank, names, owner }: { r: BoardRow; rank: number | null; names: Map<string, { name: string; creator: Address }>; owner?: Address }) {
+function Source({ r, rank, names }: { r: BoardRow; rank: number | null; names: Map<string, { name: string; creator: Address }> }) {
   if (r.kind === "Trader") {
     const a = traderOf(r.ref);
     const demo = a.toLowerCase() === config.demoLeader.toLowerCase();
@@ -48,7 +48,7 @@ function Source({ r, rank, names, owner }: { r: BoardRow; rank: number | null; n
     );
   }
   const th = names.get(r.ref.toString());
-  const ours = !!th && !!owner && th.creator.toLowerCase() === owner.toLowerCase();
+  const ours = !!th && config.isOurs(th.creator);
   return (
     <>
       <Link href={`/thesis/${r.ref}`} prefetch={false}>
@@ -111,7 +111,10 @@ export default async function Leaderboard({ searchParams }: Props) {
               />
             </SourceLedger>
           )}
-          <PanelNote>Testnet: counts are small, and Copybook&apos;s own demo sources are labelled ours. Small counts say little, so n is printed next to every share.</PanelNote>
+          <PanelNote>
+            Testnet: every wallet that has followed through the hub so far is one of Copybook&apos;s own demo wallets, so these counts show the
+            mechanics, not demand. Copybook&apos;s own sources are labelled ours; small counts say little, so n is printed next to every share.
+          </PanelNote>
         </Panel>
       </Col>
 
@@ -160,7 +163,7 @@ export default async function Leaderboard({ searchParams }: Props) {
                     <tr key={r.sourceId} data-source={r.kind} data-few={r.few ? "" : undefined}>
                       <td className={t.rank}>{rank ?? "·"}</td>
                       <td className={t.name}>
-                        <Source r={r} rank={rank} names={names} owner={config.owner} />
+                        <Source r={r} rank={rank} names={names} />
                       </td>
                       <td className={t.num} data-label="Following">
                         <b>{fmtInt(r.followersNow)}</b>
@@ -201,7 +204,7 @@ export default async function Leaderboard({ searchParams }: Props) {
             <div>
               <dt>Source</dt>
               <dd>
-                A trader some wallet followed through the hub, or a thesis in the ThemeRegistry. Ours: Copybook&apos;s demo leader, and theses published from Copybook&apos;s owner wallet.
+                A trader some wallet followed through the hub, or a thesis in the ThemeRegistry. Ours: Copybook&apos;s demo leader, and theses published from a wallet Copybook runs.
               </dd>
             </div>
             <div>

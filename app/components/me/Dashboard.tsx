@@ -20,6 +20,7 @@ import { fmtInt, shortHex } from "@/lib/format";
 import { fromJsonSafe } from "@/lib/json";
 import { currentFollowEvent, followTerms, lastRefusals, openDeferral, refusalCounts, tankStats } from "@/lib/me/activity";
 import { catchUpOffer, gateIncreases, themeBook, traderBook, traderPools } from "@/lib/me/book";
+import { ourWalletLabels } from "@/lib/ours";
 import { dashboardBanners, offerOnOpen, withdrawable } from "@/lib/me/issues";
 import { readMe, readPools, type MeReads } from "@/lib/me/read";
 import type { PublicConfig } from "@/lib/publicConfig";
@@ -112,7 +113,11 @@ function Mine({ pub, markets, theses, traders, renderedAt, who }: Props & { who:
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [newest, feed.loaded]);
 
-  const names: TapeNames = useMemo(() => ({ markets, theses, traders, wallets: { [lc(who)]: "you" } }), [markets, theses, traders, who]);
+  // the wallets Copybook runs keep their labels; this wallet is "you", whoever it is
+  const names: TapeNames = useMemo(
+    () => ({ markets, theses, traders, wallets: { ...ourWalletLabels(reader.deployments), [lc(who)]: "you" } }),
+    [markets, theses, traders, who, reader.deployments],
+  );
 
   if (!me.data && !me.isError)
     return (

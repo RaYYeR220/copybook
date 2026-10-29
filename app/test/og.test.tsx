@@ -33,7 +33,8 @@ const names: CardNames = {
   markets: { [BTC]: { symbol: "BTC", decimals: 8 }, [ETH]: { symbol: "ETH", decimals: 18 } },
   theses: { "1": "BTC vs ETH" },
   demoLeader: getAddress(LEADER),
-  owner: OWNER,
+  // the owner and a demo wallet that published a thesis
+  ours: [OWNER.toLowerCase(), "0xa969dd0b79ca1d4571e45d97a8f4981805ebaed3"],
 };
 /** The demo leader's 30-day record as /api/traders served it on 29 Oct 2026. */
 const demoStats: TraderStats = {
@@ -127,6 +128,12 @@ describe("what the cards say, from chain data", () => {
       { market: "ETH-PERP", side: "short", pct: "30%", share: 3000 / 7000 },
     ]);
     expect(m).toMatchObject({ ours: true, gross: "100%", net: "40% long", opensFrom: "$30.70", followers: "1 following through Copybook" });
+  });
+
+  it("marks a thesis ours when any wallet Copybook runs published it, and no one else's", () => {
+    const base = { id: 2n, name: "BTC over ETH, small", version: 2, legs: [{ pool: getAddress(BTC), weightBps: 12_000 }], minimum: null, names, followers: null, now: NOW };
+    expect(thesisCardModel({ ...base, creator: getAddress("0xA969Dd0B79Ca1d4571E45d97A8f4981805eBaEd3") }).ours).toBe(true);
+    expect(thesisCardModel({ ...base, creator: getAddress("0x1cf35c559bd4e1d45b738b83041855c8634e5a56") }).ours).toBe(false);
   });
 });
 

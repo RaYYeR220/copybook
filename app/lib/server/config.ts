@@ -4,6 +4,7 @@ import { deploymentsFromJson, TIERS, type Deployments, type TierName } from "@co
 import hidekiJson from "../../../deployments/hideki.json";
 import riskJson from "../../../deployments/risk.json";
 import { toJsonSafe } from "../json";
+import { ours, ourWalletLabels } from "../ours";
 import type { PublicConfig, RiskParams } from "../publicConfig";
 
 /** The committee's tally on Shannon for one review, as recorded when the review ran. */
@@ -51,8 +52,8 @@ export function configFrom(hideki: unknown, risk: unknown) {
   const demoLeader = asAddress(targets.leader);
   if (!demoLeader) throw new Error('risk.json: missing "runV1.reviewTargets.leader"');
 
-  // Our contracts and every wallet that sent a recorded transaction on Hideki: the owner, the demo leader and its
-  // follower, the Hyperlane relayer. None of them is a trader to rank.
+  // Our contracts, the venue's margin bank and the Hyperlane relayer, every wallet that sent a recorded transaction on
+  // Hideki, and every wallet Copybook runs. None of them is a trader to rank.
   const own = new Map<string, Address>();
   const add = (v: unknown) => {
     const a = asAddress(v);
@@ -60,6 +61,8 @@ export function configFrom(hideki: unknown, risk: unknown) {
   };
   [deployments.hub, deployments.engine, deployments.themes, deployments.marginBank, deployments.gate, h.owner, rh.owner, rh.mailbox, demoLeader].forEach(add);
   for (const t of txs) if (t.chain === "hideki") add(t.from);
+  // and every wallet Copybook runs (hideki.json's demoWallets): its demo followers, the agent wallet, a thesis creator
+  for (const w of deployments.demoWallets) add(w.address);
 
   const tallies = new Map<string, ShannonTally>();
   for (const review of (Array.isArray(r.reviews) ? r.reviews : []) as Json[]) {
@@ -100,6 +103,10 @@ export function configFrom(hideki: unknown, risk: unknown) {
     gateDeployBlock,
     demoLeader,
     ownWallets: [...own.values()],
+    /** Copybook's own contracts and the wallets it runs (demoWallets): what the app marks "ours". */
+    isOurs: (address: string) => ours(deployments, address),
+    /** lower-case address → label for every wallet Copybook runs, for the tape. */
+    walletLabels: ourWalletLabels(deployments),
     shannonExplorer,
     reviewerUrl,
     /** The recorded tally for a verdict's Shannon request id; undefined for reviews this file did not record. */

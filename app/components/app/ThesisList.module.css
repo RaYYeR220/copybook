@@ -37,6 +37,11 @@
   white-space: nowrap;
 }
 
+.ours {
+  color: var(--gold);
+  letter-spacing: 0.08em;
+}
+
 .legs {
   margin-top: 8px;
   font: 400 12px/1.6 var(--mono);

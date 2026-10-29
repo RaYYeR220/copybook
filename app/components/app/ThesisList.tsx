@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { shortHex } from "@/lib/format";
+import { config } from "@/lib/server/config";
 import type { Thesis } from "@/lib/server/theses";
 import type { MarketMeta } from "@/lib/tape";
 import { legSide } from "@/lib/thesis";
@@ -11,7 +12,10 @@ const name = (markets: Record<string, MarketMeta>, pool: string) => {
   return m ? `${m.symbol}-PERP` : shortHex(pool);
 };
 
-/** The ThemeRegistry's theses: name, legs by side and weight, version, and the smallest allocation at live marks. */
+/**
+ * The ThemeRegistry's theses: name, legs by side and weight, version, and the smallest allocation at live marks. A
+ * thesis published from a wallet Copybook runs is marked ours.
+ */
 export function ThesisList({ theses, markets }: { theses: Thesis[]; markets: Record<string, MarketMeta> }) {
   return (
     <ul className={styles.list}>
@@ -23,6 +27,7 @@ export function ThesisList({ theses, markets }: { theses: Thesis[]; markets: Rec
             </Link>
             <span className={styles.ver}>
               #{t.id.toString()} · v{t.version}
+              {config.isOurs(t.creator) && <span className={styles.ours}> · ours</span>}
             </span>
           </div>
           <p className={styles.legs}>

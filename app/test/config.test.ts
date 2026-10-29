@@ -41,6 +41,24 @@ describe("server config from deployments/*.json", () => {
     expect(new Set(ours).size).toBe(ours.length);
   });
 
+  it("knows every wallet Copybook runs: excluded from rankings, marked ours, labelled on the tape", () => {
+    const c = configFrom(hideki, risk);
+    const own = c.ownWallets.map((a) => a.toLowerCase());
+    for (const w of hideki.demoWallets) {
+      expect(own).toContain(w.address.toLowerCase());
+      expect(c.isOurs(w.address.toLowerCase())).toBe(true);
+    }
+    expect(c.isOurs(c.deployments.hub)).toBe(true);
+    // the venue's margin bank is never ranked, but it is not ours
+    expect(own).toContain(c.deployments.marginBank.toLowerCase());
+    expect(c.isOurs(c.deployments.marginBank)).toBe(false);
+    expect(c.walletLabels["0x7d736a88978e94e60494ff91c49ba838edfb1932"]).toBe("demo follower · ours");
+    expect(c.walletLabels["0xcde791006ea6e99e9a614bc9d0995879e2cc5e72"]).toBe("demo agent · ours");
+    expect(c.walletLabels["0x5397812d66f3233e0972b7aeb5e195a945504632"]).toBe("Copybook owner");
+    // client components get the same list through the public deployments
+    expect(deploymentsOf(c.publicConfig).demoWallets).toHaveLength(hideki.demoWallets.length);
+  });
+
   it("links Shannon on the explorer named in risk.json", () => {
     expect(cfg.shannonExplorer).toBe("https://shannon-explorer.somnia.network");
     expect(cfg.reviewerUrl).toBe(risk.shannon.explorer);

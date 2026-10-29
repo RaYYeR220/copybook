@@ -4,7 +4,7 @@ import type { Hex } from "viem";
 export const BPS = 10_000n;
 /** The hub refuses a follow funded with less than this (STT, 18 decimals). */
 export const MIN_TANK = 200_000_000_000_000_000n;
-/** Below this tank balance every increase is refused (Reason.TankEmpty); exits still run. */
+/** Below this tank balance every increase is refused (Reason.TankEmpty); exits are never gated. */
 export const MIN_TANK_FOR_INCREASE = 20_000_000_000_000_000n;
 /** A trader follow may name at most this many markets to manage. */
 export const MAX_JOIN_POOLS = 32;

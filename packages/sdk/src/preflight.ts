@@ -263,7 +263,7 @@ export async function preflightFollow(c: ReadContext, input: PreflightInput): Pr
         add({
           code: "TRADER_BLOCKED",
           severity: "warning",
-          message: "The AI risk review rates this trader Block. With the guard on, this wallet gets no new size from them until the verdict expires or the guard is turned off. Exits are still copied.",
+          message: "The AI risk review rates this trader Block. With the guard on, this wallet gets no new size from them until the verdict expires or the guard is turned off. Exits are never gated.",
         });
       }
       // a market list is checked as named; allowAll is checked in the markets the caller says the trader holds now

@@ -212,7 +212,7 @@ export function createCopybook(config: CopybookConfig) {
       issues.push({
         code: "TANK_EMPTY",
         severity: "error",
-        message: "The gas tank is nearly empty, so every increase is refused (exits still run). Fund it.",
+        message: "The gas tank is nearly empty, so every increase is refused (exits are never gated). Fund it.",
         action: { method: "fundTank", args: [MIN_TANK] },
       });
     } else if (tank < MIN_TANK) {

@@ -187,8 +187,12 @@ describe("read tools", () => {
     const a = await call(deps, "get_copy_history", { follower: AGENT });
     expect(copybook.history).toHaveBeenLastCalledWith({ fromBlock: 950_000n, follower: AGENT });
     expect(a.body.events[0]).toMatchObject({ name: "Copied", toSize: "5", block: "12", txHash: "0xabc" });
-    await call(deps, "get_copy_history", { follower: AGENT, fromBlock: 500 });
+    // the default window says what it leaves out, and where everything starts
+    expect(a.body.window).toMatch(/last 50000 blocks only/);
+    expect(a.body.deployBlock).toBe("100");
+    const b = await call(deps, "get_copy_history", { follower: AGENT, fromBlock: 500 });
     expect(copybook.history).toHaveBeenLastCalledWith({ fromBlock: 500n, follower: AGENT });
+    expect(b.body.window).toBeUndefined();
   });
 });
 

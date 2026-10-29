@@ -53,7 +53,7 @@ Read (always on):
 | `list_theses {}` | Every thesis with legs and version. |
 | `get_thesis {id}` | One thesis plus the least allocation that opens every leg at today's marks (and a figure with headroom). |
 | `get_follow {follower?}` | The follow, tank, AI guard, thesis drift, and every stuck state with the exact call that clears it. |
-| `get_copy_history {follower?, fromBlock?, limit?}` | Followed / Copied / Refused / Stopped events for a wallet. |
+| `get_copy_history {follower?, fromBlock?, limit?}` | Followed / Copied / Refused / Stopped events for a wallet. Without `fromBlock` it reads the last 50000 blocks only (about two hours) and says so. |
 
 Write (registered only when `COPYBOOK_AGENT_KEY` is set; all dry-run by default):
 

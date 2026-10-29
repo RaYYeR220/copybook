@@ -49,6 +49,18 @@ describe("preflightFollow (thesis)", () => {
     expect(r.reasons.find((x) => x.code === "CAP_BELOW_ONE_ORDER")).toMatchObject({ pool: ETH, field: "maxNotional", required: 12n * E });
   });
 
+  it("in edit mode, a thesis allocation below a leg's minimum or a tight cap warns instead of blocking", async () => {
+    const c = world();
+    c.on(deployments.hub, "followOf", followed(1, 1n));
+    const r = await run(c, { policy: policy({ allocation: 50n * E, maxTotalNotional: 5n * E }), mode: "edit" });
+    expect(r.ok).toBe(true);
+    expect(r.reasons.find((x) => x.code === "ALLOCATION_BELOW_MINIMUM")).toMatchObject({ severity: "warning", pool: ETH });
+    expect(r.reasons.find((x) => x.code === "ALLOCATION_BELOW_MINIMUM")!.message).toContain("Exits toward the new targets are never gated");
+    const cap = await run(c, { policy: policy({ allocation: 200n * E, maxTotalNotional: 50n * E }), mode: "edit" });
+    expect(cap.ok).toBe(true);
+    expect(cap.reasons.find((x) => x.code === "TOTAL_CAP_BELOW_BASKET")?.severity).toBe("warning");
+  });
+
   it("catches a whole-book cap below the basket", async () => {
     const r = await run(world(), { policy: policy({ allocation: 200n * E, maxTotalNotional: 50n * E }) });
     expect(codes(r)).toContain("TOTAL_CAP_BELOW_BASKET");
@@ -156,6 +168,31 @@ describe("preflightFollow (trader)", () => {
     const all = await run(c, { ...trader, joinPools: [], checkPools: [ETH], policy: policy({ maxNotional: 500n * E, maxTotalNotional: 100n * E }) });
     expect(all.ok).toBe(true);
     expect(all.reasons.find((x) => x.code === "TOTAL_CAP_BELOW_BASKET")?.severity).toBe("warning");
+  });
+
+  it("in edit mode, a tighter whole-book cap is a warning about new increases, never a block", async () => {
+    const c = world();
+    c.on(deployments.hub, "followOf", followed(0, BigInt(TRADER)));
+    c.on(deployments.marginBank, "getPosition", (args: readonly unknown[]) => ({
+      size: args[0] === TRADER && args[1] === ETH ? 5n * 10n ** 16n : 0n,
+      avgEntryPrice: 0n,
+      entryFundingIndex: 0n,
+      lastUpdatedTimestampNs: 0n,
+    }));
+    const tight = policy({ maxNotional: 500n * E, maxTotalNotional: 10n * E });
+    const asFollow = await run(c, { ...trader, policy: tight });
+    expect(asFollow.ok).toBe(false);
+    expect(codes(asFollow)).toEqual(expect.arrayContaining(["ALREADY_FOLLOWING", "TOTAL_CAP_BELOW_ONE_ORDER", "TOTAL_CAP_BELOW_BASKET"]));
+    const asEdit = await run(c, { ...trader, policy: tight, mode: "edit" });
+    expect(asEdit.ok).toBe(true);
+    expect(asEdit.reasons.some((x) => x.code === "ALREADY_FOLLOWING")).toBe(false);
+    const basket = asEdit.reasons.find((x) => x.code === "TOTAL_CAP_BELOW_BASKET")!;
+    expect(basket.severity).toBe("warning");
+    expect(basket.message).toContain("new increases will be refused (Total cap) until your book is under the cap");
+    expect(basket.message).toContain("Existing positions are not reduced");
+    expect(asEdit.reasons.find((x) => x.code === "TOTAL_CAP_BELOW_ONE_ORDER")?.severity).toBe("warning");
+    // a policy the contract rejects is still an error
+    expect(codes(await run(c, { ...trader, policy: policy({ bandBps: 0 }), mode: "edit" }))).toContain("INVALID_POLICY");
   });
 
   it("takes the AI guard as the follow will run with it when the caller sets it", async () => {

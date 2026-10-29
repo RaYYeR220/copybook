@@ -77,6 +77,13 @@ export interface PreflightInput {
   walletChainId?: number;
   /** Wallet STT balance in wei, if the app already read it (skips one call). */
   walletBalance?: bigint;
+  /**
+   * `follow` (default) checks a new follow and its opening transaction. `edit` checks a policy change of the follow
+   * the wallet holds (`updatePolicy`): nothing opens in that transaction, so what would refuse an opening becomes a
+   * warning about new increases, and the follow-only checks (existing follow, paused follows, tank, balance, grant)
+   * are left out. A tighter cap never blocks a change that only de-risks.
+   */
+  mode?: "follow" | "edit";
 }
 
 const order: Record<PreflightReason["severity"], number> = { error: 0, warning: 1, info: 2 };
@@ -353,6 +360,11 @@ export async function preflightFollow(c: ReadContext, input: PreflightInput): Pr
     }
   }
 
+  if (input.mode === "edit") {
+    const kept = reasons.filter((r) => !FOLLOW_ONLY.has(r.code)).map(asEdit);
+    reasons.length = 0;
+    reasons.push(...kept);
+  }
   reasons.sort((a, b) => order[a.severity] - order[b.severity]);
   return {
     ok: !reasons.some((r) => r.severity === "error"),
@@ -366,6 +378,35 @@ export async function preflightFollow(c: ReadContext, input: PreflightInput): Pr
 }
 
 const abs = (x: bigint) => (x < 0n ? -x : x);
+
+/** Checks that only a new follow can fail: an edit of the follow the wallet holds skips them. */
+const FOLLOW_ONLY = new Set<PreflightCode>([
+  "ALREADY_FOLLOWING",
+  "FOLLOWS_PAUSED",
+  "TANK_TOO_LOW",
+  "INSUFFICIENT_BALANCE",
+  "OPERATOR_NOT_APPROVED",
+  "ALLOW_ALL_MIRRORS_OPEN_BOOK",
+  "JOIN_POOLS_NOT_ALLOWED",
+  "TOO_MANY_POOLS",
+]);
+
+/** What an opening would refuse, said for a policy edit: a warning about new increases; nothing already held shrinks. */
+const EDIT_MESSAGES: Partial<Record<PreflightCode, string>> = {
+  TOTAL_CAP_BELOW_BASKET:
+    "The whole-book cap is below the book at the source's current size: new increases will be refused (Total cap) until your book is under the cap. Existing positions are not reduced.",
+  TOTAL_CAP_BELOW_ONE_ORDER:
+    "The whole-book cap is below one order in this market: new increases here will be refused (Total cap). Existing positions are not reduced.",
+  CAP_BELOW_ONE_ORDER: "The per-position cap is below one order in this market: new increases here will be refused. Exits are never gated.",
+  ALLOCATION_BELOW_MINIMUM:
+    "At this allocation this leg sizes below the market's minimum order: the next sync cannot open or grow it (Below minimum). Exits toward the new targets are never gated.",
+  UNKNOWN_MARKET: "This market could not be read just now, so the new policy could not be checked against it.",
+};
+
+function asEdit(r: PreflightReason): PreflightReason {
+  const message = EDIT_MESSAGES[r.code];
+  return message && r.severity !== "info" ? { ...r, severity: "warning", message } : r;
+}
 
 /** An 18-decimal USD amount in dollars and cents, rounded up: a minimum is never understated. */
 function usdUp(x: bigint): string {

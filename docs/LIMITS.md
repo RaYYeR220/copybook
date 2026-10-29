@@ -26,7 +26,7 @@ out of every ranking. The traders the AI guard reviewed are real dreamDEX accoun
 | demo thesis creator | `0xA969Dd0B79Ca1d4571E45d97A8f4981805eBaEd3` |
 | demo agent (MCP) | `0xCDE791006eA6E99e9A614Bc9d0995879E2Cc5E72` |
 
-The demo leader trades only when we trade it, so a copy of it lands only then.
+The demo leader moves only when we trade it, so its followers get a copy only then.
 
 ## What is mocked
 
@@ -52,8 +52,8 @@ exit ([row](PROOF.md#guard-exit)).
 
 ## Copying
 
-- **Same block is the rule, not a guarantee.** A copy lands in the source's block when Reactivity delivers the event
-  and the handler's gas covers the follower. A follower it cannot cover is deferred and synced by `catchUp`, which is
+- **Same block is the rule, not a guarantee.** A copy is placed in the source's block when Reactivity delivers the
+  event and the handler's gas covers the follower. A follower it cannot cover is deferred and synced by `catchUp`, which is
   not a same-block copy and is never labelled one. All 23 recorded pairs are same-block
   ([PROOF](PROOF.md#same-block-copies)). The hub's whole event log through Hideki block 36,282,657 (read from
   `/api/history` on 2026-10-29) holds no `Deferred` or `GroupDeferred`, so the deferral path is shown by tests only
@@ -101,8 +101,8 @@ of the wallet and stays after unfollow until revoked ([revoke](PROOF.md#app-revo
   committee's work can be checked on Shannon; the gate on Hideki trusts the lane.
 - **The gate's owner chooses the reviewer,** and with it whose messages count as verdicts.
 - **A verdict is a risk tier, not advice.** An LLM committee applies a published rubric to data from Copybook's own
-  endpoint. The data committee attests that its members fetched the same bytes, not that the bytes are true; the line
-  is built from the dreamDEX indexer with a 2,000-row cap (`partial=1` beyond it).
+  endpoint. The data committee attests that its members fetched the same bytes, not that the bytes are true; the
+  risk line is built from the dreamDEX indexer with a 2,000-row cap (`partial=1` beyond it).
 - **The scorecard is small.** Run v3 is not an out-of-sample estimate, run-to-run stability was not tested, and the
   thin-data rule was applied to 1 of 3 thin traders ([scorecard limitations](../eval/SCORECARD.md#limitations)).
 - **Verdicts change.** A trader's tier is whatever the last review returned, held by the gate's 24-hour BLOCK hold and
@@ -114,7 +114,7 @@ of the wallet and stays after unfollow until revoked ([revoke](PROOF.md#app-revo
   was.
 - **The guard covers trader follows only,** and refuses increases only. Exits are never gated.
 
-## Trust in the operators
+## Trust in the contracts' owners
 
 The hub's owner (ours) can point the hub at another gate (a gate can only refuse increases), tune the handler's gas
 budget and billing overhead within the contract's bounds, change subscription fees for groups opened later, and pause

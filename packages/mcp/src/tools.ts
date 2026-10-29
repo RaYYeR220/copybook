@@ -544,6 +544,7 @@ export function buildTools(deps: Deps): ToolDef[] {
       async ({ amountStt, dryRun }) => {
         const account = needAgent(deps);
         const [tank, follow] = await Promise.all([copybook.tankOf(account), copybook.followOf(account)]);
+        // CopybookHub.MIN_TANK (0.2 STT): withdrawTank reverts TankFloor below it while the wallet follows
         const floor = follow ? MIN_TANK : 0n;
         const free = tank > floor ? tank - floor : 0n;
         if (free === 0n) {

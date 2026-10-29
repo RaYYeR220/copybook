@@ -1,6 +1,6 @@
 # Proof ledger
 
-Every transaction Copybook's documents cite, read back from the chain. `npm run proof` (in `e2e/`) wrote this file at **Hideki block 36,614,301** and **Shannon block 527,403,475**, 2026-10-29 22:57 UTC.
+Every transaction Copybook's documents cite, read back from the chain. `npm run proof` (in `e2e/`) wrote this file at **Hideki block 36,635,027** and **Shannon block 527,424,192**, 2026-10-29 23:31 UTC.
 
 **461 transactions checked: 461 verified, 0 failed, 0 unverified.** 23 of 23 same-block pairs check out. 8 of 8 contracts check out.
 
@@ -189,9 +189,9 @@ Each input is the commit that holds the answer key followed by the key file's ke
 
 | Step | Tx | Block · position | From | What the chain says | Check |
 |---|---|---|---|---|---|
-| <a id="anchor-v2"></a>run v2: the answer key's commit (6b1b074) and the key file's keccak256, written on chain | [0x1f70dc46…cd31](https://explorer.testnet.somnia.network/tokyo/tx/0x1f70dc46bfee488d482591cffb54200795ed332b903678dfa77c85359a4dcd31) | 35,426,023 · #1 | owner 0x5397…4632 | data `0x6b1b0743…4767` as recorded, sent to itself · before all 20 review requests of the run (reviews 4–23, the first at block 35,426,610) | ✓ |
-| <a id="anchor-v3"></a>run v3: the answer key's commit (5aed53b) and the key file's keccak256, written on chain | [0xb6792325…0e13](https://explorer.testnet.somnia.network/tokyo/tx/0xb67923259aa552c033eba19271020d41f206c04a44d461ef9237c3752dd40e13) | 35,446,065 · #5 | owner 0x5397…4632 | data `0x5aed53bf…902f` as recorded, sent to itself · before all 20 review requests of the run (reviews 24–43, the first at block 35,446,272) | ✓ |
-| <a id="anchor-v4"></a>run v4: the answer key's commit (a7c42c2) and the key file's keccak256, written on chain | [0xadd80abe…6b09](https://explorer.testnet.somnia.network/tokyo/tx/0xadd80abe7fdd825fe6f4086d62b09c44f50d2aeb2519b0479462e0a14be06b09) | 36,605,996 · #1 | owner 0x5397…4632 | data `0xa7c42c24…2287` as recorded, sent to itself · before all 20 review requests of the run (reviews 48–67, the first at block 36,606,275) | ✓ |
+| <a id="anchor-v2"></a>run v2: the answer key's commit (6b1b074) and the key file's keccak256, written on chain | [0x1f70dc46…cd31](https://explorer.testnet.somnia.network/tokyo/tx/0x1f70dc46bfee488d482591cffb54200795ed332b903678dfa77c85359a4dcd31) | 35,426,023 · #1 | owner 0x5397…4632 | data `0x6b1b0743…4767` as recorded, sent to itself · before all 20 review requests of the run (reviews 4–23, the first at block 35,426,610); the key file as committed in 6b1b074 hashes to the anchored keccak256 | ✓ |
+| <a id="anchor-v3"></a>run v3: the answer key's commit (5aed53b) and the key file's keccak256, written on chain | [0xb6792325…0e13](https://explorer.testnet.somnia.network/tokyo/tx/0xb67923259aa552c033eba19271020d41f206c04a44d461ef9237c3752dd40e13) | 35,446,065 · #5 | owner 0x5397…4632 | data `0x5aed53bf…902f` as recorded, sent to itself · before all 20 review requests of the run (reviews 24–43, the first at block 35,446,272); the key file as committed in 5aed53b hashes to the anchored keccak256 | ✓ |
+| <a id="anchor-v4"></a>run v4: the answer key's commit (a7c42c2) and the key file's keccak256, written on chain | [0xadd80abe…6b09](https://explorer.testnet.somnia.network/tokyo/tx/0xadd80abe7fdd825fe6f4086d62b09c44f50d2aeb2519b0479462e0a14be06b09) | 36,605,996 · #1 | owner 0x5397…4632 | data `0xa7c42c24…2287` as recorded, sent to itself · before all 20 review requests of the run (reviews 48–67, the first at block 36,606,275); the key file as committed in a7c42c2 hashes to the anchored keccak256 | ✓ |
 
 ### Every review (67)
 

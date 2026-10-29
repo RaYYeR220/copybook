@@ -73,7 +73,9 @@ describe("GET /api/history", () => {
   it("serves the whole log, bigints encoded, cached for 30 s", async () => {
     const { res, body, decoded } = await call();
     expect(res.status).toBe(200);
-    expect(res.headers.get("cache-control")).toBe("public, s-maxage=30, stale-while-revalidate=60");
+    // the edge keeps it 30 s; browsers always revalidate
+    expect(res.headers.get("cdn-cache-control")).toBe("public, s-maxage=30, stale-while-revalidate=60");
+    expect(res.headers.get("cache-control")).toBe("no-cache");
     expect(decoded.events.length).toBe(EVENTS.length);
     expect(decoded.toBlock).toBe(200n);
     expect(body.complete).toBe(true);
@@ -90,6 +92,20 @@ describe("GET /api/history", () => {
     expect("topics" in lean).toBe(false);
     expect(lean.transactionHash).toBe(`0x${(1).toString(16).padStart(64, "0")}`);
     expect((await call("?raw=1")).decoded.events[0].log.topics).toEqual([]);
+  });
+
+  it("summarises the whole log, not the returned window: followed sources, followed traders, a source's followers", async () => {
+    const { body } = await call(`?source=${TRADER}&limit=1`);
+    const summary = fromJsonSafe<{ sources: { sourceId: string; kind: string; ref: bigint }[]; followedTraders: string[]; followers: { current: string[]; ever: string[] } }>(body.summary);
+    expect(summary.sources.map((s) => s.kind)).toEqual(["Trader", "Theme"]);
+    expect(summary.followedTraders).toEqual([TRADER]);
+    expect(summary.followers).toEqual({ current: [FOLLOWER], ever: [FOLLOWER] });
+    expect((body.events as unknown[]).length).toBe(1);
+  });
+
+  it("no summary on a backfill from a block (it would only cover that range)", async () => {
+    const { body } = await call("?fromBlock=130");
+    expect(body.summary).toBeUndefined();
   });
 
   it("filters by follower", async () => {
@@ -125,7 +141,8 @@ describe("GET /api/history", () => {
     expect(body.complete).toBe(false);
     expect(fromJsonSafe(body.missing)).toEqual([{ contract: "hub", from: 111n, to: 160n }]);
     expect(decoded.events.length).toBe(2);
-    expect(res.headers.get("cache-control")).toBe("public, s-maxage=5");
+    expect(res.headers.get("cdn-cache-control")).toBe("public, s-maxage=5");
+    expect(res.headers.get("cache-control")).toBe("no-cache");
   });
 
   it.each([

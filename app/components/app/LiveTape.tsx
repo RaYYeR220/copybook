@@ -6,6 +6,7 @@ import { Badge } from "@/components/Badge";
 import { Feed, FeedAside, FeedFigure, FeedReason, FeedRow } from "@/components/FeedRow";
 import { SameBlockMark } from "@/components/SameBlockBadge";
 import { fmtInt } from "@/lib/format";
+import { followedSources, followedTraders } from "@/lib/followers";
 import { followedOnly, sourceNames, tapeRow, type MarketMeta, type Segment, type TapeRow } from "@/lib/tape";
 import { useHubFeed, type FeedStatus } from "./HubFeed";
 import { Meta, PanelNote, Wide } from "./Panel";
@@ -93,20 +94,22 @@ export function TapeRows({
   const feed = useHubFeed();
   const [all, setAll] = useState(false);
   const rows = useMemo(() => {
-    const chain = [...feed.events].reverse();
+    // names and the followed set come from the whole log (the route's summary), plus follows seen since
+    const seen = followedSources([...feed.events].reverse());
+    const sources = [...(feed.summary?.sources ?? []), ...seen];
     const ctx = {
       markets: names.markets,
       traders: names.traders,
       wallets: names.wallets,
       sources: sourceNames(
-        chain,
+        sources,
         names.theses.map((t) => ({ id: BigInt(t.id), name: t.name })),
         names.traders,
       ),
     };
-    const keep = followed ? followedOnly(chain) : () => true;
+    const keep = followed ? followedOnly(followedTraders(sources)) : () => true;
     return feed.events.filter(keep).map((e) => tapeRow(e, ctx)).filter((r): r is TapeRow => r !== null);
-  }, [feed.events, names, followed]);
+  }, [feed.events, feed.summary, names, followed]);
 
   if (!feed.loaded)
     return <DataState kind="loading" title="Reading Copybook's history from the chain…">The hub's and the risk gate's logs since deployment, read in 10,000-block segments.</DataState>;

@@ -4,6 +4,7 @@ import { txUrl } from "./explorer";
 import { fmtInt, shortHex } from "./format";
 import { REASON_LABEL } from "./reasons";
 import type { LoggedEvent } from "./events";
+import type { FollowedSource } from "./followers";
 import { fmtPrice18, fmtUnits } from "./units";
 
 export interface MarketMeta {
@@ -261,10 +262,9 @@ const TRADER_EVENTS = new Set(["ReviewRequested", "VerdictReceived", "ReviewFail
  * The tape of followed sources: every hub event, follower-level guard changes, and reviews only of traders someone
  * follows (or followed). Reviews of traders nobody copies are the trader pages' business, not the tape's.
  */
-export function followedOnly(events: readonly CopybookEvent[]): (e: CopybookEvent) => boolean {
-  const traders = new Set<string>();
-  for (const e of events) if (e.name === "Followed" && e.kind === "Trader") traders.add(`0x${e.ref.toString(16).padStart(40, "0")}`);
-  return (e) => !TRADER_EVENTS.has(e.name) || ("trader" in e && traders.has(lc(e.trader)));
+export function followedOnly(traders: Iterable<string>): (e: CopybookEvent) => boolean {
+  const set = new Set([...traders].map(lc));
+  return (e) => !TRADER_EVENTS.has(e.name) || ("trader" in e && set.has(lc(e.trader)));
 }
 
 /** Newest first, one entry per `txHash:logIndex`; a copy that learned how it was sent replaces its bare twin. */
@@ -276,7 +276,7 @@ export function mergeFeed(prev: readonly LoggedEvent[], incoming: readonly Logge
     const had = byKey.get(k);
     if (!had || (had.via === undefined && e.via !== undefined)) byKey.set(k, e);
   }
-  const out = [...byKey.values()].filter((e) => e.log.blockNumber !== undefined);
+  const out = [...byKey.values()].filter((e) => e.log.blockNumber != null);
   out.sort(
     (a, b) =>
       Number(b.log.blockNumber! - a.log.blockNumber!) ||
@@ -288,24 +288,23 @@ export function mergeFeed(prev: readonly LoggedEvent[], incoming: readonly Logge
 
 /**
  * Names for sources the tape mentions: traders by address (the demo leader labelled as ours), theses by name.
- * Built from the Followed events themselves, so every followed source gets a name.
+ * Built from every source ever followed (the history route's summary, plus follows seen live).
  */
 export function sourceNames(
-  events: readonly CopybookEvent[],
+  sources: readonly FollowedSource[],
   theses: readonly { id: bigint; name: string }[],
   traderLabels: Record<string, string>,
 ): TapeContext["sources"] {
   const out: TapeContext["sources"] = {};
   const thesis = new Map(theses.map((t) => [t.id.toString(), t.name]));
-  for (const e of events) {
-    if (e.name !== "Followed") continue;
-    const sid = lc(e.sourceId);
+  for (const s of sources) {
+    const sid = lc(s.sourceId);
     if (out[sid]) continue;
-    if (e.kind === "Theme") {
-      const name = thesis.get(e.ref.toString());
-      out[sid] = { label: name ? `thesis “${name}”` : `thesis #${e.ref}`, href: `/thesis/${e.ref}` };
+    if (s.kind === "Theme") {
+      const name = thesis.get(s.ref.toString());
+      out[sid] = { label: name ? `thesis “${name}”` : `thesis #${s.ref}`, href: `/thesis/${s.ref}` };
     } else {
-      const a = getAddress(`0x${e.ref.toString(16).padStart(40, "0")}`);
+      const a = getAddress(`0x${s.ref.toString(16).padStart(40, "0")}`);
       const label = traderLabels[lc(a)];
       out[sid] = { label: label ? `${label} ${shortHex(a)}` : shortHex(a), href: `/t/${a}` };
     }

@@ -3,10 +3,11 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPublicClient, http, type Address, type PublicClient } from "viem";
 import { createCopybook, type CopybookEvent, type WatchHandle, type WatchStatus } from "@copybook/sdk";
+import { viaOf, type LoggedEvent, type MissingRange } from "@/lib/events";
+import type { HistorySummary } from "@/lib/followers";
 import { aboutFollower, aboutSource, parseSource } from "@/lib/historyFilter";
 import { fromJsonSafe } from "@/lib/json";
 import { deploymentsOf, type PublicConfig } from "@/lib/publicConfig";
-import { viaOf, type LoggedEvent, type MissingRange } from "@/lib/events";
 import { mergeFeed } from "@/lib/tape";
 import { hideki } from "@/lib/wallet/hideki";
 
@@ -21,6 +22,9 @@ export interface HubFeed {
   /** False while the history route is still reading older ranges. */
   complete: boolean;
   missing: MissingRange[];
+  /** What the history route computed over the whole log (followed sources, a source's followers), and up to which block. */
+  summary?: HistorySummary;
+  summaryAt?: bigint;
   /** Set when the history route did not answer. */
   error?: string;
   /** True once the first history answer (or failure) is in. */
@@ -40,12 +44,18 @@ interface HistoryBody {
   toBlock: bigint;
   complete: boolean;
   missing: MissingRange[];
+  summary?: HistorySummary;
 }
 
+/** The node answers getLogs over at most this many blocks. */
+const LOG_CHUNK = 1_000n;
+
 /**
- * The hub's and the gate's events for one page: the history route on mount, then the live watcher (somnia_watch
- * ticks, then getLogs). After a reconnect, and when the tab comes back, the history route is read again from the
- * last block seen; everything merges on txHash:logIndex, so nothing repeats. The socket closes while the tab is hidden.
+ * The hub's and the gate's events for one page: the history route on mount, then the live watcher started at the
+ * block that read ended on, so nothing between the two is missed (somnia_watch ticks, then getLogs). After a
+ * reconnect, and when the tab comes back, the history route is read again from the last block seen and the watcher
+ * resumes from there; everything merges on txHash:logIndex, so nothing repeats. The socket closes while the tab is
+ * hidden.
  */
 export function HubFeedProvider({
   pub,
@@ -64,7 +74,11 @@ export function HubFeedProvider({
   children: ReactNode;
 }) {
   const [state, setState] = useState<HubFeed>({ events: [], status: "loading", complete: true, missing: [], loaded: false });
-  const deployments = useMemo(() => deploymentsOf(pub), [pub]);
+  // keyed on the contracts, not on the props object: a router refresh hands down an equal config, not a new feed
+  const hub = (pub.deployments as { hub?: string }).hub ?? "";
+  const pubRef = useRef(pub);
+  pubRef.current = pub;
+  const deployments = useMemo(() => deploymentsOf(pubRef.current), [hub]);
   const ref = useMemo(() => (source ? parseSource(source) : undefined), [source]);
   const readTo = useRef<bigint | undefined>(undefined);
 
@@ -93,7 +107,8 @@ export function HubFeedProvider({
       if (fromBlock !== undefined) qs.set("fromBlock", fromBlock.toString());
       qs.set("limit", String(cap));
       try {
-        const res = await fetch(`/api/history?${qs}`);
+        // never a browser-cached answer: the edge may hold one for a few seconds, and the watcher covers that gap
+        const res = await fetch(`/api/history?${qs}`, { cache: "no-store" });
         if (!res.ok) {
           const msg = ((await res.json().catch(() => ({}))) as { error?: string }).error ?? `HTTP ${res.status}`;
           throw new Error(msg);
@@ -103,8 +118,8 @@ export function HubFeedProvider({
         merge(body.events, {
           loaded: true,
           error: undefined,
-          // a backfill from a later block says nothing about older ranges: keep what the first read said
-          ...(fromBlock === undefined ? { complete: body.complete, missing: body.missing } : {}),
+          // a backfill from a later block says nothing about older ranges or the whole log: keep what the first read said
+          ...(fromBlock === undefined ? { complete: body.complete, missing: body.missing, summary: body.summary, summaryAt: body.toBlock } : {}),
         });
       } catch (err) {
         if (!stopped) setState((s) => ({ ...s, loaded: true, error: err instanceof Error ? err.message : String(err) }));
@@ -131,6 +146,9 @@ export function HubFeedProvider({
           wsUrl,
           follower,
           contracts: ["hub", "gate"],
+          // resume where the history (or the last watcher) stopped: the first read covers [readTo, head]
+          fromBlock: readTo.current,
+          chunkSize: LOG_CHUNK,
           onEvent: (e) => void onLive(e),
           onStatus: (s: WatchStatus) => {
             if (stopped) return;

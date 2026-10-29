@@ -39,3 +39,35 @@ describe("followers from hub events", () => {
     expect(followerWallets([f(A, T, 1), f(B, TH, 2), f(A, TH, 3)])).toEqual([A, B]);
   });
 });
+
+describe("server follower sets and live deltas", () => {
+  const log = [f(A, T, 35025568), f(B, TH, 35026093), u(A, T, 35026952), f(A, T, 35027038)];
+
+  it("lists followed sources once and the traders among them", async () => {
+    const { followedSources, followedTraders } = await import("@/lib/followers");
+    const s = followedSources(log);
+    expect(s.map((x) => x.sourceId)).toEqual([T, TH]);
+    expect(followedTraders([{ sourceId: T, kind: "Trader", ref: BigInt("0xA1d0CB85c869e534Fe1e0c22af3b238301157b5d") }])).toEqual([
+      "0xA1d0CB85c869e534Fe1e0c22af3b238301157b5d",
+    ]);
+  });
+
+  it("current and ever as wallets", async () => {
+    const { followerSets } = await import("@/lib/followers");
+    expect(followerSets(log, T)).toEqual({ current: [A], ever: [A] });
+    expect(followerSets(log, TH)).toEqual({ current: [B], ever: [B] });
+  });
+
+  it("applies follows and unfollows that came after the server's read, and ignores older ones", async () => {
+    const { applyFollowDeltas } = await import("@/lib/followers");
+    const base = { current: [A], ever: [A] };
+    const after = 35027038n;
+    // replayed history at or before the read changes nothing
+    expect(applyFollowDeltas(base, log, T, after)).toEqual(base);
+    // B joins live, then A leaves
+    const live = [f(B, T, 35800001), u(A, T, 35800002)];
+    expect(applyFollowDeltas(base, [...log, ...live], T, after)).toEqual({ current: [B], ever: [A, B] });
+    // a follower that moves to another source stops counting here
+    expect(applyFollowDeltas({ current: [A, B], ever: [A, B] }, [f(B, TH, 35800003)], T, after).current).toEqual([A]);
+  });
+});

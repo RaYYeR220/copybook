@@ -28,8 +28,8 @@ const ctx: TapeContext = {
   markets: { [BTC.toLowerCase()]: { symbol: "BTC", decimals: 8 } },
   sources: sourceNames(
     [
-      { name: "Followed", follower: FOLLOWER, sourceId: SRC, kind: "Trader", ref: BigInt(LEADER), log: meta(35025568, H1) },
-      { name: "Followed", follower: FOLLOWER, sourceId: TH, kind: "Theme", ref: 1n, log: meta(35026093, H2) },
+      { sourceId: SRC, kind: "Trader", ref: BigInt(LEADER) },
+      { sourceId: TH, kind: "Theme", ref: 1n },
     ],
     [{ id: 1n, name: "BTC vs ETH" }],
     { [LEADER.toLowerCase()]: "demo leader" },
@@ -133,7 +133,9 @@ describe("tape of followed sources", () => {
   ] as LoggedEvent[];
 
   it("keeps hub events, guard changes and reviews of followed traders; drops reviews of anyone else", () => {
-    expect(log.filter(followedOnly(log)).map((e) => e.name)).toEqual(["Followed", "VerdictReceived", "GuardSet", "Copied"]);
+    expect(log.filter(followedOnly([LEADER])).map((e) => e.name)).toEqual(["Followed", "VerdictReceived", "GuardSet", "Copied"]);
+    // with nobody followed, no review shows
+    expect(log.filter(followedOnly([])).map((e) => e.name)).toEqual(["Followed", "GuardSet", "Copied"]);
   });
 
   it("names known wallets such as the owner", () => {

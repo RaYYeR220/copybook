@@ -107,7 +107,20 @@
   padding: 18px 20px 20px;
 }
 
+.share {
+  padding: 0 20px 20px;
+}
+
+/* under the actions, the pills sit closer than a new section would */
+.acts + .share {
+  margin-top: -6px;
+}
+
 @media (max-width: 720px) {
+  .share {
+    padding: 0 16px 16px;
+  }
+
   .top,
   .line,
   .lead {

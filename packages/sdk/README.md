@@ -23,11 +23,12 @@ await copybook.watch({ follower: account, onEvent });    // somnia_watch ticks +
 const past = await copybook.history({ fromBlock, follower: account });
 ```
 
-Reads: `followOf`, `tankOf`, `syncedPools`, `pendingOf`, `themeSyncOf`, `gasParams`, `verdictOf`, `guardOf`, `reviewPendingOf`, `reviewFee`, `theme`, `themes`, `market`, `positionSize`, `isOperatorApproved`, `sourceIdOf`, `status`, `themeMinimum`.
-Writes (each returns `{ hash, wait() }`): `approveOperator`, `follow`, `unfollow`, `updatePolicy`, `fundTank`, `withdrawTank`, `catchUp`, `poke`, `resume`, `resync`, `setGuard`, `requestReview`, `createTheme`, `rebalance`.
+Reads: `followOf`, `tankOf`, `syncedPools`, `pendingOf`, `themeSyncOf`, `gasParams`, `verdictOf`, `guardOf`, `reviewPendingOf`, `reviewFee`, `theme`, `themes`, `market`, `positionSize`, `isOperatorApproved`, `sourceIdOf`, `status`, `themeMinimum`, `marginToken`, `spotUsdsoBalance`, `marginAllowance`, `marginFunding`.
+Writes (each returns `{ hash, wait() }`): `approveOperator`, `follow`, `unfollow`, `updatePolicy`, `fundTank`, `withdrawTank`, `catchUp`, `poke`, `resume`, `resync`, `setGuard`, `requestReview`, `createTheme`, `rebalance`, `approveMargin`, `depositMargin`.
 
 Notes:
 
+- `approveMargin(amount)` then `depositMargin(amount)` move spot USDso into the wallet's dreamDEX perps account, the way dreamDEX's own SDK does it: an ERC-20 approval of the margin bank (for exactly that amount), then `deposit` on the bank. USDso is the token the bank names in `getSystemConfig`. `depositMargin` reads the spot balance and the allowance first and refuses with `INSUFFICIENT_FUNDS` or `NEEDS_APPROVAL` before anything is signed.
 - Writes check the wallet's chain first and estimate gas on the node before asking for a signature, so a call that would revert fails with the contract's reason (`CopybookError.revert`). Somnia's estimate runs low for handler-heavy calls, so the SDK sends 1.5x.
 - The `walletClient` can be a browser wallet (it signs in the wallet) or a viem client with a local key, as a script or an agent holds one (the SDK signs and sends the raw transaction).
 - `Copied.limitPrice` is the limit price of the order that moved the position, not the fill price.

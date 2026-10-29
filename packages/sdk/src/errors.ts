@@ -51,7 +51,11 @@ export type CopybookErrorCode =
   | "NO_ACCOUNT"
   | "REVERTED"
   | "TX_FAILED"
-  | "INVALID_INPUT";
+  | "INVALID_INPUT"
+  /** A margin deposit for more USDso than the wallet holds on spot. */
+  | "INSUFFICIENT_FUNDS"
+  /** A margin deposit the bank may not pull yet: `approveMargin` first. */
+  | "NEEDS_APPROVAL";
 
 /** The one error type the SDK throws for failures it understands. */
 export class CopybookError extends Error {

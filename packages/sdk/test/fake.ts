@@ -34,9 +34,19 @@ export const hidekiJson = {
 export const riskJson = { hideki: { hub: hidekiJson.hub, gate: "0xEe54c49E9e70a0e5C2218Eec1b1BDBd4e1Cb20f1" } };
 export const deployments: Deployments = deploymentsFromJson(hidekiJson, riskJson);
 
+/** USDso on Hideki2, the margin bank's collateral (the fake bank names it in getSystemConfig). */
+export const USDSO: Address = "0xed7993A74dAe1e6656B704A424DcD8711aAf4F72";
+
 const bankAbi = parseAbi([
   "function getPosition(address account, address pool) view returns ((int128 size, uint128 avgEntryPrice, int256 entryFundingIndex, uint64 lastUpdatedTimestampNs))",
   "function getAccountHealth(address account) view returns (int256 equity, uint256 imReq, uint256 mmReq, uint256 cmReq)",
+  "function getSystemConfig() view returns ((address marginBank, address collateralToken, address perpPoolFactory, address liquidationEngine, address insuranceFund, address feeRecipient, uint16 maxLeverageLimit, bool fullyWired))",
+  "function deposit(uint256 amount)",
+]);
+const erc20Abi = parseAbi([
+  "function balanceOf(address account) view returns (uint256)",
+  "function allowance(address owner, address spender) view returns (uint256)",
+  "function approve(address spender, uint256 amount) returns (bool)",
 ]);
 const registryAbi = parseAbi(["function isGloballyApproved(address owner, address operator, bytes4 selector) view returns (bool)"]);
 
@@ -47,6 +57,7 @@ const abisByAddress = (): Map<string, Abi> =>
     [deployments.gate.toLowerCase(), gateAbi as Abi],
     [deployments.marginBank.toLowerCase(), bankAbi],
     [deployments.operatorRegistry.toLowerCase(), registryAbi],
+    [USDSO.toLowerCase(), erc20Abi],
   ]);
 
 type Handler = (args: readonly unknown[]) => unknown;

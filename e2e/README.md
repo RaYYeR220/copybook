@@ -214,3 +214,12 @@ review's deposits answers every review with no verdict (`Unfunded`), which chang
 (commit it before any review), `npm run risk review <trader>` runs each review, and `npm run eval score` scores them.
 A later run re-registers the same sample: `npm run eval key v3` writes `eval/v3/answer-key.json`, commit it,
 `npm run eval anchor v3 <commit>` writes the commit and key hash on Hideki, then the reviews, then `npm run eval score v3`.
+
+## Proof ledger
+
+`npm run proof` re-reads every transaction the docs cite from Hideki and Shannon and writes
+[`docs/PROOF.md`](../docs/PROOF.md); it also checks that every link and test [`docs/CLAIMS.md`](../docs/CLAIMS.md) cites
+exists. It only reads (public RPCs, no key, no `contracts/out`), so it runs right after `npm ci` here. The recorded runs'
+transactions are in `proof/sources.json`; it also checks everything in `deployments/*.json` and `eval/*/anchor.json`
+and every explorer link in the docs. Exit code 0 when all verify, 1 when any fails, 2 when the RPC kept failing.
+`npm test` runs the ledger's own tests (`COPYBOOK_LIVE=1` adds one against the live RPC). PROOF.md is written only when everything verifies; `npm run proof -- --write-anyway` writes it with the failures marked.

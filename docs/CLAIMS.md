@@ -1,0 +1,138 @@
+# Claims and their evidence
+
+Every capability that Copybook's [README](../README.md), landing page (`app/components/landing/`, the hero and the
+footer), [MCP README](../packages/mcp/README.md) and [AI-guard scorecard](../eval/SCORECARD.md) state, and where it is
+shown. Evidence is of three kinds:
+
+- **chain**: a row of the proof ledger, [PROOF.md](PROOF.md), where every cited transaction is read back from the chain
+  and checked against what was recorded for it (`npm run proof` in `e2e/`);
+- **test**: `file::test name`, a contract, invariant or unit test;
+- **code**: the code path itself, where no test or transaction shows it.
+
+All test suites passed in a run on 2026-10-29: `forge test` 257 tests; `npm test -w @copybook/app` 317;
+`-w @copybook/sdk` 88 (plus 4 live ones, skipped without `COPYBOOK_LIVE=1`); `-w @copybook/mcp` 56;
+`-w @copybook/stats` 35; `npm run eval:test` (in `e2e/`) 8; `npm test` (in `e2e/`, the ledger) 21 (plus 1 live one with `COPYBOOK_LIVE=1`, also passing).
+
+## Same-block copying
+
+| Claim | Stated in | Evidence |
+|---|---|---|
+| When the source moves, Somnia's validators run the hub's reactive handler inside the same block, and the hub places the copy in the follower's own dreamDEX account. | README; landing hero ("in the same block"), How ("Copied in the same block"), Closing ("One block · every leg") | chain: [23 of 23 same-block pairs](PROOF.md#same-block-copies), each with the copy in the move's block, after the move, sent by the hub, e.g. [the app run's pair](PROOF.md#app-live) (block 35,977,607, positions 4 and 7). test: `contracts/test/HubFollow.t.sol::test_reactive_fireThroughRelayCopies`, `contracts/test/HubReactive.t.sol::test_event_copiesToAllFollowersInGroup` |
+| The landing's proof line: leader tx and your copy, both in block 35,025,602. | landing hero, Proof | chain: [landing rows](PROOF.md#the-landing-pages-proof) (the block and positions the page states) and [pair 1](PROOF.md#e2e-01) |
+| Every leg in the same block: a thesis rebalance is copied in the rebalance's own block. | README ("every leg, in the same block"); landing Theses | chain: [thesis 1 rebalance](PROOF.md#thesis1-rebalance) (one handler transaction resizes both legs in the rebalance's block). test: `contracts/test/HubTheme.t.sol::test_rebalance_event_resizesAndDropsRemovedLeg` |
+| Copybook is a bot on your own account, not a server watching someone else's. | landing How | chain: [operator approval](PROOF.md#app-approve) granted to the hub; every `Copied` names the follower whose account moved. test: `contracts/test/Mocks.t.sol::test_operatorMustBeApproved`, `contracts/test/HubFollow.t.sol::test_strangerCannotTouchNonAllowlistedPool` |
+| It can open and close perps for you; it can't withdraw. | landing How; MCP README (safety model: "cannot withdraw or move funds, and it cannot cancel orders") | chain: [app approval](PROOF.md#app-approve), [agent approval](PROOF.md#mcp-approve), [single-market approval](PROOF.md#e2e-approve-btc): each grants one selector, `placeOrderFor` (`0x80054449`). test: `packages/sdk/test/client.test.ts::approveOperator grants the hub the global placeOrderFor selector on the venue registry`. What a `placeOrderFor` grant allows is dreamDEX's operator model. |
+| A wallet follows one source. | README; landing How; MCP README | test: `contracts/test/HubFollow.t.sol::test_secondFollow_reverts`, `packages/sdk/test/preflight.test.ts::catches a wallet that already follows` |
+| Your copy is sized to your scale, not theirs. | landing How | test: `contracts/test/PolicyLib.t.sol::test_traderTarget`, `::test_clampNotional` |
+| A follow mirrors the source's whole book, positions already open included. | README; MCP README | chain: in the app run the follow named no markets and copied nothing itself; the three markets the leader already held were then opened by [one catchUp from the dashboard](PROOF.md#app-catchup), and a market also syncs to the source's full size on its next move ([pair 16](PROOF.md#app-live): 0.00015 → 0.00028 BTC). test: `contracts/test/HubFollow.t.sol::test_follow_joinPools_copiesExistingPosition` (markets named at follow: copied in the follow transaction), `packages/sdk/test/preflight.test.ts::passes and says allowAll mirrors the open book when no markets are named` |
+| A copy made by a direct call (follow, catchUp, unfollow) is never labelled same-block. | app (tape, copy page, share card) | test: `app/test/tape.test.ts::a copy someone sent directly never claims the same block`, `app/test/og.test.tsx::a copy sent by the follow call says so and claims no same block` |
+
+## Exits, policy and refusals
+
+| Claim | Stated in | Evidence |
+|---|---|---|
+| Exits are always copied: a refusal can stop you opening, never stop you closing. | README; landing How, Refusals, Theses, Guard, Closing; MCP README | chain: [an exit copied while the leader held a BLOCK and the follower's guard was on](PROOF.md#guard-exit); [an exit that never asks the gate](PROOF.md#gate-close). test: `contracts/test/HubFollow.t.sol::test_reductionIgnoresTankAndCaps`, `::test_reductionGoesThroughWhilePaused`, `::test_reactive_reducesWhilePausedWithEmptyTank`, `contracts/test/risk/RiskHub.t.sol::test_liveHub_blockRefusesGuardedIncreasesOnly_exitsStillCopy`. Limit: an exit whose handler run runs out of gas is deferred, not refused, and completes through `catchUp`: `contracts/test/HubEdgeCases.t.sol::test_exitsOutOfGas_deferredUnbilled`, `app/test/me.test.ts::latched exits: catchUp(you, [])` |
+| Increases pass the follower's price band, per-position and whole-book caps, equity floor and gas tank. | README; MCP README; landing How ("Set scale, caps, price band and equity floor once") | chain: [band refusal](PROOF.md#refusal-band), [equity floor stop](PROOF.md#floor-poke). test: `contracts/test/HubFollow.t.sol::test_increaseNeverCrossesBand`, `contracts/test/invariant/HubInvariant.t.sol::invariant_increaseWithinBand`, `contracts/test/HubFollow.t.sol::test_notionalClampFlagsCapped`, `::test_totalCap_refusesIncrease`, `::test_tankEmpty_refusesIncrease`, `::test_increaseBelowFloor_stopsInsteadOfCopying`, `::test_poke_belowFloor_flattensAndPauses` |
+| Anything refused is written on chain with its reason. | landing How, Refusals ("A refusal is a record too"), footer | chain: [refusals on chain](PROOF.md#refusals-on-chain): `BandUnfilled` with the venue's `FillOrKillNotFillable()`, and `RiskGate` twice, in the block of the move each refused. test: `contracts/test/HubFollow.t.sol::test_fokWithoutFill_isBandUnfilled`, `::test_venueRevert_reportedWithBytes`, `packages/sdk/test/events.test.ts::names every Refused reason, including BelowMinimum, AtCap and RiskGate` |
+| Seven reasons from your policy, all on chain: BandUnfilled, TotalCap, EquityFloor, TankEmpty, RiskGate, BelowMinimum, AtCap; also market not allowed, venue rejected, leg failed, paused. | landing Refusals | chain: `BandUnfilled` ([row](PROOF.md#refusal-band)) and `RiskGate` ([row](PROOF.md#guard-blocked)); the equity floor as a `Stopped` stop ([row](PROOF.md#floor-poke)). The others are shown by tests that expect the hub's `Refused` event: TotalCap `contracts/test/HubFollow.t.sol::test_totalCap_refusesIncrease`; EquityFloor `::test_increaseBelowFloor_stopsInsteadOfCopying`; TankEmpty `::test_tankEmpty_refusesIncrease`; BelowMinimum `::test_increaseBelowMinimum_reported`; AtCap `::test_increaseAtCap_reported`; MarketNotAllowed `contracts/test/HubTheme.t.sol::test_theme_allowlistBounded`; VenueRejected `contracts/test/HubFollow.t.sol::test_revertingMark_refusesWithoutReverting`; LegFailed `contracts/test/HubTheme.t.sol::test_themeIncreasesAllOrNothing`; Paused `contracts/test/HubReactive.t.sol::test_increaseOnly_refusedBeforeMarketReads` |
+| Under the equity floor, the copied positions are closed and copying stops until you resume. | landing Refusals | chain: [poke](PROOF.md#floor-poke) (`Stopped`, BTC 0.0005 → 0 in the same transaction), then [resume](PROOF.md#floor-resume). test: `contracts/test/HubFollow.t.sol::test_poke_belowFloor_flattensAndPauses`, `::test_resume_requiresEquityAtFloor` |
+
+## Theses
+
+| Claim | Stated in | Evidence |
+|---|---|---|
+| A thesis is a weighted basket of perps, long and short, that its creator rebalances. | README; landing How | chain: [thesis 1 created](PROOF.md#thesis1-create) (BTC +50%, ETH −50%), [thesis 2 published from the builder and rebalanced by its creator](PROOF.md#theses). test: `contracts/test/ThemeRegistry.t.sol::test_rebalance_onlyCreator`, `::test_create_emitsAndStores` |
+| A thesis opens whole: every new leg opens in one transaction, or none do; nothing half-open. | landing Theses; MCP README ("opens all legs or none", "in one block") | chain: [a follow that opens both legs in one transaction](PROOF.md#thesis1-follow), and [the agent's follow](PROOF.md#mcp-follow). test: `contracts/test/HubTheme.t.sol::test_followTheme_opensAllLegsSameTx`, `::test_themeIncreasesAllOrNothing` (a leg that cannot fill rolls the others back and is recorded as `Refused(LegFailed)`), `::test_theme_successWithoutFill_rollsBackSet` |
+| Thesis 1 "BTC vs ETH", rebalanced 50/50 → 70/30, copied in the rebalance's own block. | landing Theses | chain: [pair](PROOF.md#thesis1-rebalance) and [landing rows](PROOF.md#landing-thesisRebalance-copy) |
+| Between thesis versions the book can drift until resync. | MCP README | test: `contracts/test/HubTheme.t.sol::test_theme_resync_driftBand`, `packages/sdk/test/client.test.ts::theme: behind a version, incomplete sync, and drift past 5%` |
+| The thesis page shows the least allocation that opens every leg at today's marks. | README | test: `packages/sdk/test/market.test.ts::finds the smallest allocation that opens every leg, and that one wei less does not`, `app/test/builder-chain.test.ts::matches the SDK's figure for the same legs (the one /thesis/[id] shows once published)` |
+| The thesis builder checks the registry's rules as you type. | README | test: `app/test/builder.test.ts::every issue names the contract error it mirrors`. chain: [thesis 2 published from the builder](PROOF.md#thesis2-create) |
+
+## AI guard
+
+| Claim | Stated in | Evidence |
+|---|---|---|
+| A committee of Somnia validators on Shannon reviews the trader's 30-day record with an LLM; the verdict crosses to a gate on Hideki over Hyperlane, and your copies obey it. | README; landing Guard | chain: [one review, end to end](PROOF.md#one-review-end-to-end-review-11) (request on Hideki, delivery on Shannon, the data committee, the verdict committee, delivery to the gate), and [all 43 reviews](PROOF.md#every-review-43) with each tier read from `VerdictTallied`. test: `contracts/test/risk/RiskEndToEnd.t.sol::test_happyPath_blockAcrossBothMailboxes`, `contracts/test/risk/RiskReviewer.t.sol::test_stage1_fetchesSummaryFromTheEndpoint`, `::test_stage2_asksTheModelWithTheStoredPrompt`, `::test_stage2_repliesWithTheMajorityTier`. Scorecard: [run v3](../eval/SCORECARD.md#run-v3-the-rubric-as-the-system-message-and-only-the-keys-it-reads) |
+| BLOCK refuses new size with reason RiskGate; OK and CAUTION copy as usual; exits are never blocked. | landing Guard; MCP README | chain: [unguarded: copied](PROOF.md#guard-unguarded), [guarded: refused `RiskGate`](PROOF.md#guard-blocked), [exit: copied](PROOF.md#guard-exit); and in the app run, [one group, two followers](PROOF.md#app-live): the guarded one refused `RiskGate`, the one with its guard off copied. test: `contracts/test/risk/RiskHub.t.sol::test_liveHub_cautionAndOkNeverRefuse`, `::test_liveHub_blockRefusesGuardedIncreasesOnly_exitsStillCopy`, `contracts/test/risk/RiskGate.t.sol::test_allowIncrease_blocksGuardedFollowersOfABlockedTraderOnly` |
+| The hub asks the gate only before an increase. | landing Guard ("Exits are never gated"); e2e README | chain: [gated increase and ungated exit](PROOF.md#the-gate-in-the-copy-path); the traces are in `deployments/risk.json` (`measurements.gatedCopy`: one `STATICCALL` from the hub on the open, none on the close). test: `contracts/test/HubAdmin.t.sol::test_setRiskGate_gatesIncreasesOnly` |
+| The guard is per follower, on by default for trader follows, and optional. | README ("optional AI guard"); landing Guard | chain: [guard off](PROOF.md#guard-off), [guard on](PROOF.md#guard-on), [the app follower turns it off](PROOF.md#app-guard-off). test: `contracts/test/risk/RiskGate.t.sol::test_setGuard_perFollower` (a wallet that never set it is guarded) |
+| Trader follows only. | README; landing How, Guard; MCP README | test: `contracts/test/risk/RiskGate.t.sol::test_allowIncrease_blocksGuardedFollowersOfABlockedTraderOnly` (verdicts are kept per trader source), `app/test/follow-flow.test.ts::theses have no review step` |
+| CAUTION shows on your dashboard and in the feed. | landing Guard | test: `app/test/tape.test.ts::verdicts and held verdicts read as the gate logged them`. code: `app/components/me/GuardCard.tsx` |
+| Live review: trader 0xb870…50a8, 3 of 3 validators answered CAUTION; verdict on Shannon, delivered to Hideki. | landing Guard | chain: [verdict](PROOF.md#landing-guardReview-verdictTx) (`VerdictTallied`: Caution, 3 of 3) and [delivery](PROOF.md#landing-guardReview-deliveryTx) |
+| A BLOCK holds against a milder verdict for 24 hours and stops blocking after 7 days if not replaced. | e2e README; scorecard ([what the gate holds](../eval/SCORECARD.md#what-the-gate-holds-now)) | chain: the reviews marked "earlier Block held" in [every review](PROOF.md#every-review-43) (`BlockHeld` on the gate). test: `contracts/test/risk/RiskGate.t.sol::test_blockHold_milderVerdictHeldFor24Hours`, `::test_staleBlock_allows`, `::test_blockHold_newBlockRefreshesAnytime` |
+| Run v3: 18 of 20 verdicts match the rubric; the gate decision they imply is right for all 20; BLOCK recall 6 of 6; no false BLOCKs; every committee unanimous; no review failed. | scorecard | Scorecard: [run v3 result](../eval/SCORECARD.md#result). chain: reviews 24–43 in [every review](PROOF.md#every-review-43), each tier and vote count read from `VerdictTallied`. test: `eval/rubric.test.ts` (the rubric in code) |
+| The answer keys of runs v2 and v3 were committed and written on chain before the first review. | scorecard ([pre-registration](../eval/SCORECARD.md#pre-registration)) | chain: [run v2 anchor](PROOF.md#anchor-v2), [run v3 anchor](PROOF.md#anchor-v3): each carries the commit and the key file's keccak256 as recorded in `eval/*/anchor.json`, and the ledger checks it landed before every review request of its run |
+| The rubric line the validators read gives the same tier as the full summary. | scorecard | test: `eval/rubric.test.ts::the rubric line served to the validators gives the same tier as the full summary`, `packages/stats/test/risk.test.ts::carries only the rubric's inputs, in a fixed order` |
+| The risk endpoint the validators read is public. | README (Live table) | chain: every data request in [the review table](PROOF.md#every-review-43) fetched it (the reviewer's base URL is in `deployments/risk.json`). test: `app/test/risk-route.test.ts::200 with the rubric line: only the keys the rubric reads, beside the full summary` |
+
+## The app
+
+| Claim | Stated in | Evidence |
+|---|---|---|
+| The app sends every transaction from the visitor's own wallet. | README | chain: every follower transaction of the [app run](PROOF.md#in-the-app) is sent by the follower's wallet. code: `app/components/follow/hooks.ts` (writes through `@copybook/sdk` with the connected wallet) |
+| It reads what it shows from the chain or the dreamDEX indexer; no account, no backend database. | README | code: `app/lib/server/chain.ts` (reads through `@copybook/sdk`), `packages/stats` (the indexer); the app has no database dependency (`app/package.json`). No test states it. |
+| The follow flow: operator approval, policy, AI guard, gas tank, follow; every step is read back from the chain, so it resumes after a reload. | README | chain: [approval, guard, follow](PROOF.md#in-the-app) sent from the flow. test: `app/test/follow-flow.test.ts::asks for the operator approval before the policy, and skips it once the chain has it`, `::approval sent, follow not: a reload resumes at the policy, never at the approval` |
+| The dashboard: the book against the source's, the live copy feed, refusals by reason, the tank, the guard, and every stuck state with the call that clears it. | README | chain: [catchUp, fundTank, unfollow, withdrawTank and revoke from the dashboard](PROOF.md#in-the-app). test: `app/test/me.test.ts::builds rows with target, state and the reason a market is out of step`, `::counts refusals by reason since the follow, listing the main seven even at zero`, `packages/sdk/test/client.test.ts::stopped: resume, unless equity is still under the floor`, `::latched exits: catchUp; latched stop closes: poke` |
+| Discover ranks dreamDEX traders by 30-day realized PnL, without Copybook's own wallets. | README | test: `app/test/traders-route.test.ts::ranks real traders over 30 days without our own wallets, cached for 5 minutes`, `packages/stats/test/rank.test.ts::ranks by realized PnL and exposes PnL per unit of drawdown` |
+| A trader page offers a paid request for a fresh verdict. | README | test: `app/test/ask.test.ts::pays exactly the gate's current fee and reports the request's nonce and block`. chain: a review request carries the 0.5 STT fee ([review 11](PROOF.md#example-review-11-request)) |
+| The leaderboard ranks sources by followers and by copy fidelity. | README | test: `app/test/leaderboard.test.ts::fidelity is copied increases over copied plus refused, with the counts`, `::by followers: now, then ever` |
+| `/copy/<tx>` shows one copy with its same-block proof and a share card; share cards are 1200×630. | README | test: `app/test/tape.test.ts::a handler copy carries the same-block badge with its real block`, `app/test/og.test.tsx::the same-block copy: block, the two tx positions, the move, the source`, `::draws the copy card as a 1200×630 PNG, cached for good` |
+| Any injected browser wallet (MetaMask, Rabby, any EIP-6963 wallet) on Hideki; the app offers to add the network. | README | code: `app/lib/wallet/config.ts` (wagmi `injected` connector with `multiInjectedProviderDiscovery`). test: `app/test/wallet.test.ts::asks the wallet to add it with EIP-3085 parameters` |
+| Copybook's own wallets are marked ours and never ranked. | README (`deployments/`) | test: `app/test/config.test.ts::knows every wallet Copybook runs: excluded from rankings, marked ours, labelled on the tape`, `packages/sdk/test/deployments.test.ts::reads the wallets Copybook runs, with their roles, and knows its own addresses` |
+
+## SDK
+
+| Claim | Stated in | Evidence |
+|---|---|---|
+| Typed reads, writes, preflight checks, event history and a live watch; everything the app and the MCP server do on chain goes through it. | README | test: `packages/sdk/test/client.test.ts::encodes the rest of the write surface`, `packages/sdk/test/events.test.ts`, `packages/sdk/test/feed.test.ts`. code: `app/lib/server/chain.ts`, `app/components/follow/hooks.ts`, `packages/mcp/src/config.ts` all build `createCopybook` |
+| `preflightFollow`: everything the hub would refuse, checked at live marks before anything is signed, each reason with the least value that clears it. | README | test: `packages/sdk/test/preflight.test.ts::passes a healthy follow and reports the minimums`, `::rejects invalid policy fields like the contract does`, `::catches a per-position cap below one order`, `app/test/follow-reasons.test.ts::a cap below one order offers the least cap, naming an unnamed market by address` |
+| `status`: every stuck state with the exact call that clears it. | README | test: `packages/sdk/test/client.test.ts::stopped: resume, unless equity is still under the floor`, `::latched exits: catchUp; latched stop closes: poke`, `::tank: fund it when empty or under the floor` |
+| A reconnecting live watch. | README | test: `packages/sdk/test/feed.test.ts::two consecutive reconnects with overlapping windows deliver every event exactly once`, `packages/sdk/test/transport.test.ts::after the socket dies, the next subscription gets a new socket and is answered` |
+| A browser wallet or a local key both work as the wallet client. | README | chain: the [MCP agent's transactions](PROOF.md#mcp-agent), signed with a local key. test: `packages/sdk/test/client.test.ts::signs with a local key itself and sends the raw transaction, never asking the node to sign` |
+
+## MCP server
+
+| Claim | Stated in | Evidence |
+|---|---|---|
+| Read tools without a key; write tools only with `COPYBOOK_AGENT_KEY`. | README; MCP README | test: `packages/mcp/test/tools.test.ts::the server registers no write tools without a key, and all of them with one` |
+| Every write is a dry run unless called with `dryRun: false`. | README; MCP README | test: `packages/mcp/test/tools.test.ts::dry-runs by default: returns preflight and calls, sends nothing`. chain: [the agent's four writes](PROOF.md#mcp-agent), each sent after a dry run |
+| Every follow runs the SDK's preflight first and is refused with each reason, even with `dryRun: false`. | README; MCP README | test: `packages/mcp/test/tools.test.ts::refuses with the preflight's reasons and sends nothing, even with dryRun=false` |
+| An agent can follow a thesis, unfollow and withdraw its tank. | README; MCP README | chain: [approval, follow thesis 2, unfollow with flatten, withdraw 0.3 STT](PROOF.md#mcp-agent) |
+| The tank stays on the hub after unfollow until `withdraw_tank`; while following, `withdraw_tank` keeps the 0.2 STT floor. | MCP README | chain: [withdraw after unfollow](PROOF.md#mcp-withdraw). test: `packages/mcp/test/tools.test.ts::takes the whole tank once the wallet follows nothing, dry-run first`, `::keeps the floor while following and refuses more than can come out`, `contracts/test/HubReactive.t.sol::test_withdrawTank_keepsFloorWhileFollowing` |
+| `revoke_operator` is refused while the wallet follows something; the grant persists after unfollow until revoked. | MCP README | chain: [the app follower revokes after unfollowing](PROOF.md#app-revoke). test: `packages/mcp/test/tools.test.ts::refuses while following, and when there is nothing to revoke`, `::follow descriptions and the dry-run note say the grant is global, persists and cannot withdraw` |
+| `request_review` pays exactly the fee; `create_thesis` publishes a basket the registry accepts. | MCP README | test: `packages/mcp/test/tools.test.ts::dry-runs with the fee, then pays exactly that fee`, `::sends with dryRun=false and returns the new id`, `::refuses legs the registry would refuse, listing each reason` |
+| `list_top_traders` leaves out Copybook's wallets and wallets that follow through the hub now. | MCP README | test: `packages/mcp/test/tools.test.ts::list_top_traders drops a wallet that follows through the hub now, and renumbers` |
+| `follow_trader` without `markets` checks the caps in the markets the trader holds now. | MCP README | test: `packages/mcp/test/tools.test.ts::a whole-book trader follow checks the caps in the markets the trader holds now` |
+| The approval is the first transaction of a live follow, skipped when granted; a failure after a send lists every hash sent and how to resume. | MCP README | chain: [approval, then follow](PROOF.md#mcp-agent). test: `packages/mcp/test/tools.test.ts::dryRun=false approves first, then follows, in order`, `::does not repeat an approval that is already on chain`, `::a failure after the approval names what was sent and how to resume` |
+| The key is never logged or returned; errors are scrubbed of endpoint URLs and key-shaped strings. | MCP README | test: `packages/mcp/test/tools.test.ts::an invalid key config error does not echo the key; the banner shows only the address`, `::an RPC error carrying the RPC URL and a 64-hex string is scrubbed (unexpected and sent-then-failed paths)` |
+| No hidden caps: a zero cap is rejected. | MCP README | test: `packages/mcp/test/tools.test.ts::rejects maxNotionalUsdso 0 before any chain call` |
+| `Copied`'s price is the limit price of the order that moved the position, not the fill. | MCP README | test: `packages/sdk/test/events.test.ts::decodes Copied with the limit price named as such`. code: the `Copied` event's NatSpec in `contracts/src/CopybookHub.sol` |
+
+## Deployment
+
+| Claim | Stated in | Evidence |
+|---|---|---|
+| The contracts are deployed on Hideki (hub, engine, thesis registry, relays, risk gate) and Shannon (risk reviewer), at the addresses in `deployments/*.json`. | README | chain: [contracts](PROOF.md#contracts): code at each address, created by its deploy transaction, matching `deployments/*.json` |
+| The contracts' sources are verified on the explorers. | README (`deployments/` explorer links); scorecard | chain: [contracts](PROOF.md#contracts). Shannon's reviewers are read back from the explorer's API (verified). The Tokyo explorer's API does not answer ("Not available"), so the Hideki contracts rest on the `forge verify-contract` result recorded at deploy time. |
+| Testnet only. | README | chain: every row of [PROOF.md](PROOF.md) is on Hideki (chain 50383) or Shannon (chain 50312) |
+
+## What is not claimed
+
+- **Mainnet.** Nothing is deployed on a mainnet. Everything above runs on Somnia testnets, Hideki (chain 50383) and
+  Shannon (chain 50312), and STT and USDso have no market value.
+- **A trustless verdict lane.** The Hyperlane lane between Shannon and Hideki is a dev lane: each side's ISM has a
+  single validator, the same key on both. Whoever holds that key could deliver a forged verdict, a BLOCK included. The
+  committee's work can be checked on Shannon; the gate on Hideki trusts the lane
+  ([scorecard limitations](../eval/SCORECARD.md#limitations)).
+- **Verdicts as advice about a trader.** The LLM verdicts are risk tiers under a published rubric, applied by a
+  validator committee to data from Copybook's own endpoint. The committee attests that its members fetched the same
+  bytes, not that the bytes are true. Run v3 is not an out-of-sample estimate, run-to-run stability was not tested, and
+  the thin-data rule was applied to 1 of 3 thin traders. The gate acts only on BLOCK, and only on increases.
+- **Same block in every case.** A copy lands in the source's block when Somnia's Reactivity delivers the event and the
+  handler's gas covers the follower. A follower whose share runs short is deferred and synced by `catchUp`, which is not
+  a same-block copy and is never labelled one. Every same-block pair cited is in [PROOF.md](PROOF.md).
+- **Users.** Every wallet that follows, trades as the leader or creates a thesis in the evidence is one of Copybook's
+  own demo wallets (`demoWallets` in `deployments/hideki.json`). The reviewed traders are real dreamDEX accounts on the
+  testnet. No outside users are claimed.
+- **Costs.** Gas and STT figures are single testnet runs at 6 gwei. They are not a mainnet cost estimate.
+- **An audit.** The contracts have tests, invariants and a live run, not an external audit.

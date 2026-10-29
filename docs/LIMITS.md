@@ -111,7 +111,7 @@ of the wallet and stays after unfollow until revoked ([revoke](PROOF.md#app-revo
   endpoint. The data committee attests that its members fetched the same bytes, not that the bytes are true; the
   risk line is built from the dreamDEX indexer with a 2,000-row cap (`partial=1` beyond it).
 - **The scorecard is small.** Each run reviews 20 traders once. Run v3 is not an out-of-sample estimate; run v4, on
-  20 traders no earlier run had seen, scored 19 of 20. Run-to-run stability was not tested, and the thin-data rule was
+  20 traders no earlier run had seen, scored 19 of 20 (95% interval 76–99%). Run-to-run stability was not tested, and the thin-data rule was
   applied to 1 of 3 thin traders in run v3 and to run v4's single thin trader
   ([scorecard limitations](../eval/SCORECARD.md#limitations)).
 - **The committee can miss a BLOCK.** In run v4 a trader with 10 liquidations got CAUTION, 3 votes of 3. The gate then

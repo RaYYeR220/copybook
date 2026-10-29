@@ -5,6 +5,7 @@ import { LIMB } from "@/lib/atlas";
 import { deployments } from "@/lib/deployments";
 import { fmtInt, shortHex } from "@/lib/format";
 import { REASON_LABEL } from "@/lib/reasons";
+import fixtures from "./fixtures/copies.json";
 
 const isTxHash = (h: string) => /^0x[0-9a-f]{64}$/i.test(h);
 
@@ -19,6 +20,25 @@ describe("landing proof", () => {
     expect(isTxHash(thesisRebalance.copy.hash)).toBe(true);
     expect(isTxHash(guardReview.verdictTx)).toBe(true);
     expect(isTxHash(guardReview.deliveryTx)).toBe(true);
+  });
+
+  it("matches the transactions recorded from the chain (test/fixtures/copies.json)", () => {
+    const { txs } = fixtures;
+    const block = (t: { receipt: { blockNumber: { $bigint: string } } }) => Number(t.receipt.blockNumber.$bigint);
+    // the leader's move and the hub's copy: same block, the move first, the copy sent by the hub's handler
+    expect(txs.leaderTrade.hash).toBe(sameBlockOpen.leader.hash);
+    expect(block(txs.leaderTrade)).toBe(sameBlockOpen.block);
+    expect(txs.leaderTrade.receipt.transactionIndex).toBe(sameBlockOpen.leader.index);
+    expect(txs.leaderTrade.tx.from.toLowerCase()).toBe(LEADER);
+    expect(txs.traderCopy.hash).toBe(sameBlockOpen.copy.hash);
+    expect(block(txs.traderCopy)).toBe(sameBlockOpen.block);
+    expect(txs.traderCopy.receipt.transactionIndex).toBe(sameBlockOpen.copy.index);
+    expect(txs.traderCopy.tx.from.toLowerCase()).toBe(deployments.hub.toLowerCase());
+    // the thesis rebalance's copy
+    expect(txs.thesisCopy.hash).toBe(thesisRebalance.copy.hash);
+    expect(block(txs.thesisCopy)).toBe(thesisRebalance.block);
+    expect(txs.thesisCopy.receipt.transactionIndex).toBe(thesisRebalance.copy.index);
+    expect(txs.thesisCopy.tx.from.toLowerCase()).toBe(deployments.hub.toLowerCase());
   });
 
   it("links every proof to the explorer it lives on", () => {

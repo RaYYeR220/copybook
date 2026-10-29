@@ -139,6 +139,35 @@ describe("the card routes", () => {
     expect(await pngSize(res)).toEqual({ width: 1200, height: 630 });
   });
 
+  it("keeps a copy card for good only when every name resolved, and not at all while the source is unnamed", async () => {
+    const copy = (h: string, l: number | undefined) => loadCopy(h, l, chain);
+    const noMarkets = await copyCard(sameBlockOpen.copy.hash, undefined, { copy, names: async () => ({ ...names, markets: {} }) });
+    expect(noMarkets.status).toBe(200);
+    expect(noMarkets.headers.get("cache-control")).toBe(CACHE_LIVE);
+    const noThesisName = await copyCard(thesisRebalance.copy.hash, undefined, { copy, names: async () => ({ ...names, theses: {} }) });
+    expect(noThesisName.headers.get("cache-control")).toBe(CACHE_LIVE);
+    const pending = await copyCard(fx.txs.followCopy.hash, undefined, {
+      copy: (h, l) => loadCopy(h, l, { ...chain, transaction: async () => ({ ...fx.txs.followCopy.tx, input: "0xdeadbeef" as Hex }), sourceOf: async () => ({ source: null, complete: false }) }),
+      names: async () => names,
+    });
+    expect(pending.status).toBe(200);
+    expect(pending.headers.get("cache-control")).toBe("no-store");
+  });
+
+  it("a log read that fails is a 502, not a card without its move", async () => {
+    const res = await copyCard(sameBlockOpen.copy.hash, undefined, {
+      copy: (h, l) =>
+        loadCopy(h, l, {
+          ...chain,
+          logs: async () => {
+            throw new Error("timeout");
+          },
+        }),
+      names: async () => names,
+    });
+    expect(res.status).toBe(502);
+  });
+
   it("404 for a transaction with no Copied event, never a made-up card", async () => {
     const res = await copyCard(sameBlockOpen.leader.hash, undefined, { copy: (h, l) => loadCopy(h, l, chain), names: async () => names });
     expect(res.status).toBe(404);

@@ -38,6 +38,10 @@ export interface CopyCardModel {
   source: string;
   sourceOurs: boolean;
   follower: string;
+  /** Every name on the card came from a read that answered: the market, the source, a thesis's name. Only then is the card kept for good. */
+  resolved: boolean;
+  /** The view itself is final (see CopyView.complete). */
+  complete: boolean;
 }
 
 const sideOf = (size: bigint) => (size > 0n ? "long" : size < 0n ? "short" : "flat");
@@ -45,14 +49,17 @@ const sideOf = (size: bigint) => (size > 0n ? "long" : size < 0n ? "short" : "fl
 export function copyCardModel(v: CopyView, names: CardNames): CopyCardModel {
   const meta = names.markets[lc(v.pool)];
   const size = (x: bigint) => (meta ? fmtUnits(x < 0n ? -x : x, meta.decimals) : `${(x < 0n ? -x : x).toString()} units`);
-  let source = "a source the hub's log names by id only";
+  let source = v.complete ? `source ${shortHex(v.sourceId, 6, 4)}, which the hub's log does not name` : "a source not named yet: the hub's log is still being read";
   let ours = false;
+  let named = false;
   if (v.source?.kind === "Trader") {
     ours = lc(v.source.trader) === lc(names.demoLeader);
     source = `trader ${shortHex(v.source.trader)}${ours ? " · demo leader, ours" : ""}`;
+    named = true;
   } else if (v.source?.kind === "Theme") {
-    const name = names.theses[v.source.themeId.toString()];
-    source = `thesis #${v.source.themeId}${name ? ` · ${name}` : ""}`;
+    const id = v.source.themeId.toString();
+    named = id in names.theses;
+    source = `thesis #${v.source.themeId}${named ? ` · ${names.theses[id]}` : ""}`;
   }
   return {
     sameBlock: v.sameBlock,
@@ -73,6 +80,8 @@ export function copyCardModel(v: CopyView, names: CardNames): CopyCardModel {
     source,
     sourceOurs: ours,
     follower: shortHex(v.follower),
+    resolved: v.complete && named && !!meta,
+    complete: v.complete,
   };
 }
 

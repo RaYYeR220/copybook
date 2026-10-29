@@ -15,6 +15,12 @@ export const CACHE_LIVE = "public, max-age=300, s-maxage=300, stale-while-revali
 const CACHE_MISSING = "public, max-age=0, s-maxage=60";
 
 /**
+ * A copy's card is kept for good only when every name on it resolved (a market or thesis name the indexer or
+ * registry did not give this time would otherwise stay missing); a view still waiting on the hub's log is not kept.
+ */
+export const copyCardCache = (m: { resolved: boolean; complete: boolean }) => (m.resolved ? CACHE_IMMUTABLE : m.complete ? CACHE_LIVE : "no-store");
+
+/**
  * A share card as a PNG response. `load` returns null for nothing to draw (a 404, never a made-up card) and throws
  * when the chain or indexer cannot be read (a 502, not cached).
  */
@@ -54,7 +60,7 @@ export const copyCard = (hash: string, logIndex: number | undefined, deps: { cop
       return v ? copyCardModel(v, await deps.names()) : null;
     },
     (m) => <CopyCard m={m} />,
-    { cache: CACHE_IMMUTABLE },
+    { cache: copyCardCache },
   );
 
 const parseTrader = (raw: string): Address | null => (raw.length === 42 && isAddress(raw, { strict: false }) ? getAddress(raw) : null);

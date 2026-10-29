@@ -25,8 +25,12 @@ export interface CopyDeps {
   blockTime(block: bigint): Promise<number>;
   /** Logs of one contract in one block; `topics` narrow it where the node honours them, the caller matches exactly either way. */
   logs(q: { block: bigint; address: Address; topics: readonly Hex[] }): Promise<RawLog[]>;
-  /** The kind and ref of a followed source, from the hub's Followed events, when the copy's own block does not say. */
-  sourceOf?(sourceId: Hex): Promise<{ kind: SourceKindName; ref: bigint } | null>;
+  /**
+   * The kind and ref of a followed source, from the hub's Followed events, when the copy's own block does not say.
+   * `complete` is false when the log was read only in part, so a source not found there may still exist. Throws when
+   * the log cannot be read.
+   */
+  sourceOf?(sourceId: Hex): Promise<{ source: { kind: SourceKindName; ref: bigint } | null; complete: boolean }>;
 }
 
 export type CopySource = { kind: "Trader"; trader: Address } | { kind: "Theme"; themeId: bigint };
@@ -57,6 +61,11 @@ export interface CopyView {
   sameBlock: boolean;
   /** Other copies in the same transaction (a thesis resizes every leg in one). */
   siblings: { logIndex: number; pool: Address }[];
+  /**
+   * False when the source was looked up in a hub log read only in part and not found there: the view is right as far
+   * as it goes but must not be kept, since a later read can name the source.
+   */
+  complete: boolean;
 }
 
 type Copied = Extract<CopybookEvent, { name: "Copied" }>;
@@ -81,7 +90,8 @@ function sourceFromTrigger(emitter: Address, topics: readonly Hex[], d: CopyDeps
  * One copy, read from the chain: the transaction's `Copied` event (the one at `logIndex`, or its first), how it was
  * sent, and for a handler copy the source's move it answered, matched exactly (emitter, topics and data, as the
  * handler's input carries them) among the logs of the same block. Null when the transaction is unknown, reverted,
- * holds no `Copied`, or none at `logIndex`: there is no copy to show, so nothing is made up.
+ * holds no `Copied`, or none at `logIndex`: there is no copy to show, so nothing is made up. A read that fails throws:
+ * a node that did not answer is never shown as a move that is not there.
  */
 export async function loadCopy(hash: string, logIndex: number | undefined, deps: CopyDeps): Promise<CopyView | null> {
   if (!TX_RE.test(hash)) return null;
@@ -100,11 +110,17 @@ export async function loadCopy(hash: string, logIndex: number | undefined, deps:
   let call: string | undefined;
 
   if (via === "handler") {
+    let trigger: [Address, readonly Hex[], Hex] | null = null;
     try {
-      const { args } = decodeFunctionData({ abi: handlerAbi, data: tx.input });
-      const [emitter, topics, data] = args as unknown as [Address, readonly Hex[], Hex];
+      trigger = decodeFunctionData({ abi: handlerAbi, data: tx.input }).args as unknown as [Address, readonly Hex[], Hex];
+    } catch {
+      /* not a relay call this page understands: no leader is claimed */
+    }
+    if (trigger) {
+      const [emitter, topics, data] = trigger;
       source = sourceFromTrigger(emitter, topics, deps.deployments, copy.sourceId);
       if (source) {
+        // a failed read throws: only logs actually read can say the move is not in this block
         const logs = await deps.logs({ block: r.blockNumber, address: emitter, topics });
         const match = logs
           .filter(
@@ -119,8 +135,6 @@ export async function loadCopy(hash: string, logIndex: number | undefined, deps:
           .sort((a, b) => (b.transactionIndex ?? 0) - (a.transactionIndex ?? 0) || (b.logIndex ?? 0) - (a.logIndex ?? 0))[0];
         if (match?.transactionHash) leader = { hash: match.transactionHash, txIndex: match.transactionIndex!, logIndex: match.logIndex! };
       }
-    } catch {
-      /* not a relay call this page understands: no leader is claimed */
     }
   } else {
     try {
@@ -136,9 +150,11 @@ export async function loadCopy(hash: string, logIndex: number | undefined, deps:
       /* a contract called the hub: the function stays unnamed */
     }
   }
+  let complete = true;
   if (!source && deps.sourceOf) {
-    const s = await deps.sourceOf(copy.sourceId).catch(() => null);
+    const { source: s, complete: whole } = await deps.sourceOf(copy.sourceId);
     if (s) source = s.kind === "Theme" ? { kind: "Theme", themeId: s.ref } : { kind: "Trader", trader: getAddress(`0x${s.ref.toString(16).padStart(40, "0")}`) };
+    else if (!whole) complete = false;
   }
 
   return {
@@ -160,6 +176,36 @@ export async function loadCopy(hash: string, logIndex: number | undefined, deps:
     leader,
     sameBlock: via === "handler" && leader !== null,
     siblings: copies.filter((c) => c !== copy).map((c) => ({ logIndex: c.log.logIndex!, pool: getAddress(c.pool) })),
+    complete,
+  };
+}
+
+/** Thrown inside a cache's loader to hand a result back without the cache keeping it. */
+const UNCACHED = "copybook:uncached-copy";
+type Uncached = Error & { [UNCACHED]: true; view: CopyView | null };
+const uncached = (view: CopyView | null): Uncached => Object.assign(new Error(UNCACHED), { [UNCACHED]: true as const, view });
+const isUncached = (e: unknown): e is Uncached => !!e && typeof e === "object" && (e as Record<string, unknown>)[UNCACHED] === true;
+
+/** A cache that keeps what `load` returns and keeps nothing when it throws (Next's unstable_cache, or a Map in tests). */
+export type Persist = (key: string[], load: () => Promise<CopyView>) => Promise<CopyView>;
+
+/**
+ * Copies through a cache that keeps only what will never change: a complete view of a landed copy. "No copy" (the
+ * transaction may still land) and a view whose source the hub's log has not named yet are returned but not kept; a
+ * failed read throws and keeps nothing.
+ */
+export function copyReader(deps: CopyDeps, persist: Persist) {
+  return async (hash: string, logIndex: number | undefined): Promise<CopyView | null> => {
+    try {
+      return await persist(["copy", "v2", hash.toLowerCase(), String(logIndex ?? "first")], async () => {
+        const v = await loadCopy(hash, logIndex, deps);
+        if (!v || !v.complete) throw uncached(v);
+        return v;
+      });
+    } catch (e) {
+      if (isUncached(e)) return e.view;
+      throw e;
+    }
   };
 }
 

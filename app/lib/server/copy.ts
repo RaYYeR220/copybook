@@ -3,7 +3,7 @@ import { unstable_cache } from "next/cache";
 import { cache } from "react";
 import { TransactionReceiptNotFoundError, getAddress, type Address, type Hex } from "viem";
 import type { RawLog } from "@copybook/sdk";
-import { loadCopy, type CopyDeps, type CopyView } from "../copy";
+import { copyReader, type CopyDeps, type CopyView } from "../copy";
 import { followedSources } from "../followers";
 import { fromJsonSafe, toJsonSafe } from "../json";
 import { publicClient, hubLog } from "./chain";
@@ -47,33 +47,14 @@ const deps: CopyDeps = {
   sourceOf: async (sourceId) => {
     const log = await hubLog.read({ budgetMs: 8_000 });
     const s = followedSources(log.events).find((x) => x.sourceId.toLowerCase() === sourceId.toLowerCase());
-    return s ? { kind: s.kind, ref: s.ref } : null;
+    return { source: s ? { kind: s.kind, ref: s.ref } : null, complete: log.complete };
   },
 };
 
-class NoCopy extends Error {}
+/** A complete view of a landed copy never changes: kept in the data cache for good (JSON-safe). */
+const read = copyReader(deps, (key, load) =>
+  unstable_cache(async () => toJsonSafe(await load()), key, { revalidate: false })().then((v) => fromJsonSafe<CopyView>(v)),
+);
 
-/**
- * A landed copy never changes, so a found one is cached for good. "No copy" is not cached: the transaction may
- * still be on its way. A chain error throws.
- */
-const cachedCopy = (hash: string, logIndex: number | undefined) =>
-  unstable_cache(
-    async () => {
-      const v = await loadCopy(hash, logIndex, deps);
-      if (!v) throw new NoCopy();
-      return toJsonSafe(v);
-    },
-    ["copy", "v1", hash.toLowerCase(), String(logIndex ?? "first")],
-    { revalidate: false },
-  )().then((v) => fromJsonSafe<CopyView>(v));
-
-/** One copy for the page, its metadata and its card. Null when the transaction holds no such copy. */
-export const copyOf = cache(async (hash: string, logIndex: number | undefined): Promise<CopyView | null> => {
-  try {
-    return await cachedCopy(hash, logIndex);
-  } catch (e) {
-    if (e instanceof NoCopy) return null;
-    throw e;
-  }
-});
+/** One copy for the page, its metadata and its card. Null when the transaction holds no such copy; throws when the chain could not be read. */
+export const copyOf = cache((hash: string, logIndex: number | undefined): Promise<CopyView | null> => read(hash, logIndex));

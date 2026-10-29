@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { getAddress, type Address, type Hex } from "viem";
 import type { RawLog } from "@copybook/sdk";
-import { loadCopy, parseLogIndex, type CopyDeps, type CopyReceipt } from "@/lib/copy";
+import { copyReader, loadCopy, parseLogIndex, type CopyDeps, type CopyReceipt, type CopyView, type Persist } from "@/lib/copy";
 import { fromJsonSafe } from "@/lib/json";
 import { bandRefusal, sameBlockOpen, thesisRebalance, LEADER } from "@/content/proof";
 import raw from "./fixtures/copies.json";
@@ -101,11 +101,37 @@ describe("a copy, read from the chain", () => {
     expect(d.calls.filter((c) => c.startsWith("logs"))).toEqual([]);
   });
 
+  it("a log read that fails throws: it is never shown as a move missing from the block", async () => {
+    const down = replay({
+      logs: async () => {
+        throw new Error("node did not answer");
+      },
+    });
+    await expect(loadCopy(sameBlockOpen.copy.hash, undefined, down)).rejects.toThrow("node did not answer");
+  });
+
   it("claims no leader when the trigger is not in the block", async () => {
     const v = await loadCopy(sameBlockOpen.copy.hash, undefined, replay({ logs: async () => [] }));
     expect(v!.via).toBe("handler");
     expect(v!.leader).toBeNull();
     expect(v!.sameBlock).toBe(false);
+  });
+
+  it("a call copy whose source the partial hub log does not name is returned but marked incomplete", async () => {
+    // a catchUp-like call: the input does not decode as follow, so the source comes from the hub's log
+    const notFollow = (complete: boolean, found: boolean) =>
+      replay({
+        transaction: async (h) => ({ ...fx.txs.followCopy.tx, ...(h.toLowerCase() === fx.txs.followCopy.hash.toLowerCase() ? { input: "0xdeadbeef" as Hex } : {}) }),
+        sourceOf: async () => ({ source: found ? { kind: "Theme", ref: 1n } : null, complete }),
+      });
+    const partial = await loadCopy(fx.txs.followCopy.hash, undefined, notFollow(false, false));
+    expect(partial!.source).toBeNull();
+    expect(partial!.complete).toBe(false);
+    const whole = await loadCopy(fx.txs.followCopy.hash, undefined, notFollow(true, false));
+    expect(whole!.complete).toBe(true); // the whole log read and no follow names it: final
+    const named = await loadCopy(fx.txs.followCopy.hash, undefined, notFollow(false, true));
+    expect(named!.source).toEqual({ kind: "Theme", themeId: 1n });
+    expect(named!.complete).toBe(true);
   });
 
   it("reads ?log strictly", () => {
@@ -114,5 +140,60 @@ describe("a copy, read from the chain", () => {
     expect(parseLogIndex(["7", "8"])).toBe(7);
     expect(parseLogIndex("5x")).toBe("invalid");
     expect(parseLogIndex("-1")).toBe("invalid");
+  });
+});
+
+describe("the copy cache keeps only what will never change", () => {
+  const memory = () => {
+    const kept = new Map<string, CopyView>();
+    const persist: Persist = async (key, load) => {
+      const k = key.join("|");
+      if (kept.has(k)) return kept.get(k)!;
+      const v = await load();
+      kept.set(k, v);
+      return v;
+    };
+    return { kept, persist };
+  };
+
+  it("a failed log read throws and keeps nothing; the next read renders the same-block copy and keeps it", async () => {
+    const { kept, persist } = memory();
+    let fail = true;
+    const base = replay();
+    const deps: CopyDeps = {
+      ...base,
+      logs: async (q) => {
+        if (fail) {
+          fail = false;
+          throw new Error("timeout");
+        }
+        return base.logs(q);
+      },
+    };
+    const read = copyReader(deps, persist);
+    await expect(read(sameBlockOpen.copy.hash, undefined)).rejects.toThrow("timeout");
+    expect(kept.size).toBe(0);
+    const v = await read(sameBlockOpen.copy.hash, undefined);
+    expect(v!.sameBlock).toBe(true);
+    expect(v!.leader!.txIndex).toBe(0);
+    expect(kept.size).toBe(1);
+    // served from the cache from now on, even with the node down
+    const again = await copyReader({ ...deps, receipt: async () => Promise.reject(new Error("down")) }, persist)(sameBlockOpen.copy.hash, undefined);
+    expect(again!.sameBlock).toBe(true);
+  });
+
+  it("keeps neither 'no copy' nor an incomplete view", async () => {
+    const { kept, persist } = memory();
+    expect(await copyReader(replay(), persist)(sameBlockOpen.leader.hash, undefined)).toBeNull();
+    const partial = copyReader(
+      replay({
+        transaction: async () => ({ ...fx.txs.followCopy.tx, input: "0xdeadbeef" as Hex }),
+        sourceOf: async () => ({ source: null, complete: false }),
+      }),
+      persist,
+    );
+    const v = await partial(fx.txs.followCopy.hash, undefined);
+    expect(v!.complete).toBe(false);
+    expect(kept.size).toBe(0);
   });
 });

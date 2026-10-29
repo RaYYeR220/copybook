@@ -44,16 +44,13 @@
   color: var(--night-4);
 }
 
-.ever {
-  color: var(--night-4);
-}
-
 /* too few events to rank: hollow and dashed, like everything not counted */
 .few {
-  display: inline-flex;
+  display: flex;
+  width: fit-content;
   align-items: center;
   height: 20px;
-  margin-left: 8px;
+  margin: 6px 0 0 auto;
   padding: 0 8px;
   border-radius: var(--r-pill);
   border: 1px dashed var(--hair-3);
@@ -63,16 +60,25 @@
   vertical-align: 1px;
 }
 
+/* the reasons under a refusal count: wrapped in a narrow measure so the table keeps its width */
 .why {
   display: block;
-  margin-top: 4px;
+  max-width: 17ch;
+  margin: 4px 0 0 auto;
   font-size: 10.5px;
+  line-height: 1.45;
   color: var(--night-4);
+  white-space: normal;
 }
 
 @media (max-width: 720px) {
   .why {
-    white-space: normal;
+    max-width: none;
+    margin-left: 0;
+  }
+
+  .few {
+    margin-left: 0;
   }
 }
 
@@ -112,4 +118,29 @@
   .notes div {
     grid-template-columns: 1fr;
   }
+}
+
+/* the leaderboard runs seven columns in the fluid column: tighter cells than the book table */
+table.board th,
+table.board td {
+  padding-left: 14px;
+  padding-right: 14px;
+}
+
+table.board td {
+  vertical-align: top;
+}
+
+@media (max-width: 720px) {
+  table.board th,
+  table.board td {
+    padding-left: 0;
+    padding-right: 0;
+  }
+}
+
+.ours {
+  margin-left: 8px;
+  color: var(--gold);
+  letter-spacing: 0.08em;
 }

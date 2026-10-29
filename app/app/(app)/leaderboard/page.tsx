@@ -10,7 +10,7 @@ import { SourceLead, SourceLedger, SourceTitle, SourceTop } from "@/components/a
 import { DataState } from "@/components/app/State";
 import t from "@/components/app/Table.module.css";
 import { fmtInt, shortHex } from "@/lib/format";
-import { FEW_EVENTS, boardRows, fidelityText, rankRows, type BoardRow, type RankBy } from "@/lib/leaderboard";
+import { FEW_EVENTS, boardRows, fidelityParts, fidelityText, rankRows, type BoardRow, type RankBy } from "@/lib/leaderboard";
 import { REASON_LABEL } from "@/lib/reasons";
 import { hubLog } from "@/lib/server/chain";
 import { config } from "@/lib/server/config";
@@ -37,8 +37,9 @@ function Source({ r, names, owner }: { r: BoardRow; names: Map<string, { name: s
         <Link href={`/t/${a}`} className={t.addr} title={a} prefetch={false}>
           {shortHex(a)}
         </Link>
-        {demo && <span className={t.tag}>demo leader · ours</span>}
-        <span className={b.kind}>trader</span>
+        <span className={b.kind}>
+          trader{demo && <span className={b.ours}>demo leader · ours</span>}
+        </span>
       </>
     );
   }
@@ -49,8 +50,10 @@ function Source({ r, names, owner }: { r: BoardRow; names: Map<string, { name: s
       <Link href={`/thesis/${r.ref}`} prefetch={false}>
         {th?.name ?? `Thesis #${r.ref}`}
       </Link>
-      {ours && <span className={t.tag}>ours</span>}
-      <span className={b.kind}>thesis #{r.ref.toString()}</span>
+      <span className={b.kind}>
+        thesis #{r.ref.toString()}
+        {ours && <span className={b.ours}>ours</span>}
+      </span>
     </>
   );
 }
@@ -122,7 +125,7 @@ export default async function Leaderboard({ searchParams }: Props) {
                   {log.missing.length} block range{log.missing.length === 1 ? "" : "s"} not covered yet, so every count below is a floor. Reload in a moment.
                 </DataState>
               )}
-              <table className={t.table}>
+              <table className={`${t.table} ${b.board}`}>
                 <caption className="sr-only">Sources ranked {by === "followers" ? "by followers now" : "by copy fidelity"}</caption>
                 <thead>
                   <tr>
@@ -156,7 +159,7 @@ export default async function Leaderboard({ searchParams }: Props) {
                       </td>
                       <td className={t.num} data-label="Following">
                         <b>{fmtInt(r.followersNow)}</b>
-                        <span className={b.ever}> · {fmtInt(r.followersEver)} ever</span>
+                        <span className={b.why}>{fmtInt(r.followersEver)} ever</span>
                       </td>
                       <td className={t.num} data-label="Copied">
                         <b>{fmtInt(r.copied)}</b>
@@ -166,7 +169,14 @@ export default async function Leaderboard({ searchParams }: Props) {
                         {r.refused > 0 && <span className={b.why}>{reasons(r)}</span>}
                       </td>
                       <td className={`${t.num} ${t.full}`} data-label="Fidelity">
-                        {r.decisions ? <b>{fidelityText(r)}</b> : <span className={t.dim}>{fidelityText(r)}</span>}
+                        {fidelityParts(r) ? (
+                          <>
+                            <b>{fidelityParts(r)!.pct}</b>
+                            <span className={b.why}>{fidelityParts(r)!.counts}</span>
+                          </>
+                        ) : (
+                          <span className={t.dim}>{fidelityText(r)}</span>
+                        )}
                         {r.few && <span className={b.few}>few events</span>}
                       </td>
                       <td className={t.num} data-label="Exits">

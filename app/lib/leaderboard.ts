@@ -91,12 +91,17 @@ export function boardRows(events: readonly CopybookEvent[], extra: readonly { so
   return [...rows.values()];
 }
 
-/** `60% · 3 of 5`: the share floored to a tenth of a percent (it never reads 100% while anything was refused), always with n. */
-export function fidelityText(r: Pick<BoardRow, "copied" | "decisions" | "fidelityBps">): string {
-  if (r.fidelityBps === null) return "no increases yet";
+/** The share floored to a tenth of a percent (it never reads 100% while anything was refused) and its counts; null with none. */
+export function fidelityParts(r: Pick<BoardRow, "copied" | "decisions" | "fidelityBps">): { pct: string; counts: string } | null {
+  if (r.fidelityBps === null) return null;
   const tenths = Math.floor(r.fidelityBps / 10);
-  const pct = tenths % 10 === 0 ? String(tenths / 10) : (tenths / 10).toFixed(1);
-  return `${pct}% · ${fmtInt(r.copied)} of ${fmtInt(r.decisions)}`;
+  return { pct: `${tenths % 10 === 0 ? String(tenths / 10) : (tenths / 10).toFixed(1)}%`, counts: `${fmtInt(r.copied)} of ${fmtInt(r.decisions)}` };
+}
+
+/** `60% · 3 of 5`: never the share without n. */
+export function fidelityText(r: Pick<BoardRow, "copied" | "decisions" | "fidelityBps">): string {
+  const p = fidelityParts(r);
+  return p ? `${p.pct} · ${p.counts}` : "no increases yet";
 }
 
 export type RankBy = "followers" | "fidelity";

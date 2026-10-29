@@ -120,7 +120,13 @@ export function createHubLog(deps: HubLogDeps) {
     return p;
   }
 
-  /** Every event of `c` from its start through the end of checkpoint `k`: checkpoint k-1 plus its own segments. */
+  /**
+   * Every event of `c` from its start through the end of checkpoint `k`: checkpoint k-1 plus its own segments.
+   * Size: a checkpoint holds the contract's whole log up to it, and Vercel's data cache stores an item of at most 2 MB;
+   * a larger one is simply not kept, so every cold process rebuilds it from its segments (still cached, but slow).
+   * A logged event serialises to about 0.8 KB, so that is roughly 2,500 events per contract (183 in all today). Before
+   * the log nears it, store checkpoints as ranges of their own instead of cumulative ones.
+   */
   function loadCheckpoint(c: Contract, k: bigint): Promise<LoggedEvent[]> {
     const start = deps.starts[c];
     const from = start + k * CP;

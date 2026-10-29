@@ -132,6 +132,32 @@ describe("preflightFollow (trader)", () => {
     expect(named.reasons.filter((x) => x.code === "CAP_BELOW_ONE_ORDER").map((x) => x.pool)).toEqual([BTC]);
   });
 
+  it("rejects a whole-book cap below one order in a checked market", async () => {
+    const r = await run(world(), { ...trader, policy: policy({ maxTotalNotional: 10n * E }) });
+    expect(r.ok).toBe(false);
+    expect(r.reasons.find((x) => x.code === "TOTAL_CAP_BELOW_ONE_ORDER")).toMatchObject({ severity: "error", field: "maxTotalNotional", pool: ETH, required: 12n * E });
+    expect((await run(world(), { ...trader, policy: policy({ maxTotalNotional: 12n * E }) })).reasons.some((x) => x.code === "TOTAL_CAP_BELOW_ONE_ORDER")).toBe(false);
+  });
+
+  it("rejects a whole-book cap below what a market list's sync would open in the follow transaction", async () => {
+    const c = world();
+    // the trader holds 0.05 ETH ($150 at 3,000)
+    c.on(deployments.marginBank, "getPosition", (args: readonly unknown[]) => ({
+      size: args[0] === TRADER && args[1] === ETH ? 5n * 10n ** 16n : 0n,
+      avgEntryPrice: 0n,
+      entryFundingIndex: 0n,
+      lastUpdatedTimestampNs: 0n,
+    }));
+    const over = await run(c, { ...trader, policy: policy({ maxNotional: 500n * E, maxTotalNotional: 100n * E }) });
+    expect(over.reasons.find((x) => x.code === "TOTAL_CAP_BELOW_BASKET")).toMatchObject({ severity: "error", field: "maxTotalNotional", required: 150n * E });
+    // the per-position cap clamps it to 0.033 ETH ($99): within a $100 whole-book cap
+    expect((await run(c, { ...trader, policy: policy({ maxNotional: 100n * E, maxTotalNotional: 100n * E }) })).ok).toBe(true);
+    // a whole-book follow only warns: the book opens as the trader moves, not in the follow transaction
+    const all = await run(c, { ...trader, joinPools: [], checkPools: [ETH], policy: policy({ maxNotional: 500n * E, maxTotalNotional: 100n * E }) });
+    expect(all.ok).toBe(true);
+    expect(all.reasons.find((x) => x.code === "TOTAL_CAP_BELOW_BASKET")?.severity).toBe("warning");
+  });
+
   it("takes the AI guard as the follow will run with it when the caller sets it", async () => {
     const c = world();
     const now = Math.floor(Date.now() / 1000);

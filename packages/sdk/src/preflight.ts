@@ -21,6 +21,7 @@ export type PreflightCode =
   | "ALLOCATION_BELOW_MINIMUM"
   | "CAP_BELOW_ONE_ORDER"
   | "TOTAL_CAP_BELOW_BASKET"
+  | "TOTAL_CAP_BELOW_ONE_ORDER"
   | "EQUITY_BELOW_FLOOR"
   | "EQUITY_UNREADABLE"
   | "SCALED_BELOW_MINIMUM"
@@ -261,6 +262,9 @@ export async function preflightFollow(c: ReadContext, input: PreflightInput): Pr
       // a market list is checked as named; allowAll is checked in the markets the caller says the trader holds now
       const checked =
         joinPools.length > 0 ? joinPools : [...new Set((input.checkPools ?? []).filter((p) => isAddress(p, { strict: false })).map((p) => getAddress(p)))];
+      const cap = policy.maxTotalNotional;
+      // what syncing each checked market would open: the trader's size there, scaled, capped, in whole orders
+      let opening = 0n;
       await Promise.all(
         checked.map(async (pool) => {
           let m: Market;
@@ -282,8 +286,23 @@ export async function preflightFollow(c: ReadContext, input: PreflightInput): Pr
               message: "The per-position cap is below the size of one order in this market, so increases there would always be refused.",
             });
           }
+          const oneOrderUp = (minOrderQty(m) * m.mark + m.oneBase - 1n) / m.oneBase;
+          if (cap > 0n && cap < oneOrderUp) {
+            add({
+              code: "TOTAL_CAP_BELOW_ONE_ORDER",
+              severity: "error",
+              field: "maxTotalNotional",
+              pool,
+              required: oneOrderUp,
+              message: "The whole-book cap is below the size of one order in this market, so increases there would always be refused (Total cap).",
+            });
+          }
           const source = await reads.positionSize(c, trader, pool).catch(() => 0n);
-          if (source !== 0n && tradableQty(abs(scaledSize(source, policy.scaleBps)), m) === 0n) {
+          const scaled = scaledSize(source, policy.scaleBps);
+          let target = abs(scaled);
+          if (notionalOf(target, m) > policy.maxNotional && policy.maxNotional > 0n) target = (policy.maxNotional * m.oneBase) / m.mark;
+          opening += notionalOf(tradableQty(target, m), m);
+          if (source !== 0n && tradableQty(abs(scaled), m) === 0n) {
             add({
               code: "SCALED_BELOW_MINIMUM",
               severity: "warning",
@@ -293,6 +312,26 @@ export async function preflightFollow(c: ReadContext, input: PreflightInput): Pr
           }
         }),
       );
+      if (cap > 0n && opening > cap) {
+        add(
+          joinPools.length > 0
+            ? {
+                code: "TOTAL_CAP_BELOW_BASKET",
+                severity: "error",
+                field: "maxTotalNotional",
+                required: opening,
+                message:
+                  "The whole-book cap is below what the follow transaction opens in the listed markets (the trader's positions there, scaled and capped), so the last of them would be refused (Total cap).",
+              }
+            : {
+                code: "TOTAL_CAP_BELOW_BASKET",
+                severity: "warning",
+                field: "maxTotalNotional",
+                required: opening,
+                message: "The whole-book cap is below the trader's current book scaled to your size, so part of it will be refused (Total cap) as the trader moves.",
+              },
+        );
+      }
     }
   }
 

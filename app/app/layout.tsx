@@ -11,6 +11,8 @@ const fraunces = Fraunces({
   style: ["normal", "italic"],
   display: "swap",
   variable: "--font-fraunces",
+  // about 270 KB for both styles: not preloaded; the landing headline preloads its own instances (app/(site)/page.tsx)
+  preload: false,
 });
 
 const figtree = Figtree({
@@ -18,6 +20,7 @@ const figtree = Figtree({
   weight: ["400", "500", "600"],
   display: "swap",
   variable: "--font-figtree",
+  preload: false,
 });
 
 /** Arrows (→ ↗) and Δ are outside the latin subset: they fall back to the system mono, not to a metric-matched sans. */
@@ -27,6 +30,7 @@ const fragmentMono = Fragment_Mono({
   display: "swap",
   variable: "--font-fragment-mono",
   adjustFontFallback: false,
+  preload: false,
   fallback: ["ui-monospace", "SFMono-Regular", "Consolas", "monospace"],
 });
 

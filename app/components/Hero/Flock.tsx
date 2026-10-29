@@ -1,9 +1,8 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { prefersReducedMotion } from "@/lib/motion";
+import { prefersReducedMotion, whenIdle } from "@/lib/motion";
 import { useFlockStore } from "./FlockState";
-import { startHeroFlock } from "./heroEngine";
 import styles from "./Hero.module.css";
 
 /**
@@ -22,9 +21,12 @@ export function Flock({ leaderLabel }: { leaderLabel: string }) {
     if (!cv || !tg || !hero) return;
     const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
     let stop = () => {};
+    let engine: typeof import("./heroEngine") | undefined;
+    let gone = false;
     const start = () => {
+      if (!engine) return;
       stop();
-      stop = startHeroFlock({
+      stop = engine.startHeroFlock({
         hero,
         canvas: cv,
         tag: tg,
@@ -34,9 +36,18 @@ export function Flock({ leaderLabel }: { leaderLabel: string }) {
         onBirds: (birds) => store.set({ birds }),
       });
     };
-    start();
+    // the flock is decoration: its engine loads and starts once the headline has painted and the page is idle
+    const cancel = whenIdle(() =>
+      void import("./heroEngine").then((m) => {
+        if (gone) return;
+        engine = m;
+        start();
+      }),
+    );
     motion.addEventListener("change", start);
     return () => {
+      gone = true;
+      cancel();
       motion.removeEventListener("change", start);
       stop();
     };

@@ -111,6 +111,8 @@
 .h1 {
   margin-top: 24px;
   font: 560 clamp(48px, 7.2vw, 104px) / 0.95 var(--display);
+  /* the headline's preloaded instances first (see app/(site)/page.tsx), the full variable Fraunces behind them */
+  font-family: var(--font-hero), var(--display);
   font-variation-settings:
     "opsz" 144,
     "SOFT" 100;

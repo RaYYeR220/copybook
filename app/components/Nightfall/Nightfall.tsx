@@ -2,8 +2,8 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { COPIES_AT, LEADER_AT, MERIDIAN_ANGLE, meridianPoint } from "@/lib/atlas";
-import { f1, prefersReducedMotion } from "@/lib/motion";
-import { startNightfall, type AtlasGeometry } from "./nightEngine";
+import { f1, prefersReducedMotion, whenIdle } from "@/lib/motion";
+import type { AtlasGeometry } from "./nightEngine";
 import styles from "./Nightfall.module.css";
 
 export interface MeridianLabel {
@@ -97,13 +97,26 @@ export function NightfallScene({ plate, head, readout, leaderLabel, copyLabel, l
     const els = { track: track.current, stage: stage.current, sky: sky.current, glow: glow.current, canvas: canvas.current };
     const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
     let stop = () => {};
+    let engine: typeof import("./nightEngine") | undefined;
+    let gone = false;
     const start = () => {
+      if (!engine) return;
       stop();
-      stop = startNightfall({ ...els, reduced: prefersReducedMotion(), onLayout: setGeo });
+      stop = engine.startNightfall({ ...els, reduced: prefersReducedMotion(), onLayout: setGeo });
     };
-    start();
+    // below the fold: load the scene's engine when idle, or at once when the page opens on it
+    const load = () =>
+      void import("./nightEngine").then((m) => {
+        if (gone) return;
+        engine = m;
+        start();
+      });
+    const near = els.track.getBoundingClientRect().top < window.innerHeight * 1.5;
+    const cancel = near ? (load(), () => {}) : whenIdle(load);
     motion.addEventListener("change", start);
     return () => {
+      gone = true;
+      cancel();
       motion.removeEventListener("change", start);
       stop();
     };

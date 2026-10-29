@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import localFont from "next/font/local";
 import { Footer } from "@/components/Footer";
 import { Nav, type NavLink } from "@/components/Nav";
 import { Hero } from "@/components/Hero/Hero";
@@ -21,6 +22,23 @@ const NAV: NavLink[] = [
   { href: APP_PATH, label: "Open app" },
 ];
 
+/**
+ * The headline's own Fraunces: the two exact instances the H1 draws (560, and italic 500, at opsz 144 and SOFT 100),
+ * cut to printable ASCII by scripts/hero-font.py. About 25 KB together, so this page preloads them instead of the full
+ * variable faces (about 270 KB, not preloaded) and the headline paints in Fraunces from its first frame. Called here
+ * because next/font preloads a face only for the page or layout that calls it.
+ */
+const heroFont = localFont({
+  src: [
+    { path: "../../assets/fonts/fraunces-hero-560.woff2", weight: "560", style: "normal" },
+    { path: "../../assets/fonts/fraunces-hero-italic-500.woff2", weight: "500", style: "italic" },
+  ],
+  variable: "--font-hero",
+  display: "swap",
+  preload: true,
+  adjustFontFallback: false,
+});
+
 export const metadata: Metadata = {
   title: { absolute: "Copybook — follow a trader or a thesis on dreamDEX perps" },
 };
@@ -31,7 +49,7 @@ export const viewport: Viewport = {
 
 export default function Landing() {
   return (
-    <div className={styles.page}>
+    <div className={`${styles.page} ${heroFont.variable}`}>
       <a className="skip" href="#main">
         Skip to content
       </a>

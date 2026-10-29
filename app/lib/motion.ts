@@ -25,6 +25,19 @@ export const segmentsPath = (segs: Iterable<readonly [number, number, number, nu
 /** Cyclic index into a list (negative indices wrap). */
 export const cyc = <T>(list: readonly T[], k: number): T => list[((k % list.length) + list.length) % list.length];
 
+/**
+ * Runs `fn` once the browser is idle (at the latest after `timeout` ms), so decoration starts after the first paint and
+ * never competes with it. Returns a cancel function.
+ */
+export function whenIdle(fn: () => void, timeout = 1_500): () => void {
+  if (typeof window.requestIdleCallback === "function") {
+    const id = window.requestIdleCallback(fn, { timeout });
+    return () => window.cancelIdleCallback(id);
+  }
+  const id = window.setTimeout(fn, 200);
+  return () => window.clearTimeout(id);
+}
+
 export const prefersReducedMotion = () =>
   typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 

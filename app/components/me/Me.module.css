@@ -353,6 +353,16 @@
   cursor: not-allowed;
 }
 
+/* the perps margin panel: the move form under the ledger */
+.marginBody {
+  padding: 14px 20px 4px;
+}
+
+.marginBody > div:first-child,
+.marginBody > p:first-child {
+  margin-top: 0;
+}
+
 /* the transaction line under the tank form */
 .txPad {
   padding: 0 20px;
@@ -438,6 +448,10 @@
   .txBox {
     padding-left: 16px;
     padding-right: 16px;
+  }
+
+  .marginBody {
+    padding: 12px 16px 4px;
   }
 
   .banner {

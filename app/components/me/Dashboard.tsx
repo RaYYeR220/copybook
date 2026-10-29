@@ -29,7 +29,9 @@ import { fmtStt, fmtUsd18 } from "@/lib/units";
 import { hideki } from "@/lib/wallet/hideki";
 import { Banners } from "./Banners";
 import { BookTable } from "./BookTable";
+import { followMarginTarget } from "@/lib/follow/margin";
 import { GuardCard } from "./GuardCard";
+import { MarginPanel } from "./MarginPanel";
 import { Refusals } from "./Refusals";
 import { SourceCard, type Drawer } from "./SourceCard";
 import { TankPanel } from "./TankPanel";
@@ -337,6 +339,16 @@ function Following({ who, data, names, markets, traders, pub, reader, writer, tx
         <Panel id="guard-h" title="AI guard" aside={<Kick>Validators&apos; verdict · on chain</Kick>} order={2} d={0.08}>
           <GuardCard kind={follow.kind} trader={trader} verdict={data.verdict} guardOn={st.guardOn} pub={pub} now={now} writer={writer} tx={tx} />
         </Panel>
+        <Panel id="margin-h" title="Perps margin" aside={<Kick>dreamDEX perps account</Kick>} order={5} d={0.1}>
+          <MarginPanel
+            equity={data.equity}
+            funding={data.funding}
+            target={followMarginTarget(follow.kind, follow.policy, st.theme?.legs)}
+            bank={reader.deployments.marginBank}
+            writer={writer}
+            tx={tx}
+          />
+        </Panel>
         <Panel id="gas-h" title="Gas tank" aside={<Kick>Pays for every run</Kick>} order={5} d={0.12}>
           <TankPanel tank={st.tank} stats={stats} sinceKnown={since !== undefined} following writer={writer} tx={tx} balance={data.balance} />
         </Panel>
@@ -420,6 +432,9 @@ function NotFollowing({ who, data, names, reader, writer, tx }: { who: Address; 
           <div className={styles.txBox}>
             <TxLine tx={mine} recalled={tx.recalled} />
           </div>
+        </Panel>
+        <Panel id="margin-h" title="Perps margin" aside={<Kick>dreamDEX perps account</Kick>} order={2} d={0.04}>
+          <MarginPanel equity={data.equity} funding={data.funding} bank={reader.deployments.marginBank} writer={writer} tx={tx} />
         </Panel>
       </Col>
       <Col>

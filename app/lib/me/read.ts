@@ -1,5 +1,5 @@
 import type { Address, PublicClient } from "viem";
-import { isTradeable, type Copybook, type FollowerStatus, type Verdict } from "@copybook/sdk";
+import { isTradeable, type Copybook, type FollowerStatus, type MarginFunding, type Verdict } from "@copybook/sdk";
 import type { PoolRead } from "./book";
 
 export interface MeReads {
@@ -9,6 +9,8 @@ export interface MeReads {
   approved?: boolean;
   /** Perps equity; null when the margin bank did not answer. */
   equity: bigint | null;
+  /** USDso on spot and the margin bank's allowance on it; null when the token did not answer. */
+  funding: MarginFunding | null;
   balance: bigint;
   /** Trader follows: the gate's verdict on the trader; null when the gate did not answer. */
   verdict?: Verdict | null;
@@ -16,15 +18,16 @@ export interface MeReads {
 
 /** The follower's state as the chain holds it now. `status()` carries every stuck state with its clearing call. */
 export async function readMe(cb: Copybook, publicClient: Pick<PublicClient, "getBalance">, address: Address): Promise<MeReads> {
-  const [status, approved, equity, balance] = await Promise.all([
+  const [status, approved, equity, funding, balance] = await Promise.all([
     cb.status(address),
     cb.isOperatorApproved(address).catch(() => undefined),
     cb.accountEquity(address).catch(() => null),
+    cb.marginFunding(address).catch(() => null),
     publicClient.getBalance({ address }),
   ]);
   const trader = status.follow?.trader;
   const verdict = trader ? await cb.verdictOf(trader).catch(() => null) : undefined;
-  return { address, status, approved, equity, balance, ...(verdict !== undefined ? { verdict } : {}) };
+  return { address, status, approved, equity, funding, balance, ...(verdict !== undefined ? { verdict } : {}) };
 }
 
 /** Each market's parameters and both books in it, read from the pools and the margin bank. A failed read is null, not zero. */

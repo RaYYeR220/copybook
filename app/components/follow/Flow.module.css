@@ -1,0 +1,636 @@
+/* The follow flow: the steps as a ledger on the left, the current step on the right. The policy form is the
+   policy ledger made editable: italic display labels, a dotted leader, a mono value you can type into. */
+
+/* ---------- steps ---------- */
+.steps {
+  list-style: none;
+  padding: 6px 20px 10px;
+}
+
+.steps li {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  gap: 0 12px;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--hair);
+}
+
+.steps li:last-child {
+  border-bottom: 0;
+}
+
+.marker {
+  position: relative;
+  width: 14px;
+  height: 14px;
+  margin-left: 2px;
+  border-radius: 50%;
+  border: 1px solid var(--night-3);
+}
+
+.done .marker {
+  border-color: var(--bone);
+}
+
+.done .marker::after {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  border-radius: 50%;
+  background: var(--bone);
+}
+
+.current .marker {
+  border-color: var(--gold);
+  outline: 3px solid var(--gold-wash);
+}
+
+.current .marker::after {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  border-radius: 50%;
+  background: var(--gold);
+}
+
+.skipped .marker {
+  border-style: dashed;
+  border-color: var(--night-4);
+}
+
+.stepLabel {
+  font: 400 13.5px/1.35 var(--body);
+  color: var(--night-4);
+}
+
+.done .stepLabel,
+.skipped .stepLabel {
+  color: var(--bone-2);
+}
+
+.current .stepLabel {
+  font-weight: 500;
+  color: var(--bone);
+}
+
+.stepNote {
+  font: 400 11px var(--mono);
+  color: var(--night-4);
+  white-space: nowrap;
+  text-align: right;
+}
+
+.current .stepNote {
+  color: var(--gold);
+}
+
+/* ---------- the current step ---------- */
+.body {
+  padding: 16px 20px 20px;
+}
+
+.lead {
+  max-width: 40em;
+  font: 400 14px/1.6 var(--body);
+  color: var(--bone-2);
+}
+
+.lead + .lead {
+  margin-top: 10px;
+}
+
+.lead b {
+  font-weight: 500;
+  color: var(--bone);
+}
+
+.block {
+  margin-top: 18px;
+}
+
+.block:first-child {
+  margin-top: 0;
+}
+
+.sub {
+  margin-bottom: 8px;
+  font: italic 500 17px/1.2 var(--display);
+  font-variation-settings: "opsz" 48, "SOFT" 0;
+  color: var(--bone);
+}
+
+.acts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+.hint {
+  font: 400 11.5px/1.5 var(--mono);
+  color: var(--night-4);
+}
+
+/* the exact call, as the wallet will send it */
+.call {
+  display: block;
+  margin-top: 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--hair);
+  background: rgba(21, 19, 15, 0.6);
+  font: 400 11.5px/1.6 var(--mono);
+  color: var(--bone-2);
+  overflow-wrap: anywhere;
+}
+
+.call b {
+  font-weight: 400;
+  color: var(--bone);
+}
+
+/* what the grant can and cannot do: two short lists on a hairline */
+.scope {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 24px;
+  margin-top: 16px;
+  border-top: 1px solid var(--hair);
+}
+
+.scope > div {
+  padding-top: 12px;
+}
+
+.scope h3 {
+  font: italic 500 16px/1.2 var(--display);
+  font-variation-settings: "opsz" 48, "SOFT" 0;
+  color: var(--bone);
+}
+
+.scope ul {
+  margin-top: 6px;
+  list-style: none;
+}
+
+.scope li {
+  position: relative;
+  padding: 5px 0 5px 16px;
+  font: 400 13px/1.45 var(--body);
+  color: var(--bone-2);
+}
+
+.scope li::before {
+  content: "";
+  position: absolute;
+  left: 2px;
+  top: 11px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--bone);
+}
+
+.scope .cannot li::before {
+  background: none;
+  border: 1px dashed var(--bone);
+}
+
+/* ---------- the editable ledger ---------- */
+.fields {
+  display: flex;
+  flex-direction: column;
+}
+
+.field {
+  padding: 10px 0 9px;
+  border-bottom: 1px solid var(--hair);
+}
+
+.fieldLine {
+  display: flex;
+  align-items: baseline;
+}
+
+.fieldLine label,
+.fieldLabel {
+  font: italic 500 17px/1.2 var(--display);
+  font-variation-settings: "opsz" 48, "SOFT" 0;
+  color: var(--bone-2);
+  white-space: nowrap;
+}
+
+.leader {
+  flex: 1;
+  min-width: 16px;
+  margin: 0 10px;
+  border-bottom: 1px dotted rgba(230, 223, 204, 0.24);
+  transform: translateY(-4px);
+}
+
+.input {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  font: 400 13px var(--mono);
+  color: var(--night-4);
+}
+
+.input input {
+  width: 9ch;
+  padding: 2px 0;
+  border: 0;
+  border-bottom: 1px solid var(--hair-3);
+  background: none;
+  font: 400 13px var(--mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--bone);
+  text-align: right;
+  transition: border-color 0.25s var(--ease);
+}
+
+.input input:hover {
+  border-bottom-color: var(--bone-2);
+}
+
+.input input:focus {
+  outline: 0;
+  border-bottom-color: var(--gold);
+}
+
+.input input:focus-visible {
+  outline: 0;
+}
+
+.field[data-invalid] .input input {
+  border-bottom-style: dashed;
+  border-bottom-color: var(--bone);
+}
+
+.help {
+  margin-top: 4px;
+  font: 400 11px/1.5 var(--mono);
+  color: var(--night-4);
+}
+
+.fieldErr {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+  font: 400 12.5px/1.45 var(--body);
+  color: var(--bone);
+}
+
+.fieldErr::before {
+  content: "";
+  flex: none;
+  width: 7px;
+  height: 7px;
+  margin-top: 5px;
+  border-radius: 50%;
+  border: 1px dashed var(--bone);
+}
+
+/* two-way choice set as pills */
+.seg {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.seg label {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  height: 30px;
+  padding: 0 13px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--hair-2);
+  font: 400 12.5px var(--body);
+  color: var(--night-4);
+  cursor: pointer;
+  transition:
+    color 0.25s var(--ease),
+    border-color 0.25s var(--ease);
+}
+
+.seg label:hover {
+  color: var(--bone);
+}
+
+.seg input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.seg label:has(input:checked) {
+  color: var(--bone);
+  border-color: var(--bone);
+}
+
+.seg label.goldOn:has(input:checked) {
+  color: var(--gold);
+  border-color: var(--gold-line);
+  background: var(--gold-wash);
+}
+
+.seg label:has(input:focus-visible) {
+  outline: 1px solid var(--gold);
+  outline-offset: 3px;
+}
+
+.choiceLine {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+}
+
+/* the market list */
+.markets {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 4px 14px;
+  margin-top: 10px;
+  list-style: none;
+}
+
+.markets label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 0;
+  font: 400 12.5px var(--mono);
+  color: var(--bone-2);
+  cursor: pointer;
+}
+
+.markets input {
+  appearance: none;
+  flex: none;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  border: 1px solid var(--night-4);
+  display: grid;
+  place-content: center;
+  cursor: pointer;
+}
+
+.markets input::after {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--bone);
+  transform: scale(0);
+  transition: transform 0.2s var(--ease);
+}
+
+.markets input:checked {
+  border-color: var(--bone);
+}
+
+.markets input:checked::after {
+  transform: scale(1);
+}
+
+.markets input:focus-visible {
+  outline: 1px solid var(--gold);
+  outline-offset: 3px;
+}
+
+.held {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--gold);
+}
+
+/* ---------- preflight reasons ---------- */
+.reasons {
+  margin-top: 16px;
+  list-style: none;
+  border-top: 1px solid var(--hair);
+}
+
+.reason {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  gap: 0 10px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--hair);
+}
+
+.rmark {
+  position: relative;
+  width: 9px;
+  height: 9px;
+  margin-top: 5px;
+  border-radius: 50%;
+  border: 1px solid var(--bone);
+}
+
+/* an error is a refusal before signing: dashed and hollow, like every refusal */
+.error .rmark {
+  border-style: dashed;
+}
+
+/* a warning goes through with a limit: half filled */
+.warning .rmark {
+  background: linear-gradient(90deg, var(--bone) 50%, transparent 50%);
+}
+
+.info .rmark {
+  border-color: var(--night-4);
+}
+
+.rtext {
+  font: 400 13.5px/1.5 var(--body);
+  color: var(--bone-2);
+}
+
+.error .rtext {
+  color: var(--bone);
+}
+
+.rkind {
+  margin-right: 8px;
+  font: 400 10.5px var(--mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--night-4);
+}
+
+.error .rkind {
+  color: var(--bone);
+}
+
+.rmarket {
+  margin-right: 8px;
+  font: 400 12px var(--mono);
+  color: var(--bone);
+}
+
+.rneeds {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  margin-top: 6px;
+  font: 400 11.5px/1.5 var(--mono);
+  color: var(--night-4);
+}
+
+.apply {
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 11px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--hair-3);
+  font: 400 11.5px var(--mono);
+  color: var(--bone);
+  cursor: pointer;
+  transition: border-color 0.25s var(--ease);
+}
+
+.apply:hover {
+  border-color: var(--bone);
+}
+
+.checking {
+  margin-top: 14px;
+  font: 400 11.5px var(--mono);
+  color: var(--night-4);
+}
+
+/* ---------- transaction status ---------- */
+.tx {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  margin-top: 14px;
+  font: 400 12px/1.5 var(--mono);
+  color: var(--bone-2);
+}
+
+.tx i {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  border: 1px solid var(--bone);
+}
+
+.tx.pending i {
+  border-color: var(--gold);
+  background: var(--gold);
+  outline: 3px solid var(--gold-wash);
+}
+
+.tx.ok i {
+  background: var(--bone);
+}
+
+.tx.bad i {
+  border-style: dashed;
+}
+
+.tx a {
+  border-bottom: 1px solid var(--hair-3);
+}
+
+.tx a:hover {
+  border-color: var(--bone);
+}
+
+/* ---------- summary of what will be signed ---------- */
+.summary {
+  margin-top: 6px;
+}
+
+.notes {
+  margin-top: 16px;
+  list-style: none;
+}
+
+.notes li {
+  position: relative;
+  padding: 4px 0 4px 16px;
+  font: 400 13px/1.5 var(--body);
+  color: var(--bone-2);
+}
+
+.notes li::before {
+  content: "";
+  position: absolute;
+  left: 2px;
+  top: 11px;
+  width: 6px;
+  height: 1px;
+  background: var(--bone-2);
+}
+
+.notes b {
+  font-weight: 500;
+  color: var(--bone);
+}
+
+/* the minimum box on a thesis follow */
+.min {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px 32px;
+  margin: 2px 0 14px;
+  padding: 12px 0 14px;
+  border-bottom: 1px solid var(--hair);
+}
+
+.min div {
+  font: 400 10.5px var(--mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--night-4);
+}
+
+.min b {
+  display: block;
+  margin-top: 5px;
+  font: 560 22px/1 var(--display);
+  font-variation-settings: "opsz" 48, "SOFT" 0;
+  letter-spacing: -0.02em;
+  text-transform: none;
+  color: var(--bone);
+}
+
+@media (max-width: 720px) {
+  .steps {
+    padding: 4px 16px 8px;
+  }
+
+  .body {
+    padding: 14px 16px 18px;
+  }
+
+  .scope {
+    grid-template-columns: 1fr;
+  }
+
+  .fieldLine {
+    flex-wrap: wrap;
+    row-gap: 4px;
+  }
+
+  .fieldLine label,
+  .fieldLabel {
+    font-size: 16px;
+  }
+
+  .input input {
+    width: 8ch;
+  }
+}

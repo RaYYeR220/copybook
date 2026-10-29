@@ -8,6 +8,18 @@
   color: var(--night-4);
 }
 
+/* inside a panel, not the bar: starts at the left, its messages flow under it */
+.inline {
+  margin-left: 0;
+  flex-wrap: wrap;
+}
+
+.inline .err {
+  position: static;
+  flex-basis: 100%;
+  text-align: left;
+}
+
 .chip {
   display: inline-flex;
   align-items: center;

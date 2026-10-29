@@ -28,7 +28,8 @@ function errorText(err: unknown): string | null {
  * Wallet state for the app bar: connect (choosing among announced wallets), switch to the network (adding it
  * to the wallet first when it is missing), or show the network and the connected account.
  */
-export function ConnectButton() {
+export function ConnectButton({ inline = false }: { inline?: boolean } = {}) {
+  const who = inline ? `${styles.who} ${styles.inline}` : styles.who;
   const { address, chainId, connector, status } = useAccount();
   const { connect, isPending: connecting, error: connectError, reset } = useConnect();
   const { switchChain, isPending: switching, error: switchError } = useSwitchChain();
@@ -73,7 +74,7 @@ export function ConnectButton() {
         }
       };
       return (
-        <div className={styles.who}>
+        <div className={who}>
           <Button size="md" onClick={() => switchChain({ chainId: hideki.id })} disabled={switching}>
             {switching ? "Check your wallet…" : `Switch to ${hideki.name}`}
           </Button>
@@ -85,7 +86,7 @@ export function ConnectButton() {
       );
     }
     return (
-      <div className={styles.who}>
+      <div className={who}>
         <span className={`${styles.chip} ${styles.net}`}>
           <i aria-hidden="true" />
           {hideki.name}
@@ -101,7 +102,7 @@ export function ConnectButton() {
 
   if (noWallet || !wallets.length) {
     return (
-      <div className={styles.who}>
+      <div className={who}>
         <Button size="md" variant="quiet" href="https://rabby.io">
           Install a wallet
         </Button>
@@ -117,7 +118,7 @@ export function ConnectButton() {
   };
 
   return (
-    <div className={styles.who} ref={menu}>
+    <div className={who} ref={menu}>
       <Button size="md" onClick={start} disabled={connecting} aria-expanded={wallets.length > 1 ? choosing : undefined}>
         {connecting ? "Check your wallet…" : "Connect wallet"}
       </Button>

@@ -95,7 +95,7 @@ export function GuardCard({
     return (
       <div className={g.body}>
         <p className={`${styles.law} ${styles.lawFirst}`}>
-          <b>A thesis follow is never gated.</b> The guard reads the validators&apos; verdict on a trader; a thesis has none, so copies and rebalances run whatever the switch says.
+          <b>The AI guard never applies to a thesis.</b> The guard reads the validators&apos; verdict on a trader; a thesis has none, so copies and rebalances run whatever the switch says.
           It stays this wallet&apos;s setting for any trader it follows later.
         </p>
         {toggle}

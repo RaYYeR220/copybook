@@ -576,7 +576,7 @@ function FollowStep(props: StepBodyProps) {
         ) : (
           <>
             <li>The basket opens in this transaction, every leg or none. A rebalance resizes your legs in its own block; between versions the legs drift with prices until you resync.</li>
-            <li>The AI guard applies to trader follows only: a thesis is never gated.</li>
+            <li>The AI guard applies to trader follows only: it never applies to a thesis.</li>
           </>
         )}
         <li>A copy&apos;s recorded price is its order&apos;s limit, not the fill. This is a testnet: STT and USDso have no value.</li>

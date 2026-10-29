@@ -267,7 +267,7 @@ function SourceFacts({ source, data, now, pub }: { source: FollowSource; data: C
       rows.push({ label: "Opens from", value: <b>{fmtUsd18(source.minimum.allocation, "up")}</b>, note: "every leg opens at the marks as this page loaded" });
       rows.push({ label: "With headroom", value: fmtUsd18(source.minimum.recommended, "up") });
     } else rows.push({ label: "Opens from", value: "unknown", note: "a leg's market could not be read; the form checks it live" });
-    rows.push({ label: "AI guard", value: "not applied", note: "theses are never gated" });
+    rows.push({ label: "AI guard", value: "not applied", note: "the AI guard never applies to a thesis" });
   } else if (data?.verdict) {
     const v = verdictView(data.verdict, now, pub.risk);
     rows.push({

@@ -1,5 +1,6 @@
 import { decodeFunctionData, getAddress, type Address, type Hex } from "viem";
 import { hubAbi, type CopybookEvent, type ReasonName } from "@copybook/sdk";
+import type { LoggedEvent, Via } from "../events";
 import type { LastRefusals } from "./book";
 
 /**
@@ -136,4 +137,33 @@ export function followTerms(input: Hex | undefined): { joinPools: Address[] } | 
   } catch {
     return null;
   }
+}
+
+/** A copy into this wallet's book, as the feed logged it, with the address of its own page. */
+export interface LatestCopy {
+  path: string;
+  block: bigint;
+  pool: Address;
+  sourceId: Hex;
+  /** How it was sent, when the feed knows (see LoggedEvent). */
+  via?: Via;
+}
+
+/** The newest copy into this wallet's book among the events read, by block then log position. */
+export function latestCopy(events: readonly LoggedEvent[], follower: Address): LatestCopy | undefined {
+  let best: Extract<LoggedEvent, { name: "Copied" }> | undefined;
+  for (const e of events) {
+    if (e.name !== "Copied" || lc(e.follower) !== lc(follower)) continue;
+    const { blockNumber: b, logIndex: i, transactionHash: h } = e.log;
+    if (b === undefined || i === undefined || !h) continue;
+    if (!best || b > best.log.blockNumber! || (b === best.log.blockNumber && i > best.log.logIndex!)) best = e;
+  }
+  if (!best) return undefined;
+  return {
+    path: `/copy/${best.log.transactionHash}?log=${best.log.logIndex}`,
+    block: best.log.blockNumber!,
+    pool: getAddress(best.pool),
+    sourceId: best.sourceId,
+    ...(best.via ? { via: best.via } : {}),
+  };
 }

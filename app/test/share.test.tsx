@@ -5,6 +5,8 @@ import type { RawLog } from "@copybook/sdk";
 import { LEADER, guardReview, sameBlockOpen, thesisRebalance } from "@/content/proof";
 import { loadCopy, type CopyDeps, type CopyReceipt } from "@/lib/copy";
 import { fromJsonSafe } from "@/lib/json";
+import { latestCopy } from "@/lib/me/activity";
+import type { LoggedEvent } from "@/lib/events";
 import {
   LINK_WEIGHT,
   POST_LIMIT,
@@ -197,5 +199,34 @@ describe("the share pills", () => {
     expect(intentOf(hrefOf(renderToStaticMarkup(<OwnerShareOnX {...props} />))!).text).toBe(props.text);
     account.address = OTHER.toLowerCase() as Address;
     expect(intentOf(hrefOf(renderToStaticMarkup(<OwnerShareOnX {...props} />))!).text).toBe(props.ownText);
+  });
+});
+
+describe("the dashboard's latest copy", () => {
+  const me = getAddress("0x1111111111111111111111111111111111111111");
+  const copied = (block: bigint, logIndex: number, over: Partial<LoggedEvent> = {}) =>
+    ({
+      name: "Copied",
+      follower: me,
+      sourceId: "0x01" as Hex,
+      pool: "0x4181dd08e73bbcdd1ba3e615a18f6abd941b94c0",
+      fromSize: 0n,
+      toSize: 1n,
+      limitPrice: 1n,
+      capped: false,
+      log: { blockNumber: block, logIndex, transactionHash: `0x${block.toString(16).padStart(64, "0")}` as Hex },
+      ...over,
+    }) as unknown as LoggedEvent;
+
+  it("is the newest copy into this wallet, linked to its page, with how it was sent", () => {
+    const events = [copied(10n, 2, { via: "call" } as Partial<LoggedEvent>), copied(12n, 1, { via: "handler" } as Partial<LoggedEvent>), copied(12n, 4), copied(13n, 0, { follower: OTHER } as Partial<LoggedEvent>)];
+    expect(latestCopy(events, me)).toEqual({
+      path: `/copy/0x${(12).toString(16).padStart(64, "0")}?log=4`,
+      block: 12n,
+      pool: getAddress("0x4181dd08e73bbcdd1ba3e615a18f6abd941b94c0"),
+      sourceId: "0x01",
+    });
+    expect(latestCopy(events.slice(0, 2), me)?.via).toBe("handler");
+    expect(latestCopy([], me)).toBeUndefined();
   });
 });

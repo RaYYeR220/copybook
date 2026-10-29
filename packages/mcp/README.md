@@ -85,7 +85,7 @@ What a follow means, so an agent does not assume more:
 - A trader follow with no `markets` list manages the whole book. Positions the trader already holds are not opened by
   the follow itself: each opens at the trader's next move in that market, or through `catchUp` (the app's dashboard or
   the SDK; this server has no tool for it).
-- Exits are always copied. Increases are gated by the price band, per-position and whole-book caps, the equity floor, the gas tank and, for trader follows only, the AI guard (a Block verdict stops new size from that trader).
+- Exits are never gated: no cap, tank, pause or AI verdict holds back a close. Increases are gated by the price band, per-position and whole-book caps, the equity floor, the gas tank and, for trader follows only, the AI guard (a Block verdict stops new size from that trader).
 - A thesis basket opens all legs or none; between thesis versions the book can drift until resync.
 - `Copied.limitPrice` is the limit price of the order that moved the position, not the fill.
 - Testnet only.

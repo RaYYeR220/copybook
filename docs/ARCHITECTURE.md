@@ -14,7 +14,7 @@ Addresses are in [`deployments/hideki.json`](../deployments/hideki.json) and
 | --- | --- | --- |
 | `CopybookHub` | Hideki | Follows, groups, gas tanks, the reactive handler (`onSourceEvent`), `catchUp`, `poke`, `resync`. The operator followers approve on dreamDEX. |
 | `CopyEngine` | Hideki | The per-follower sync, linked as an external library: it runs by `delegatecall` on the hub's storage and emits as the hub. |
-| `PolicyLib` | Hideki | Policy validation, sizing and band prices. |
+| `PolicyLib` | (internal) | An internal library compiled into the hub and the engine: policy validation, sizing and band prices. Not deployed on its own. |
 | `GroupRelay` | Hideki | One per group of followers of one source: up to 8 for a trader (`groupSize`), 2 for a thesis (`themeGroupSize`), whose member syncs are heavier. Only the Reactivity precompile can call it; it forwards the event to the hub tagged with its source and group. |
 | `ThemeRegistry` | Hideki | Theses: up to 8 weighted legs, long or short, versioned by `rebalance`. |
 | `RiskGate` | Hideki | Holds each trader's verdict, answers the hub's `allowIncrease`, holds each follower's guard switch, and takes review requests. |
@@ -65,9 +65,12 @@ What the handler guarantees, and where it is shown:
 - **Only the hub's own subscription drives a group.** `onSourceEvent` requires the caller to be the group's relay and
   `tx.origin` to be the hub, which Somnia sets for the subscription owner. Each recorded pair's copy is sent by the hub
   ([23 of 23](PROOF.md#same-block-copies)).
-- **Exits never wait on a gate.** Each member runs in two self-calls: its exits first, then its increases. A failing
-  increase cannot take a reduction with it
-  (`contracts/test/HubFollow.t.sol::test_reductionIgnoresTankAndCaps`, [an exit under a BLOCK](PROOF.md#guard-exit)).
+- **Exits are never gated.** No cap, tank, pause or AI verdict holds back a close. Each member runs in two
+  self-calls, its exits first, then its increases, so a failing increase cannot take a reduction with it
+  (`contracts/test/HubFollow.t.sol::test_reductionIgnoresTankAndCaps`, `::test_reductionGoesThroughWhilePaused`,
+  [an exit under a BLOCK](PROOF.md#guard-exit)). A close is one immediate-or-cancel order within the exit band,
+  max(2× the follower's band, 1%) of the mark; what the book cannot fill there is recorded and synced later
+  ([LIMITS.md](LIMITS.md#copying)).
 - **Increases are priced inside the band.** One fill-or-kill order at the follower's band edge; no fill is
   `Refused(BandUnfilled)` with the venue's error ([row](PROOF.md#refusal-band),
   `contracts/test/invariant/HubInvariant.t.sol::invariant_increaseWithinBand`).
@@ -133,8 +136,8 @@ sequenceDiagram
   themselves. A verdict for anything but the trader's pending review is ignored (`StaleVerdict`).
 - **When a review fails** (unfunded reviewer, committee timeout, no agreed line, no majority) the reply carries no
   verdict and the stored one stands.
-- **One review, every hop:** [review 11](PROOF.md#one-review-end-to-end-review-11). All 43 reviews:
-  [table](PROOF.md#every-review-43). Latency from request to verdict on Hideki: median 11 s over 19 reviews of run v3
+- **One review, every hop:** [review 11](PROOF.md#one-review-end-to-end-review-11). Every review:
+  [table](PROOF.md#every-review). Latency from request to verdict on Hideki: median 11 s over 19 reviews of run v3
   ([scorecard](../eval/SCORECARD.md#cost-and-latency)).
 
 The rubric is public ([`eval/rubric.ts`](../eval/rubric.ts)) and the field the validators fetch holds only the keys
@@ -209,4 +212,5 @@ flowchart LR
 | The hub | place orders for an approved follower in the markets its follow manages, from the handler or from `catchUp`, `poke`, `resync`, `follow` and `unfollow` | anything the `placeOrderFor` grant does not cover; it holds no follower margin |
 | Anyone | `catchUp` and `poke` any follower (on their own gas), request a review | place an order a sync would not place: `catchUp` only moves a position toward the source (`contracts/test/HubFollow.t.sol::test_catchUp_onlyMovesTowardSource`) |
 | The hub's owner | set the risk gate, the handler's gas budget and billing overhead (within the contract's bounds) and the subscription parameters, pause new follows, withdraw STT above the tanks and the subscription reserve, repair subscriptions | take a tank (`contracts/test/HubAdmin.t.sol::test_withdrawSurplus_keepsTanksAndReserve`), place orders, renounce ownership (`::test_renounceOwnership_disabled`) |
-| The gate's owner | choose the reviewer whose messages count, set the fee, withdraw collected fees | deliver a verdict itself: `handle` accepts only a Hyperlane message from the reviewer on Shannon |
+| The gate's owner | switch the reviewer whose messages count as verdicts (`setReviewer`), set the fee, withdraw collected fees | deliver a verdict itself: `handle` accepts only a Hyperlane message from the current reviewer on Shannon |
+| The reviewer's owner, on Shannon | change the endpoint the data committee fetches (`setBaseUrl`), the field it reads (`setSummarySelector`), the rubric sent as the system message (`setSystemPrompt`), the agents (`setAgents`) and the gate it answers (`setGate`), and withdraw the reviewer's balance | change a committee's answer: the tier is tallied from the validators' responses (`handleVerdict`) |

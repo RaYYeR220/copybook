@@ -3,21 +3,29 @@
 Follow a trader or a thesis on dreamDEX perps. When the source moves, the Copybook hub places your copy in your own
 dreamDEX perps account, in the same block.
 
-Copybook is on-chain copy-trading for [dreamDEX](https://app.testnet.dreamdex.io/) perps on Somnia's Hideki testnet
-(chain 50383). A wallet follows one source: a trader's account, or a thesis (a weighted basket of perps, long and short,
-that its creator rebalances). When the source's position changes, Somnia's validators run the Copybook hub's reactive
-handler inside that block, and the hub places the copy in the follower's own dreamDEX account. No server watches the
-source and no bot key signs for you.
+- **Same block, no server or bot key.** Somnia's validators run the hub's reactive handler in the block of the
+  source's move, and the hub itself sends the copy ([23 of 23 recorded pairs](docs/PROOF.md#same-block-copies)).
+- **A refusal is an on-chain record.** An increase your policy refuses is written as `Refused(reason)` in the move's
+  block, and your position stays where it was ([a band refusal](docs/PROOF.md#refusal-band)).
+- **A validator-run AI guard.** A committee of Somnia validators on Shannon reviews a trader's 30-day record, and the
+  verdict crosses to Hideki over Hyperlane ([one review, end to end](docs/PROOF.md#one-review-end-to-end-review-11)).
 
-Testnet only: STT and USDso have no market value. Every wallet that follows, leads or creates a thesis in the recorded
-runs is one of ours (`demoWallets` in [`deployments/hideki.json`](deployments/hideki.json)).
+Each copy is a page and a 1200×630 share card that carries its block proof, made to be posted. Traders gain followers
+and climb a leaderboard ranked by followers and copy fidelity, thesis creators publish baskets for others to follow,
+and agents follow through the MCP server ([claims map](docs/CLAIMS.md#the-app)). There are no outside users yet: every
+wallet that follows, leads or creates a thesis in the recorded runs is one of ours (`demoWallets` in
+[`deployments/hideki.json`](deployments/hideki.json)).
+
+Copybook runs on [dreamDEX](https://app.testnet.dreamdex.io/) perps on Hideki (Somnia's Tokyo testnet, chain 50383),
+where STT and USDso have no market value. A wallet follows one source: a trader's account, or a thesis (a weighted
+basket of perps, long and short, that its creator rebalances).
 
 | | |
 | --- | --- |
 | App | https://copybook-eosin.vercel.app |
 | Demo video | <!-- VIDEO --> |
 | For judges | [JUDGES.md](JUDGES.md): a five-minute path |
-| Proof ledger | [docs/PROOF.md](docs/PROOF.md): 340 transactions read back from the chain, 340 verified (Hideki block 36,233,501, 2026-10-29) |
+| Proof ledger | [docs/PROOF.md](docs/PROOF.md): 360 transactions read back from the chain, 360 verified (Hideki block 36,407,680, 2026-10-29) |
 | Claims and their evidence | [docs/CLAIMS.md](docs/CLAIMS.md) |
 | Contracts | `CopybookHub` [0xdF73…E154](https://explorer.testnet.somnia.network/tokyo/address/0xdF73BBbB6517B712BBeD9bfAe6253A5E1FCDE154) and `RiskGate` [0xEe54…20f1](https://explorer.testnet.somnia.network/tokyo/address/0xEe54c49E9e70a0e5C2218Eec1b1BDBd4e1Cb20f1) on Hideki, `RiskReviewer` [0xc999…7c25](https://shannon-explorer.somnia.network/address/0xc999B6924179a0dc9649DA7eBa8F3aC8b7CF7c25) on Shannon; all addresses in [`deployments/`](deployments/) |
 | How it is built | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
@@ -27,12 +35,11 @@ runs is one of ours (`demoWallets` in [`deployments/hideki.json`](deployments/hi
 ## Who it is for
 
 - **Followers.** Pick a trader or a thesis, set your scale, caps, price band and equity floor once, and your book
-  follows theirs. Exits always copy ([even under a BLOCK](docs/PROOF.md#guard-exit)); increases copy only inside your
-  limits.
-- **Traders.** Any dreamDEX account can be followed, and the trader signs nothing: `follow` rejects only the zero
-  address and the follower's own (`contracts/test/HubFollow.t.sol::test_follow_rejectsBadInput`). The leaderboard ranks
-  sources by followers and by the share of their increases that were copied
-  (`app/test/leaderboard.test.ts::fidelity is copied increases over copied plus refused, with the counts`).
+  follows theirs. Exits are never gated: no cap, tank, pause or AI verdict holds back a close
+  ([an exit under a BLOCK](docs/PROOF.md#guard-exit)). Increases copy only inside your limits.
+- **Traders.** Any dreamDEX account can be followed, and the trader signs nothing
+  ([claims map](docs/CLAIMS.md#same-block-copying)). The leaderboard ranks sources by followers and by the share of
+  their increases that were copied ([claims map](docs/CLAIMS.md#the-app)).
 - **Thesis creators.** Publish a basket ("long BTC, short ETH") from the thesis builder
   ([thesis 2](docs/PROOF.md#thesis2-create)) and rebalance it; each follower's book is resized in the rebalance's own
   block ([thesis 1](docs/PROOF.md#thesis1-rebalance)).
@@ -57,25 +64,23 @@ runs is one of ours (`demoWallets` in [`deployments/hideki.json`](deployments/hi
    gas cannot cover in that block is deferred and synced later by `catchUp`, which is not a same-block copy and is
    never labelled one ([limits](docs/LIMITS.md)).
 4. **A refusal is a record.** An increase the policy refuses is written on chain as `Refused(reason)` in the move's
-   block, and the follower's position stays where it was. Recorded live: `BandUnfilled`
-   ([row](docs/PROOF.md#refusal-band)), `RiskGate` ([row](docs/PROOF.md#guard-blocked)) and the equity-floor stop
-   ([row](docs/PROOF.md#floor-poke)). The other reasons (TotalCap, TankEmpty, BelowMinimum, AtCap, MarketNotAllowed,
-   VenueRejected, LegFailed, Paused) are shown by contract tests, listed in [CLAIMS](docs/CLAIMS.md#exits-policy-and-refusals).
+   block, and the follower's position stays where it was. Recorded live: `Refused(BandUnfilled)`
+   ([row](docs/PROOF.md#refusal-band)) and `Refused(RiskGate)` ([row](docs/PROOF.md#guard-blocked)). The equity floor
+   was recorded as a stop, a `Stopped` from `poke` that closed the copy, not as a refusal
+   ([row](docs/PROOF.md#floor-poke)). The other reasons (TotalCap, EquityFloor, TankEmpty, BelowMinimum, AtCap,
+   MarketNotAllowed, VenueRejected, LegFailed, Paused) are shown by contract tests, listed in
+   [CLAIMS](docs/CLAIMS.md#exits-policy-and-refusals).
 5. **An optional AI guard,** for trader follows. Anyone can pay for a review of a trader (0.5 STT). A committee of
    Somnia validators on Shannon fetches the trader's 30-day statistics from Copybook's public endpoint, another
    classifies them OK, CAUTION or BLOCK under a published rubric, and the verdict crosses to a gate on Hideki over
    Hyperlane ([one review, end to end](docs/PROOF.md#one-review-end-to-end-review-11)).
-   Under a BLOCK, guarded followers are refused new size; exits still copy
+   Under a BLOCK, guarded followers are refused new size; exits stay ungated
    ([refused](docs/PROOF.md#guard-blocked), [exit copied](docs/PROOF.md#guard-exit)). The guard is on by default and
    each follower can turn it off ([on chain](docs/PROOF.md#app-guard-off)). How well the committee applies the rubric:
    [scorecard](eval/SCORECARD.md#result).
 
-Positions the source already holds when you follow are not copied by the follow transaction itself. A whole-book
-trader follow manages every market the trader trades: a market the trader already holds is opened by `catchUp` (one
-click on the dashboard), or synced at the trader's next move there. In the app run, one `catchUp` opened the leader's
-three markets ([row](docs/PROOF.md#app-catchup)), and BTC then synced to the leader's full size at its next move
-([pair 16](docs/PROOF.md#app-live)). A thesis follow opens every leg in the follow transaction, all or none
-([row](docs/PROOF.md#thesis1-follow)).
+A whole-book trader follow copies nothing in its own transaction: positions the trader already holds open through
+`catchUp` on the dashboard or at the trader's next move in each market ([limits](docs/LIMITS.md#copying)).
 
 ## Categories and Somnia primitives
 
@@ -92,33 +97,35 @@ card).
 
 ## Try it in 5 minutes
 
-You need an injected browser wallet (MetaMask, Rabby) with about 1 STT on Hideki (a follow keeps at least 0.2 STT in
-its gas tank) and a few USDso of margin in that wallet's dreamDEX perps account. dreamDEX's testnet docs describe
-both: [STT through its app](https://app.testnet.dreamdex.io/docs/developers/perps-testnet/README.md) (Link a Bot with
-your wallet's address, then "Send it … for gas"), and
-[paper USDso from Perps Arena](https://app.testnet.dreamdex.io/docs/trading/perps-testnet/README.md) (USDso held in
-Spot moves to Perps with the Perps ⇆ Spot transfer). Paper USDso opens positions only in the markets dreamDEX allows
-it in; BTC, ETH and SOL are among them. The one-time perps voucher claim those docs also describe reverts for every
-account as of 2026-10-29 ([feedback/01](feedback/01-voucher-self-claim-disabled.md)). Use a dedicated wallet: a
-follow manages every market its source trades in that wallet.
+**Without a wallet.** Recorded copies open in the app, for example
+[a same-block copy](https://copybook-eosin.vercel.app/copy/0xd012c9ad808025ba8ff880bde67e6972b661b3824e839754bb8681cc1b878cbc)
+or [a thesis rebalance](https://copybook-eosin.vercel.app/copy/0xd457cf3abe3c3ecf50aa76bb478143aaed88ea3460111a71b80c019692c1c114).
+The [proof ledger](docs/PROOF.md) lists every recorded transaction, and the demo video is linked at the top of this
+page.
+
+**With a wallet.** You need an injected browser wallet (MetaMask, Rabby) on Hideki with about 1 STT (a follow keeps
+at least 0.2 STT in its gas tank) and a few USDso. There is no verified self-serve route to USDso for an injected
+wallet right now: dreamDEX's one-time perps voucher claim reverts for every account
+([feedback/01](feedback/01-voucher-self-claim-disabled.md), also filed at
+https://github.com/RaYYeR220/copybook-feedback). Message [@BazydloMis57623](https://x.com/BazydloMis57623) on X with
+your Hideki address and we send STT and USDso. Use a dedicated wallet: a follow manages every market its source
+trades in that wallet.
 
 1. Open https://copybook-eosin.vercel.app/app and connect. The app offers to add Hideki to the wallet.
 2. Pick a source:
    - **A thesis.** Open [thesis 2](https://copybook-eosin.vercel.app/thesis/2) and follow it with at least the
      allocation the page shows. Both legs open in your follow transaction.
    - **The demo leader.** Open [its page](https://copybook-eosin.vercel.app/t/0xA1d0CB85c869e534Fe1e0c22af3b238301157b5d)
-     (marked ours) and follow it. Each time the leader moves, your copy is placed in its block; it moves when we
-     trade it. Under a BLOCK verdict a guarded follow records `RiskGate` refusals instead of copies; the follow flow lets you turn the
-     guard off.
+     (marked ours) and follow it. During judging (until 2026-11-08) it trades a small BTC position about every 25
+     minutes, and each move is copied in its block. Check the verdict on its page first: if it is BLOCK, turn the
+     guard off in the follow flow to see copies (exits are never gated either way).
    - **Any trader on Discover.** Scale and cap the copy to your margin.
-3. The follow flow walks through the operator approval, the policy, the guard and the tank, and reads each step back
-   from the chain.
+3. The follow flow walks through the margin, the operator approval, the policy, the guard and the tank, and reads
+   each step back from the chain. If your USDso sits in the wallet rather than its perps account, the margin step's
+   deposit action moves USDso from spot into your perps account.
 4. Watch `/me`: your book against the source's, and each copy and refusal as it lands. A copy links to its own page,
    which names the move and the copy's positions in the block. When you are done, unfollow with flatten, withdraw the
    tank and revoke the approval from the same page ([as recorded](docs/PROOF.md#in-the-app)).
-
-No funds: the recorded copies open without a wallet, for example
-[a same-block copy](https://copybook-eosin.vercel.app/copy/0xd012c9ad808025ba8ff880bde67e6972b661b3824e839754bb8681cc1b878cbc).
 
 ## Run it locally
 
@@ -149,9 +156,9 @@ Every suite passed in a fresh clone on 2026-10-29: `forge test` 257 tests, app 3
 without `COPYBOOK_LIVE=1`), MCP 56, stats 35, the proof ledger's own tests 21 (`npm test` in `e2e/`) and the rubric 8
 (`npm run eval:test`).
 
-`npm run start -w @copybook/app` serves the production build on port 3000. `cd e2e && npm run proof` re-reads every cited transaction from the chain and rewrites `docs/PROOF.md` when all of them
-verify (read-only, public RPCs, no key). Deploying and the live end-to-end run need funded keys:
-[`e2e/README.md`](e2e/README.md).
+`npm run start -w @copybook/app` serves the production build on port 3000. `cd e2e && npm run proof` re-reads every
+cited transaction from the chain and rewrites `docs/PROOF.md` when all of them verify (read-only, public RPCs, no
+key). Deploying and the live end-to-end run need funded keys: [`e2e/README.md`](e2e/README.md).
 
 ## X posts
 
@@ -188,7 +195,7 @@ wallet. It has no accounts and no database.
 | `/t/<address>` | A trader: 30-day record, open positions, the AI guard's verdict (and a paid request for a fresh one), Copybook activity. |
 | `/thesis/<id>` | A thesis: legs, version, the least allocation that opens every leg at today's marks; its creator's rebalance panel. |
 | `/thesis/new` | The thesis builder, checked against the registry's rules as you type. |
-| `/follow/trader/<address>`, `/follow/thesis/<id>` | The follow flow: operator approval, policy, AI guard, gas tank, follow. Each step is read back from the chain, so a reload resumes where you were. |
+| `/follow/trader/<address>`, `/follow/thesis/<id>` | The follow flow: margin, operator approval, policy, AI guard, gas tank, follow. Each step is read back from the chain, so a reload resumes where you were. |
 | `/me` | The dashboard: your book against the source's, the live copy feed, refusals by reason, the tank, the guard, and every stuck state with the call that clears it. |
 | `/leaderboard` | Sources by followers and by copy fidelity. |
 | `/copy/<tx>` | One copy, with its same-block proof and a share card. |

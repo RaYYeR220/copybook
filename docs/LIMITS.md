@@ -26,7 +26,8 @@ out of every ranking. The traders the AI guard reviewed are real dreamDEX accoun
 | demo thesis creator | `0xA969Dd0B79Ca1d4571E45d97A8f4981805eBaEd3` |
 | demo agent (MCP) | `0xCDE791006eA6E99e9A614Bc9d0995879E2Cc5E72` |
 
-The demo leader moves only when we trade it, so its followers get a copy only then.
+The demo leader moves only when we trade it, so its followers get a copy only then. During judging (until
+2026-11-08) a bot of ours trades it: a small BTC position about every 25 minutes.
 
 ## What is mocked
 
@@ -58,6 +59,13 @@ exit ([row](PROOF.md#guard-exit)).
   ([PROOF](PROOF.md#same-block-copies)). The hub's whole event log through Hideki block 36,282,657 (read from
   `/api/history` on 2026-10-29) holds no `Deferred` or `GroupDeferred`, so the deferral path is shown by tests only
   (`contracts/test/HubEdgeCases.t.sol::test_exitsOutOfGas_deferredUnbilled`).
+- **A close can go unfilled.** Exits are never gated: no cap, tank, pause or AI verdict holds back a close. A close is
+  one immediate-or-cancel order within max(2× the follower's band, 1%) of the mark (`_reduce` in
+  `contracts/src/CopyEngine.sol`, `exitBand` in `contracts/src/PolicyLib.sol`). If the book cannot fill it there, it
+  is recorded as `Refused(BandUnfilled)` (or `VenueRejected` when the venue rejects the order), and the position syncs
+  at the source's next move or a `catchUp` (`contracts/test/HubFollow.t.sol::test_iocSuccessWithoutFill_isBandUnfilled`).
+  A residue below one lot or the venue's minimum order is dust the venue cannot take; it stays in the account until a
+  later order that crosses zero takes it along.
 - **A whole-book follow opens nothing by itself.** The positions the trader already holds open through `catchUp` or at
   the trader's next move in each market ([catchUp](PROOF.md#app-catchup), [next move](PROOF.md#app-live)).
 - **A copy copies the outcome too.** Scale, caps, the band and the equity floor bound the size and price of each copy,
@@ -99,7 +107,6 @@ of the wallet and stays after unfollow until revoked ([revoke](PROOF.md#app-revo
 - **The verdict lane is a dev lane.** The Hyperlane lane between Shannon and Hideki has a single validator on each
   side's ISM, the same key on both. Whoever holds that key could deliver a forged verdict, a BLOCK included. The
   committee's work can be checked on Shannon; the gate on Hideki trusts the lane.
-- **The gate's owner chooses the reviewer,** and with it whose messages count as verdicts.
 - **A verdict is a risk tier, not advice.** An LLM committee applies a published rubric to data from Copybook's own
   endpoint. The data committee attests that its members fetched the same bytes, not that the bytes are true; the
   risk line is built from the dreamDEX indexer with a 2,000-row cap (`partial=1` beyond it).
@@ -118,8 +125,13 @@ of the wallet and stays after unfollow until revoked ([revoke](PROOF.md#app-revo
 
 The hub's owner (ours) can point the hub at another gate (a gate can only refuse increases), tune the handler's gas
 budget and billing overhead within the contract's bounds, change subscription fees for groups opened later, and pause
-new follows. It cannot take a follower's tank or place orders. Ownership cannot be renounced, so these settings stay
-reachable. See [who can do what](ARCHITECTURE.md#who-can-do-what).
+new follows. It cannot take a follower's tank or place orders.
+
+The gate's owner (ours) can switch the reviewer with `setReviewer`, and with it whose messages count as verdicts. The
+reviewer's owner on Shannon (ours) can change the endpoint the data committee fetches (`setBaseUrl`), the field it
+reads (`setSummarySelector`), the rubric sent to the LLM committee (`setSystemPrompt`), the agents (`setAgents`) and
+the gate it answers (`setGate`), and withdraw the reviewer's balance. None of the three contracts can renounce
+ownership, so these settings stay reachable. See [who can do what](ARCHITECTURE.md#who-can-do-what).
 
 ## Shown in code, not by a test or a transaction
 

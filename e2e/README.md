@@ -195,7 +195,7 @@ checks of `trade` and `guard` need `debug_traceTransaction`: without a trace the
 UNVERIFIED (exit code 2), never PASS.
 
 **Held BLOCKs and the e2e follower.** A BLOCK on a trader refuses new size to every guarded follower of that trader;
-exits still copy. The gate keeps a BLOCK against a milder verdict for `BLOCK_HOLD` (24 h) after it landed, and a BLOCK
+exits are never gated. The gate keeps a BLOCK against a milder verdict for `BLOCK_HOLD` (24 h) after it landed, and a BLOCK
 that is not replaced stops blocking after `VERDICT_TTL` (7 d). While the leader holds a BLOCK, the guarded test
 follower's increases are refused, so before `npm run live` scenarios that expect increases to copy, either opt the
 follower out (`setGuard(false)` from the follower, as the `guard` step does) or re-review the leader once its hold has

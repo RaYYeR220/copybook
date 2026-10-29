@@ -1,8 +1,9 @@
 # Copybook: a path for judges
 
-Five minutes, in the order of the judging criteria. Everything runs on Somnia testnets (Hideki, chain 50383; Shannon,
-chain 50312), and every wallet that follows, leads or creates a thesis in the evidence is ours (`demoWallets` in
-[`deployments/hideki.json`](deployments/hideki.json)). What Copybook does not do: [docs/LIMITS.md](docs/LIMITS.md).
+Five minutes, in the order of the judging criteria. Everything runs on Somnia testnets: Hideki (Somnia's Tokyo
+testnet, chain 50383) and Shannon (chain 50312). There are no outside users yet: every wallet that follows, leads or
+creates a thesis in the evidence is ours (`demoWallets` in [`deployments/hideki.json`](deployments/hideki.json)).
+What Copybook does not do: [docs/LIMITS.md](docs/LIMITS.md).
 
 ## If you have one minute
 
@@ -12,29 +13,34 @@ chain 50312), and every wallet that follows, leads or creates a thesis in the ev
    account is position 22 of the same block. On the explorer:
    [the move](https://explorer.testnet.somnia.network/tokyo/tx/0x6880ee77710e3156184063cce42be51517df7ca1bb835d25037ebe5556b7f44d),
    [the copy](https://explorer.testnet.somnia.network/tokyo/tx/0xd012c9ad808025ba8ff880bde67e6972b661b3824e839754bb8681cc1b878cbc).
-2. Read the top of [docs/PROOF.md](docs/PROOF.md): 340 of 340 cited transactions verified on chain, 23 of 23
-   same-block pairs, 8 of 8 contracts, as of Hideki block 36,233,501 (2026-10-29).
+2. Read the top of [docs/PROOF.md](docs/PROOF.md): 360 of 360 cited transactions verified on chain, 23 of 23
+   same-block pairs, 8 of 8 contracts, as of Hideki block 36,407,680 (2026-10-29).
 3. Skim [docs/LIMITS.md](docs/LIMITS.md).
 
 ## 1. MVP potential (2 minutes)
 
 **The value.** Copy-trading without a copy server: you follow a trader or a thesis, and the Copybook hub resizes the
 positions in your own dreamDEX perps account in the source's block, inside the scale, caps, price band and equity
-floor you set. Exits always copy. A refusal is written on chain with its reason.
+floor you set. Exits are never gated: no cap, tank, pause or AI verdict holds back a close. A refusal is written
+on chain with its reason.
 
 **See it.**
 
 1. Open [the app](https://copybook-eosin.vercel.app/app). Discover ranks real dreamDEX traders by 30-day realized
    PnL, lists the theses with the least allocation that opens them, and shows the live tape of copies and refusals.
    Our demo leader is listed apart and marked ours.
-2. Follow a source. With a funded testnet wallet (see [Try it in 5 minutes](README.md#try-it-in-5-minutes)):
-   [thesis 2](https://copybook-eosin.vercel.app/thesis/2) opens both legs in your follow transaction;
-   [the demo leader](https://copybook-eosin.vercel.app/t/0xA1d0CB85c869e534Fe1e0c22af3b238301157b5d) is copied in its
-   own block when it moves, which is when we trade it. The trader page shows the leader's current AI verdict.
+2. Follow a source with a funded testnet wallet. For STT and USDso, message
+   [@BazydloMis57623](https://x.com/BazydloMis57623) on X with your Hideki address (why:
+   [Try it in 5 minutes](README.md#try-it-in-5-minutes)). [Thesis 2](https://copybook-eosin.vercel.app/thesis/2) opens
+   both legs in your follow transaction. During judging (until 2026-11-08)
+   [the demo leader](https://copybook-eosin.vercel.app/t/0xA1d0CB85c869e534Fe1e0c22af3b238301157b5d) trades a small
+   BTC position about every 25 minutes, and each move is copied in its block. Check the verdict on the trader page
+   first: if it is BLOCK, turn the guard off in the follow flow to see copies (exits are never gated either way).
 3. Watch it land on `/me`, or open copies already recorded:
    - [one handler run, two followers](https://copybook-eosin.vercel.app/copy/0x9b950e40fe79338890174ef0e9d4ed7cc2bf5733e6d1df04b049f74b916e9e3c):
-     the leader buys BTC, the follower with its guard off is copied, and the guarded one is refused `RiskGate`, in the
-     same block ([row](docs/PROOF.md#app-live));
+     the leader buys BTC and the follower with its guard off is copied in the same block. The same handler
+     transaction refuses the guarded follower `RiskGate`, which the copy page does not show: see
+     [its PROOF row](docs/PROOF.md#app-live);
    - [a thesis rebalance](https://copybook-eosin.vercel.app/copy/0xd457cf3abe3c3ecf50aa76bb478143aaed88ea3460111a71b80c019692c1c114),
      50/50 to 70/30, copied in the rebalance's block ([row](docs/PROOF.md#thesis1-rebalance)).
 
@@ -61,12 +67,12 @@ block, position, sender, target, function, gas and events checked.
 
 | What | Where |
 | --- | --- |
-| Live orders by the hub in followers' accounts, in the source's block | [23 same-block pairs](docs/PROOF.md#same-block-copies) |
+| Copies sent by the hub into followers' accounts, in the source's block | [23 same-block pairs](docs/PROOF.md#same-block-copies) |
 | The app run: approval, guard off, follow, `catchUp`, a live copy, top-up, unfollow with flatten, withdraw, revoke, all sent from the app's pages | [In the app](docs/PROOF.md#in-the-app) |
 | Refusals on chain, in the move's block | [Refusals](docs/PROOF.md#refusals-on-chain) |
 | Theses: created, followed (both legs in one transaction), rebalanced and copied in the rebalance's block | [Theses](docs/PROOF.md#theses) |
 | The AI guard, every hop of one review across both chains | [Review 11](docs/PROOF.md#one-review-end-to-end-review-11) |
-| All 43 reviews, each tier read from `VerdictTallied` | [Every review](docs/PROOF.md#every-review-43) |
+| Every review, each tier read from `VerdictTallied` | [Every review](docs/PROOF.md#every-review) |
 | A BLOCK refuses new size and never an exit | [Guard rows](docs/PROOF.md#a-block-refuses-new-size-never-an-exit) |
 | An AI agent following a thesis through the MCP server, dry run first | [MCP agent](docs/PROOF.md#mcp-agent) |
 | Contracts at the addresses in `deployments/`, with source verification | [Contracts](docs/PROOF.md#contracts) |

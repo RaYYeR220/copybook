@@ -165,7 +165,7 @@ key). Deploying and the live end-to-end run need funded keys: [`e2e/README.md`](
 Posts about Copybook, tagging [@DreamDEXSomnia](https://x.com/DreamDEXSomnia):
 
 - [Launch: follow a trader or a thesis, and your copy lands in the same block as their trade](https://x.com/BazydloMis57623/status/2115937201766715680)
-<!-- X2 -->
+- [How the copy path works: one Reactivity subscription, a handler in the trader's block, a one-function grant](https://x.com/BazydloMis57623/status/2116076543461961916)
 <!-- X3 -->
 
 ## What is in this repo

@@ -13,7 +13,7 @@ What Copybook does not do: [docs/LIMITS.md](docs/LIMITS.md).
    account is position 22 of the same block. On the explorer:
    [the move](https://explorer.testnet.somnia.network/tokyo/tx/0x6880ee77710e3156184063cce42be51517df7ca1bb835d25037ebe5556b7f44d),
    [the copy](https://explorer.testnet.somnia.network/tokyo/tx/0xd012c9ad808025ba8ff880bde67e6972b661b3824e839754bb8681cc1b878cbc).
-2. Read the top of [docs/PROOF.md](docs/PROOF.md): 360 of 360 cited transactions verified on chain, 23 of 23
+2. Read the top of [docs/PROOF.md](docs/PROOF.md): 461 of 461 cited transactions verified on chain, 23 of 23
    same-block pairs, 8 of 8 contracts, as of Hideki block 36,407,680 (2026-10-29).
 3. Skim [docs/LIMITS.md](docs/LIMITS.md).
 

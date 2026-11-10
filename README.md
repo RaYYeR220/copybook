@@ -1,7 +1,12 @@
 # Copybook
 
-Follow a trader or a thesis on dreamDEX perps. When the source moves, the Copybook hub places your copy in your own
-dreamDEX perps account, in the same block.
+Follow a trader or a thesis on dreamDEX perps: your copy lands in your own perps account in the same block as their trade.
+
+[![Live recording of the demo follower's dashboard on Somnia's Hideki testnet: the demo leader opens a 0.00013 BTC long, both sides of Your book vs theirs turn long 0.00013 and in step, then the copy lands in the live feed marked same block #36,461,558](docs/media/copy-lands.gif)](https://youtu.be/HpLdCtyvta0)
+
+**[Watch the 2-min demo](https://youtu.be/HpLdCtyvta0)** · **[A same-block copy, on chain](https://copybook-eosin.vercel.app/copy/0xd012c9ad808025ba8ff880bde67e6972b661b3824e839754bb8681cc1b878cbc)** · **[Judge in 5 minutes](JUDGES.md)**
+
+## Why it's different
 
 - **Same block, no server or bot key.** Somnia's validators run the hub's reactive handler in the block of the
   source's move, and the hub itself sends the copy ([40 of 40 recorded pairs](docs/PROOF.md#same-block-copies)).

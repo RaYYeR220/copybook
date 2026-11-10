@@ -1,10 +1,10 @@
 # Proof ledger
 
-Every transaction Copybook's documents cite, read back from the chain. `npm run proof` (in `e2e/`) wrote this file at **Hideki block 36,635,027** and **Shannon block 527,424,192**, 2026-10-29 23:31 UTC.
+Every transaction Copybook's documents cite, read back from the chain. `npm run proof` (in `e2e/`) wrote this file at **Hideki block 46,589,967** and **Shannon block 537,385,281**, 2026-11-10 12:17 UTC.
 
-**461 transactions checked: 461 verified, 0 failed, 0 unverified.** 23 of 23 same-block pairs check out. 8 of 8 contracts check out.
+**484 transactions checked: 484 verified, 0 failed, 0 unverified.** 25 of 25 same-block pairs check out. 8 of 8 contracts check out.
 
-Testnet only: Hideki (chain 50383; its explorer is the Tokyo explorer) and Shannon (chain 50312) are Somnia testnets, and STT and USDso have no market value. A wallet shown with a role (demo leader, demo follower, …) is one of Copybook's own (`demoWallets` in `deployments/hideki.json`); the traders in the review table are dreamDEX traders the AI guard reviewed.
+Testnet only: Hideki (chain 50383; its explorer is the Tokyo explorer) and Shannon (chain 50312) are Somnia testnets, and STT and USDso have no market value. A wallet shown with a role (demo leader, demo follower, …) is one of Copybook's own (`demoWallets` in `deployments/hideki.json`); the traders in the review table are dreamDEX traders the AI guard reviewed, and the trader in [Copying a trader we don't control](#copying-a-trader-we-dont-control) is a dreamDEX account we do not control.
 
 **What a ✓ means.** The transaction is on the chain named and succeeded, and everything recorded for it matches the chain: its block and position in the block, sender, target, the function it called and the arguments listed, its gas, and the events Copybook's contracts emitted in it, as far as the row records them. A same-block pair also needs the copy in the move's block, after the move, sent by the hub. A transaction the RPC could not return after retries is marked unverified, never ✓.
 
@@ -13,6 +13,8 @@ Testnet only: Hideki (chain 50383; its explorer is the Tokyo explorer) and Shann
 - `e2e`: The end-to-end run against the current hub (`npm run live`), 2026-10-28
 - `risk`: The risk module's runs (`npm run risk`), 2026-10-28, recorded in deployments/risk.json
 - `app`: A run through the web app's pages (a preview deployment) and the MCP server, 2026-10-29
+- `outside`: A demo follower of ours following dreamDEX trader 0xD3Ec…E619 on ETH, set up with `npm run outside` (in e2e/) on 2026-11-10
+- `refresh`: Top-ups on 2026-11-10 so the demo runs last through 2026-11-25
 
 ## Contracts
 
@@ -24,8 +26,8 @@ Testnet only: Hideki (chain 50383; its explorer is the Tokyo explorer) and Shann
 | <a id="contract-relay-leader"></a>GroupRelay (the demo leader, group 0) | Hideki | [0xEFf3…E7BF](https://explorer.testnet.somnia.network/tokyo/address/0xEFf35D485c4559D9f44e5138B38Cd93052f2E7BF) | opened by the hub in [0x07e53352…af92](https://explorer.testnet.somnia.network/tokyo/tx/0x07e53352b9e495f57377bfc383df4c0ef64d05eb4c2647f29b7e3ad7ea35af92) (`GroupOpened`) | verified at deploy (forge); explorer read-back unavailable | ✓ |
 | <a id="contract-relay-thesis1"></a>GroupRelay (thesis 1, group 0) | Hideki | [0x6DAd…648c](https://explorer.testnet.somnia.network/tokyo/address/0x6DAda17bC84079374Bf73FCa8E9F1066290E648c) | opened by the hub in [0x9ba45cff…cd3e](https://explorer.testnet.somnia.network/tokyo/tx/0x9ba45cff499cf822453b385cba8a0b1286c1ec06a43a9abac360e23af19ecd3e) (`GroupOpened`) | verified at deploy (forge); explorer read-back unavailable | ✓ |
 | <a id="contract-gate"></a>RiskGate | Hideki | [0xEe54…20f1](https://explorer.testnet.somnia.network/tokyo/address/0xEe54c49E9e70a0e5C2218Eec1b1BDBd4e1Cb20f1) | [0x7176d2e2…72a5](https://explorer.testnet.somnia.network/tokyo/tx/0x7176d2e229bb9a88e2f853360dc81a6bf6597d3d1602f4f53554b53b469e72a5) · block 35,358,791 | verified at deploy (forge); explorer read-back unavailable | ✓ |
-| <a id="contract-reviewer"></a>RiskReviewer (run v3 and after) | Shannon | [0xc999…7c25](https://shannon-explorer.somnia.network/address/0xc999B6924179a0dc9649DA7eBa8F3aC8b7CF7c25) | [0x99765a02…3ced](https://shannon-explorer.somnia.network/tx/0x99765a02b814805036c8293ff919d1cb1f0130829d6983272463ed4f919a3ced) · block 526,233,904 | read back from the explorer: verified, v0.8.30+commit.73712a01 | ✓ |
-| <a id="contract-reviewer-v2"></a>RiskReviewer (runs v1 and v2, retired) | Shannon | [0x45b4…ECc3](https://shannon-explorer.somnia.network/address/0x45b46d39697Cfd191BfEb215512d012d28E6ECc3) | [0x7aaa705f…9f17](https://shannon-explorer.somnia.network/tx/0x7aaa705f0aad43c41404f55685e6b2c2e3df494112876456f4bdc524d8f39f17) · block 526,147,746 | read back from the explorer: verified, v0.8.30+commit.73712a01 | ✓ |
+| <a id="contract-reviewer"></a>RiskReviewer (run v3 and after) | Shannon | [0xc999…7c25](https://shannon-explorer.somnia.network/address/0xc999B6924179a0dc9649DA7eBa8F3aC8b7CF7c25) | [0x99765a02…3ced](https://shannon-explorer.somnia.network/tx/0x99765a02b814805036c8293ff919d1cb1f0130829d6983272463ed4f919a3ced) · block 526,233,904 | read back from the explorer: verified, solc 0.8.30+commit.73712a01 | ✓ |
+| <a id="contract-reviewer-v2"></a>RiskReviewer (runs v1 and v2, retired) | Shannon | [0x45b4…ECc3](https://shannon-explorer.somnia.network/address/0x45b46d39697Cfd191BfEb215512d012d28E6ECc3) | [0x7aaa705f…9f17](https://shannon-explorer.somnia.network/tx/0x7aaa705f0aad43c41404f55685e6b2c2e3df494112876456f4bdc524d8f39f17) · block 526,147,746 | read back from the explorer: verified, solc 0.8.30+commit.73712a01 | ✓ |
 
 **On chain** is what the ledger read from the chain: the address holds code now, its deploy transaction created exactly that address (CopyEngine through the CREATE2 deployer, the relays by the hub inside a follow, named by `GroupOpened`), and it matches `deployments/*.json`. **Source verification** is not a chain fact. The Shannon reviewers are read back from Shannon's explorer API on every run. The Hideki contracts were verified with `forge verify-contract` when they were deployed; the Tokyo explorer's API does not answer verification queries ("Not available"), so for them this column repeats what forge reported then and is not re-checked.
 
@@ -44,7 +46,7 @@ Testnet only: Hideki (chain 50383; its explorer is the Tokyo explorer) and Shann
 
 When a source's position changes, Somnia's validators run the hub's reactive handler inside the same block, and the handler places the copy in the follower's own dreamDEX account. Each row is a move and the hub's handler transaction for it.
 
-**23 of 23 pairs in this ledger** (this table and the pairs under Refusals, Theses and AI guard) have the copy in the move's block, after it, sent by the hub.
+**25 of 25 pairs in this ledger** (this table and the pairs under Live since the bot started, Refusals, Theses and AI guard) have the copy in the move's block, after it, sent by the hub.
 
 | # | Run | The move | Block | Move · position | Copy · position | What the copy did | Check |
 |---|---|---|---|---|---|---|---|
@@ -71,6 +73,40 @@ Setup for the residue pairs:
 |---|---|---|---|---|---|
 | <a id="residue-14e2"></a>Residue setup: the follower buys 0.00023 BTC on its own | [0x14e23ae1…d4b4](https://explorer.testnet.somnia.network/tokyo/tx/0x14e23ae1e3caa789758991ba99fe3266a0c70ec4e6c0864731a104fb5070d4b4) | 35,025,740 · #2 | demo follower 0x7d73…1932 | `placeOrder` | ✓ |
 | <a id="residue-7d03"></a>Residue setup: the follower sells 0.00013 BTC, leaving 0.0001 (below the 0.00013 minimum) | [0x7d031829…53ea](https://explorer.testnet.somnia.network/tokyo/tx/0x7d031829ef569159ec8aeaec4a7722d8386eb1b78e3d45d07939133a4af953ea) | 35,025,748 · #5 | demo follower 0x7d73…1932 | `placeOrder` | ✓ |
+
+## Live since the bot started
+
+`npm run uptime` (in `e2e/`) read every move of the demo leader 0xA1d0…7b5d and the hub's log from Hideki block 36,410,390 (2026-10-29 17:17 UTC, the demo-leader bot's first trade) to block 46,570,615 (2026-11-10 11:45 UTC). A move is a transaction that emitted dreamDEX's `PositionUpdated` for the leader; a handler run is a transaction the hub sent to the leader's group relay in the move's block, after the move. These are that run's numbers, kept in `e2e/proof/uptime.json`; this ledger re-checks the sample pairs below, not every copy.
+
+| | |
+|---|---|
+| The leader's moves | 665 transactions, 709 `PositionUpdated` events |
+| Handler runs in the moves' blocks | 709: 651 with a copy, 8 with refusals only, 50 that copied and refused nothing |
+| Handler copies | **651, 651 in the leader's block** |
+| Handler copies by follower | demo follower 0x7d73…1932: 651 |
+| Refusals by reason | `BandUnfilled` 8 |
+| `Deferred`, `GroupDeferred` | 0, 0 |
+| Copies sent directly (`catchUp`, `follow`, `unfollow`), not by the handler | 0 |
+| Charged to the followers' tanks in these runs | demo follower 0x7d73…1932: 7.37 STT |
+
+| Run | The move | Block | Move · position | Copy · position | What the copy did | Check |
+|---|---|---|---|---|---|---|
+| uptime | <a id="uptime-1"></a>the first handler copy after the bot started | 36,410,390 | [0x8cc34704…1690](https://explorer.testnet.somnia.network/tokyo/tx/0x8cc34704fb5596fdc9ba78802cb4986141e373cd51d118af13e8239475a81690) · #0 | [0x18d3cc07…dd32](https://explorer.testnet.somnia.network/tokyo/tx/0x18d3cc070f568a9242429b5cb893ce117d8a21c024f1bfed8790803aa4ffdd32) · #29 | copied BTC 0 → 0.00026 · tank charged 0.0103 STT | ✓ |
+| uptime | <a id="uptime-2"></a>the last handler copy before the as-of block | 46,559,342 | [0x1c85a0b3…7665](https://explorer.testnet.somnia.network/tokyo/tx/0x1c85a0b395e32d70e75f36ca3300f9402cda445ee4964692d29b4862c63f7665) · #2 | [0x84ffc26a…86b8](https://explorer.testnet.somnia.network/tokyo/tx/0x84ffc26aa903fcf0bff7c3a8fd008db81c51f1e74be10f42778831b87e5f86b8) · #4 | copied BTC 0 → 0.00013 · tank charged 0.0118 STT | ✓ |
+
+## Copying a trader we don't control
+
+A demo follower of ours following dreamDEX trader 0xD3Ec…E619 on ETH, set up with `npm run outside` (in e2e/) on 2026-11-10. The trader is a dreamDEX account Copybook does not control: it signed nothing, does not know it is followed, and every move below is its own. The follower is ours (`demoWallets`), so this is a source we do not control, not an outside user. Each pair is one of the trader's moves and the hub's handler transaction in its block, with what it did for our follower: a copy, or a refusal with its reason. The review of the trader that the follower paid for is in [every review](#every-review).
+
+| Step | Tx | Block · position | From | What the chain says | Check |
+|---|---|---|---|---|---|
+| <a id="outside-fund-stt"></a>The owner sends the follower 3.5 STT (gas, the review fee and the tank) | [0xc5706d0f…58f6](https://explorer.testnet.somnia.network/tokyo/tx/0xc5706d0f734a3b955b4c133f9388cb9328ca2e36822884374f899166207758f6) | 46,568,134 · #0 | owner 0x5397…4632 | 3.5 STT sent | ✓ |
+| <a id="outside-fund-usdso"></a>The owner sends the follower 10 USDso | [0x633a081c…2cc1](https://explorer.testnet.somnia.network/tokyo/tx/0x633a081ce146b52d6d1b1ef2e7a70fbf5199cfda35113ed8389ed17080462cc1) | 46,568,159 · #3 | owner 0x5397…4632 |  | ✓ |
+| <a id="outside-deposit"></a>The follower deposits 10 USDso into its perps account | [0x244c75b9…e86e](https://explorer.testnet.somnia.network/tokyo/tx/0x244c75b9901186fe04c7d8f181ae66555a95cb2f78d1758f6baca06a8fcfe86e) | 46,568,315 · #2 | demo follower 0xDe52…eaAB |  | ✓ |
+| <a id="outside-guard-on"></a>The follower turns its AI guard on | [0xc79c1065…6e2a](https://explorer.testnet.somnia.network/tokyo/tx/0xc79c10654a67862a84ac59f70dd9b0933fcfd9e811250089a4cedd69f9cc6e2a) | 46,568,336 · #0 | demo follower 0xDe52…eaAB | `setGuard`(on=true) · guard on | ✓ |
+| <a id="outside-approve"></a>The follower grants the hub placeOrderFor (global) | [0xaf72b103…0a0a](https://explorer.testnet.somnia.network/tokyo/tx/0xaf72b103a7aca4f29b9885135a835a947b6ca13229b77a3c905ff99591b70a0a) | 46,568,356 · #1 | demo follower 0xDe52…eaAB | `setOperatorApprovalGlobal`(operator=the hub, selectors=["0x80054449"], approved=true) | ✓ |
+| <a id="outside-review"></a>The follower pays the gate 0.5 STT for a review of the trader (review 68: CAUTION, 3 of 3) | [0x1ba3aa30…66bf](https://explorer.testnet.somnia.network/tokyo/tx/0x1ba3aa30d51666e580dff75db687c1706a4067bbc843c4eca68576f6184c66bf) | 46,568,377 · #1 | demo follower 0xDe52…eaAB | `requestReview`(trader=0xD3Ec…E619), 0.5 STT sent · review 68 requested | ✓ |
+| <a id="outside-follow"></a>The follower follows the trader on ETH: scale 1.5%, at most 10 USDso a position and 15 in all, band 0.5%, floor 3 USDso, tank 2 STT. The trader held 0.5376 ETH short, so the follow itself opens 0.0047 ETH short, at the cap | [0x5a9596cb…7493](https://explorer.testnet.somnia.network/tokyo/tx/0x5a9596cb659c1b10775703e0b015c00eb50cb8cb5af904d38b4528e2f1de7493) | 46,568,414 · #0 | demo follower 0xDe52…eaAB | `follow`(kind=Trader), 2 STT sent · group 0 opened (relay 0x8ad8…5404, subscription 37752877) · Followed (Trader) · copied ETH 0 → -0.0047 | ✓ |
 
 ## Refusals on chain
 
@@ -193,7 +229,7 @@ Each input is the commit that holds the answer key followed by the key file's ke
 | <a id="anchor-v3"></a>run v3: the answer key's commit (5aed53b) and the key file's keccak256, written on chain | [0xb6792325…0e13](https://explorer.testnet.somnia.network/tokyo/tx/0xb67923259aa552c033eba19271020d41f206c04a44d461ef9237c3752dd40e13) | 35,446,065 · #5 | owner 0x5397…4632 | data `0x5aed53bf…902f` as recorded, sent to itself · before all 20 review requests of the run (reviews 24–43, the first at block 35,446,272); the key file as committed in 5aed53b hashes to the anchored keccak256 | ✓ |
 | <a id="anchor-v4"></a>run v4: the answer key's commit (a7c42c2) and the key file's keccak256, written on chain | [0xadd80abe…6b09](https://explorer.testnet.somnia.network/tokyo/tx/0xadd80abe7fdd825fe6f4086d62b09c44f50d2aeb2519b0479462e0a14be06b09) | 36,605,996 · #1 | owner 0x5397…4632 | data `0xa7c42c24…2287` as recorded, sent to itself · before all 20 review requests of the run (reviews 48–67, the first at block 36,606,275); the key file as committed in a7c42c2 hashes to the anchored keccak256 | ✓ |
 
-### Every review (67)
+### Every review (69)
 
 <a id="every-review"></a>The committee's tier is read from `VerdictTallied` on Shannon, and what the gate did from `VerdictReceived` or `BlockHeld` on Hideki. Runs, prompts and scoring: `eval/SCORECARD.md`.
 
@@ -266,6 +302,8 @@ Each input is the commit that holds the answer key followed by the key file's ke
 | <a id="review-65"></a>65 | [0x518E…9A18](https://explorer.testnet.somnia.network/tokyo/address/0x518EB8ee6D091F74D673B6331b65ab5318B39A18) | Caution (0/3/0 of 3) | Caution stored | [0xea3e41e0…34cd](https://explorer.testnet.somnia.network/tokyo/tx/0xea3e41e0f5e180bc50be6c133ef8a006e1509778d9618e68b6fb668e7e7e34cd) | [0xf5417c47…c05a](https://shannon-explorer.somnia.network/tx/0xf5417c475ba2d4d5f73a91526049748eae94880c604d7a0af433088f247fc05a) | [0xbcc236b8…50f1](https://shannon-explorer.somnia.network/tx/0xbcc236b88a2e014c95db5c14acdf19a330a431d6c9005aa1a262d531d1d150f1) | [0x9ce0ff39…d378](https://shannon-explorer.somnia.network/tx/0x9ce0ff3984ec03cc6b414f0617ef2692e87a6e6471a469dcb947235a4624d378) | [0x42ed327d…5c84](https://explorer.testnet.somnia.network/tokyo/tx/0x42ed327dbbfb53d63d4003cc3398d73be8c61e1fae728500f1a67975ebe45c84) | ✓ |
 | <a id="review-66"></a>66 | [0x9e18…3495](https://explorer.testnet.somnia.network/tokyo/address/0x9e18c49EfC49ac55D9F7E4c4aDa469Aef4073495) | Block (0/0/3 of 3) | Block stored | [0x824d7e56…1f10](https://explorer.testnet.somnia.network/tokyo/tx/0x824d7e560cd459d6d8a68dbb64490154e8e08db195dae607214dd834aae21f10) | [0xe2a3760d…01a0](https://shannon-explorer.somnia.network/tx/0xe2a3760dea9f992d1348e8b775b63ece1ed9d101de8b1d3cbae64f10f92101a0) | [0xc34aea24…ce38](https://shannon-explorer.somnia.network/tx/0xc34aea241e43c7b8281699874d1447eac2a663dc3f4c54ca508fa2828168ce38) | [0xd7758e90…bea9](https://shannon-explorer.somnia.network/tx/0xd7758e9036127141eedfff62827111d730f59088a3ffd53492f29922e2f6bea9) | [0x135d6518…04ae](https://explorer.testnet.somnia.network/tokyo/tx/0x135d651830f59cd3e2c9ea9274f5938adde68a0e98deb4ed1d8b1c6caa4c04ae) | ✓ |
 | <a id="review-67"></a>67 | [0xC1DA…f5b1](https://explorer.testnet.somnia.network/tokyo/address/0xC1DA1F512528b0b77C5fF199904951B7B9Dcf5b1) | Block (0/0/3 of 3) | Block stored | [0x0180c68c…adde](https://explorer.testnet.somnia.network/tokyo/tx/0x0180c68cf5d8f9eefc5e400922a62e0312fefc0227eede0e99b78124ae75adde) | [0xdaf552d8…a9c8](https://shannon-explorer.somnia.network/tx/0xdaf552d8a8cb4b78e816d51df4b6770d66e438cdce1b72489742166f3663a9c8) | [0xb3609550…de83](https://shannon-explorer.somnia.network/tx/0xb3609550ac7acef9e2d61bdc3c6aaef19c539e12345ded70fd932012d29ade83) | [0x0208db32…3495](https://shannon-explorer.somnia.network/tx/0x0208db32108de2958bb42a7273f9cdc74c6a6413fe4dadc2e2f8a12e6ea23495) | [0x8a70ffe5…28af](https://explorer.testnet.somnia.network/tokyo/tx/0x8a70ffe570747dc782f2557cedfc22826ddda0b94912b624149cb68b6e9c28af) | ✓ |
+| <a id="review-68"></a>68 | [0xD3Ec…E619](https://explorer.testnet.somnia.network/tokyo/address/0xD3Ecd94b11Dfe7515d5614b0458Bf22175aDE619) | Caution (0/3/0 of 3) | Caution stored | [0x1ba3aa30…66bf](https://explorer.testnet.somnia.network/tokyo/tx/0x1ba3aa30d51666e580dff75db687c1706a4067bbc843c4eca68576f6184c66bf) | [0x30f91373…7103](https://shannon-explorer.somnia.network/tx/0x30f91373024cc92394d16c2480784fcca1000a7ce3f2df9ddfcfac29b29a7103) | [0x4021d1db…242c](https://shannon-explorer.somnia.network/tx/0x4021d1db977c98af637fc31210ac67f3ce99dfd5a85bd5fd2e3733dec467242c) | [0xf5ce66e1…1237](https://shannon-explorer.somnia.network/tx/0xf5ce66e1836803a7ca7f85739e3bd542a180254f22de6ccf1564cdd1caad1237) | [0xe79c378a…7d02](https://explorer.testnet.somnia.network/tokyo/tx/0xe79c378ab2949589dfd965e41ebb2cd237e745c1f4b445e32bf8104d02f37d02) | ✓ |
+| <a id="review-69"></a>69 | [0xA1d0…7b5d](https://explorer.testnet.somnia.network/tokyo/address/0xA1d0CB85c869e534Fe1e0c22af3b238301157b5d) | Ok (3/0/0 of 3) | Ok stored | [0x03c0871b…7098](https://explorer.testnet.somnia.network/tokyo/tx/0x03c0871b0ba45f543c70c38b054e38cef1f4399b332451801a80a3b565c07098) | [0x762e832e…4452](https://shannon-explorer.somnia.network/tx/0x762e832ed2f8ede80a2ae3657effd72907dec9fb7015154fbd90452c039a4452) | [0x1db214bb…9a5c](https://shannon-explorer.somnia.network/tx/0x1db214bbf32d743827fe46f453bf6ff784e0356359aac24cd5dab1fbccf69a5c) | [0xc24ae27c…3e44](https://shannon-explorer.somnia.network/tx/0xc24ae27c2de7bfce3f255aa7fb52aae57de5916a6692c76af147925914063e44) | [0xff278cea…7271](https://explorer.testnet.somnia.network/tokyo/tx/0xff278cea407f632ca553804f613f1c157ed9355ebec7d3530863c501e1157271) | ✓ |
 
 ## MCP agent
 
@@ -315,9 +353,9 @@ Every transaction the landing page shows (`app/content/proof.ts`), checked at th
 
 ## Every other transaction
 
-Everything else recorded in `deployments/*.json`, the app run's funding and cleanup, and transaction links in the docs. Another 691 rows re-check transactions shown above against what `deployments/*.json` recorded for them; all verified.
+Everything else recorded in `deployments/*.json`, the app run's funding and cleanup, and transaction links in the docs. Another 711 rows re-check transactions shown above against what `deployments/*.json` recorded for them; all verified.
 
-<details><summary>27 transactions</summary>
+<details><summary>30 transactions</summary>
 
 | Source | Step | Chain | Tx | Block · position | Check |
 |---|---|---|---|---|---|
@@ -337,6 +375,9 @@ Everything else recorded in `deployments/*.json`, the app run's funding and clea
 | app | Cleanup: the agent withdraws 5.97 USDso margin | Hideki | [0x6ca9b5f0…0bed](https://explorer.testnet.somnia.network/tokyo/tx/0x6ca9b5f00026b2e56f770943e34c21b5dc4cd6cd68097d71212bd7b9f1800bed) | 36,046,931 · #3 | ✓ |
 | app | … and returns it to the owner | Hideki | [0xa327b382…ba78](https://explorer.testnet.somnia.network/tokyo/tx/0xa327b38259f69324e71c54559cdf759622dcbb456076894aeace19ecfaf0ba78) | 36,046,946 · #7 | ✓ |
 | app | … and its STT | Hideki | [0x4659ea7a…d63e](https://explorer.testnet.somnia.network/tokyo/tx/0x4659ea7ae89b15edb1ad25a04e20762197fb1433c2bdac98fd2b31da9c8dd63e) | 36,046,962 · #0 | ✓ |
+| refresh 2026-11-10 | The owner sends demo follower 0x7d73…1932 5 STT for its tank | Hideki | [0xc44a74d0…9c94](https://explorer.testnet.somnia.network/tokyo/tx/0xc44a74d020b5907e369d302055b8e2f6f38c973debbac0e2c691261cde629c94) | 46,571,377 · #0 | ✓ |
+| refresh 2026-11-10 | Demo follower 0x7d73…1932 adds 5 STT to its gas tank (fundTank) | Hideki | [0x12de7546…b575](https://explorer.testnet.somnia.network/tokyo/tx/0x12de7546d3b6b35fb5d3437be214a9e9f111910dabb91487123a564f27f0b575) | 46,571,943 · #0 | ✓ |
+| refresh 2026-11-10 | The owner sends the demo leader 4 STT for the bot's gas | Hideki | [0xd322b539…8b20](https://explorer.testnet.somnia.network/tokyo/tx/0xd322b539ee736dcca57d43cc7b5b7868b7c5698fd61b3f5394f490d1bf4f8b20) | 46,572,528 · #1 | ✓ |
 | deployments/risk.json | bridge 15 STT to Shannon (transferRemote) | Hideki | [0xc7aefa63…f85d](https://explorer.testnet.somnia.network/tokyo/tx/0xc7aefa63e066ae6fdcd00892bb5f5e9fb24d776143cee7083fcea5e00947f85d) | 35,358,283 · #1 | ✓ |
 | deployments/risk.json | bridge delivery on Shannon (15 STT) | Shannon | [0x0cc71fa8…d285](https://shannon-explorer.somnia.network/tx/0x0cc71fa8372c396f040cf86a8d4802bab84a879ea46945c75801dc50fc6ad285) | 526,147,605 · #0 | ✓ |
 | deployments/risk.json | RiskGate.setReviewer(address) | Hideki | [0xc003b9aa…42a5](https://explorer.testnet.somnia.network/tokyo/tx/0xc003b9aa29275797c526b2fd9b4b1458a4b3b2786387905c02672d1aa1b042a5) | 35,358,805 · #0 | ✓ |

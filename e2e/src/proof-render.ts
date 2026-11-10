@@ -360,7 +360,7 @@ export function renderProof(input: ProofInput): string {
     const reasons = Object.entries(u.refusals);
     out.push("## Live since the bot started", "");
     out.push(
-      `\`npm run uptime\` (in \`e2e/\`) read every move of the demo leader ${d.who(u.leader)} and the hub's log from Hideki block ${int(u.fromBlock)} (${utc(u.fromTime)}, the demo-leader bot's first trade) to block ${int(u.asOfBlock)} (${utc(u.asOfTime)}). A move is a transaction that emitted dreamDEX's \`PositionUpdated\` for the leader; a handler run is a transaction the hub sent to the leader's group relay in the move's block, after the move. These are that run's numbers, kept in \`e2e/proof/uptime.json\`; this ledger re-checks the sample pairs below, not every copy.`,
+      `\`npm run uptime\` (in \`e2e/\`) read every move of the ${d.who(u.leader)} and the hub's log from Hideki block ${int(u.fromBlock)} (${utc(u.fromTime)}, the demo-leader bot's first trade) to block ${int(u.asOfBlock)} (${utc(u.asOfTime)}). A move is a transaction that emitted dreamDEX's \`PositionUpdated\` for the leader; a handler run is a transaction the hub sent to the leader's group relay in the move's block, after the move. These are that run's numbers, kept in \`e2e/proof/uptime.json\`; this ledger re-checks the sample pairs below, not every copy.`,
       "",
       "| | |",
       "|---|---|",

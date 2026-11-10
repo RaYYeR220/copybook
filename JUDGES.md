@@ -1,8 +1,10 @@
 # Copybook: a path for judges
 
 Five minutes, in the order of the judging criteria. Everything runs on Somnia testnets: Hideki (Somnia's Tokyo
-testnet, chain 50383) and Shannon (chain 50312). There are no outside users yet: every wallet that follows, leads or
-creates a thesis in the evidence is ours (`demoWallets` in [`deployments/hideki.json`](deployments/hideki.json)).
+testnet, chain 50383) and Shannon (chain 50312). There are no outside users yet: every wallet that follows or creates
+a thesis in the evidence is ours, and so is the demo leader (`demoWallets` in
+[`deployments/hideki.json`](deployments/hideki.json)). One followed trader is not ours: a dreamDEX account that signed
+nothing and does not know it is followed ([LIMITS](docs/LIMITS.md#our-wallets-no-outside-users)).
 What Copybook does not do: [docs/LIMITS.md](docs/LIMITS.md).
 
 ## If you have one minute

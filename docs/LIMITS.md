@@ -12,7 +12,7 @@ mainnet. dreamDEX's perps are themselves on testnet only (its
 
 ## Our wallets, no outside users
 
-Every wallet that follows, leads, creates a thesis or acts as the agent in the recorded runs is ours, listed in
+Every wallet that follows, creates a thesis or acts as the agent in the recorded runs is ours, listed in
 `demoWallets` in [`deployments/hideki.json`](../deployments/hideki.json). The app marks each one ours and leaves it
 out of every ranking. The traders the AI guard reviewed are real dreamDEX accounts. No outside users are claimed.
 
@@ -26,8 +26,16 @@ out of every ranking. The traders the AI guard reviewed are real dreamDEX accoun
 | demo thesis creator | `0xA969Dd0B79Ca1d4571E45d97A8f4981805eBaEd3` |
 | demo agent (MCP) | `0xCDE791006eA6E99e9A614Bc9d0995879E2Cc5E72` |
 
-The demo leader moves only when we trade it, so its followers get a copy only then. During judging (until
-2026-11-21) a bot of ours trades it: a small BTC or ETH position about every 25 minutes.
+Two traders are followed in the evidence. The demo leader is ours. It moves only when we trade it, so its followers
+get a copy only then. During judging (until 2026-11-21) a bot of ours trades it: a small BTC or ETH position about
+every 25 minutes.
+
+The other is dreamDEX account `0xD3Ecd94b11Dfe7515d5614b0458Bf22175aDE619`, which Copybook does not control. Since
+2026-11-10 the demo follower from the app run (`0xDe52…eaAB`, ours) follows it on ETH
+([PROOF](PROOF.md#copying-a-trader-we-dont-control)). That trader signed nothing, granted nothing and does not know it
+is followed, because a follow needs nothing from the trader. Its moves are its own, and their size, timing and outcome
+are not ours to choose. It is a source we do not control, not a user: the follower, its margin, its policy and its gas
+tank are ours.
 
 ## What is mocked
 
@@ -57,7 +65,8 @@ exit ([row](PROOF.md#guard-exit)).
   event and the handler's gas covers the follower. A follower it cannot cover is deferred and synced by `catchUp`, which is
   not a same-block copy and is never labelled one. All 23 recorded pairs are same-block
   ([PROOF](PROOF.md#same-block-copies)). The hub's whole event log through Hideki block 36,282,657 (read from
-  `/api/history` on 2026-10-29) holds no `Deferred` or `GroupDeferred`, so the deferral path is shown by tests only
+  `/api/history` on 2026-10-29) holds no `Deferred` or `GroupDeferred`, and neither do the demo leader's 709 handler runs from its bot's first trade
+  to block 46,570,615 ([live](PROOF.md#live-since-the-bot-started)), so the deferral path is shown by tests only
   (`contracts/test/HubEdgeCases.t.sol::test_exitsOutOfGas_deferredUnbilled`).
 - **A close can go unfilled.** Exits are never gated: no cap, tank, pause or AI verdict holds back a close. A close is
   one immediate-or-cancel order within max(2× the follower's band, 1%) of the mark (`_reduce` in
@@ -92,6 +101,8 @@ Every refusal reason is written on chain as `Refused(reason)` when it happens. T
 | The equity floor | as a `Stopped` from `poke`, which closed the copy ([row](PROOF.md#floor-poke)); no `Refused(EquityFloor)` has been recorded |
 
 The hub's whole log through block 36,282,657 holds 6 refusals, 1 `BandUnfilled` and 5 `RiskGate`, and 1 `Stopped`.
+From the demo-leader bot's first trade to block 46,570,615, its follower's handler runs hold 8 more, all
+`BandUnfilled` ([live](PROOF.md#live-since-the-bot-started)).
 TotalCap, EquityFloor (as a refusal), TankEmpty, BelowMinimum, AtCap, MarketNotAllowed, VenueRejected, LegFailed and
 Paused are shown by contract tests only, each listed in [CLAIMS.md](CLAIMS.md#exits-policy-and-refusals).
 

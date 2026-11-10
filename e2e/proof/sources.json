@@ -4,7 +4,9 @@
     "deploy": "Deployment of the current hub, 2026-10-28",
     "e2e": "The end-to-end run against the current hub (`npm run live`), 2026-10-28",
     "risk": "The risk module's runs (`npm run risk`), 2026-10-28, recorded in deployments/risk.json",
-    "app": "A run through the web app's pages (a preview deployment) and the MCP server, 2026-10-29"
+    "app": "A run through the web app's pages (a preview deployment) and the MCP server, 2026-10-29",
+    "outside": "A demo follower of ours following dreamDEX trader 0xD3Ec…E619 on ETH, set up with `npm run outside` (in e2e/) on 2026-11-10",
+    "refresh": "Top-ups on 2026-11-10 so the demo runs last through 2026-11-25"
   },
   "markets": {
     "0x4181dd08e73bbcdd1ba3e615a18f6abd941b94c0": {
@@ -2752,6 +2754,234 @@
         "from": "0x5397812d66F3233E0972b7AEB5e195a945504632",
         "to": "0xdF73BBbB6517B712BBeD9bfAe6253A5E1FCDE154",
         "value": "40000000000000000000"
+      }
+    },
+    {
+      "chain": "hideki",
+      "run": "outside",
+      "hash": "0xc5706d0f734a3b955b4c133f9388cb9328ca2e36822884374f899166207758f6",
+      "id": "outside-fund-stt",
+      "section": "outside",
+      "context": true,
+      "label": "The owner sends the follower 3.5 STT (gas, the review fee and the tank)",
+      "expect": {
+        "block": 46568134,
+        "index": 0,
+        "gasUsed": 21000,
+        "from": "0x5397812d66F3233E0972b7AEB5e195a945504632",
+        "to": "0xDe52dd7f81F67D2124ae0fBd8567f405cFAEeaAB",
+        "value": "3500000000000000000"
+      }
+    },
+    {
+      "chain": "hideki",
+      "run": "outside",
+      "hash": "0x633a081ce146b52d6d1b1ef2e7a70fbf5199cfda35113ed8389ed17080462cc1",
+      "id": "outside-fund-usdso",
+      "section": "outside",
+      "context": true,
+      "label": "The owner sends the follower 10 USDso",
+      "expect": {
+        "block": 46568159,
+        "index": 3,
+        "gasUsed": 62837,
+        "from": "0x5397812d66F3233E0972b7AEB5e195a945504632",
+        "to": "0xed7993A74dAe1e6656B704A424DcD8711aAf4F72"
+      }
+    },
+    {
+      "chain": "hideki",
+      "run": "outside",
+      "hash": "0x244c75b9901186fe04c7d8f181ae66555a95cb2f78d1758f6baca06a8fcfe86e",
+      "id": "outside-deposit",
+      "section": "outside",
+      "context": true,
+      "label": "The follower deposits 10 USDso into its perps account",
+      "expect": {
+        "block": 46568315,
+        "index": 2,
+        "gasUsed": 93839,
+        "from": "0xDe52dd7f81F67D2124ae0fBd8567f405cFAEeaAB",
+        "to": "0x478769E1177C0773c43A593DCCc4Ad15F15F1394"
+      }
+    },
+    {
+      "chain": "hideki",
+      "run": "outside",
+      "hash": "0xc79c10654a67862a84ac59f70dd9b0933fcfd9e811250089a4cedd69f9cc6e2a",
+      "id": "outside-guard-on",
+      "section": "outside",
+      "context": true,
+      "label": "The follower turns its AI guard on",
+      "expect": {
+        "block": 46568336,
+        "index": 0,
+        "gasUsed": 47799,
+        "from": "0xDe52dd7f81F67D2124ae0fBd8567f405cFAEeaAB",
+        "to": "0xEe54c49E9e70a0e5C2218Eec1b1BDBd4e1Cb20f1",
+        "method": "setGuard",
+        "args": {
+          "on": true
+        },
+        "events": [
+          {
+            "name": "GuardSet",
+            "args": {
+              "follower": "0xDe52dd7f81F67D2124ae0fBd8567f405cFAEeaAB",
+              "on": "true"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "chain": "hideki",
+      "run": "outside",
+      "hash": "0xaf72b103a7aca4f29b9885135a835a947b6ca13229b77a3c905ff99591b70a0a",
+      "id": "outside-approve",
+      "section": "outside",
+      "context": true,
+      "label": "The follower grants the hub placeOrderFor (global)",
+      "expect": {
+        "block": 46568356,
+        "index": 1,
+        "gasUsed": 83347,
+        "from": "0xDe52dd7f81F67D2124ae0fBd8567f405cFAEeaAB",
+        "to": "0x6B2FbfeD328FF5F20C0BE7D3C3437613aFFE8D3a",
+        "method": "setOperatorApprovalGlobal",
+        "args": {
+          "operator": "0xdF73BBbB6517B712BBeD9bfAe6253A5E1FCDE154",
+          "selectors": "[\"0x80054449\"]",
+          "approved": true
+        }
+      }
+    },
+    {
+      "chain": "hideki",
+      "run": "outside",
+      "hash": "0x1ba3aa30d51666e580dff75db687c1706a4067bbc843c4eca68576f6184c66bf",
+      "id": "outside-review",
+      "section": "outside",
+      "context": true,
+      "label": "The follower pays the gate 0.5 STT for a review of the trader (review 68: CAUTION, 3 of 3)",
+      "expect": {
+        "block": 46568377,
+        "index": 1,
+        "gasUsed": 401262,
+        "from": "0xDe52dd7f81F67D2124ae0fBd8567f405cFAEeaAB",
+        "to": "0xEe54c49E9e70a0e5C2218Eec1b1BDBd4e1Cb20f1",
+        "method": "requestReview",
+        "args": {
+          "trader": "0xD3Ecd94b11Dfe7515d5614b0458Bf22175aDE619"
+        },
+        "value": "500000000000000000",
+        "events": [
+          {
+            "name": "ReviewRequested",
+            "args": {
+              "trader": "0xD3Ecd94b11Dfe7515d5614b0458Bf22175aDE619",
+              "nonce": "68"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "chain": "hideki",
+      "run": "outside",
+      "hash": "0x5a9596cb659c1b10775703e0b015c00eb50cb8cb5af904d38b4528e2f1de7493",
+      "id": "outside-follow",
+      "section": "outside",
+      "context": true,
+      "label": "The follower follows the trader on ETH: scale 1.5%, at most 10 USDso a position and 15 in all, band 0.5%, floor 3 USDso, tank 2 STT. The trader held 0.5376 ETH short, so the follow itself opens 0.0047 ETH short, at the cap",
+      "expect": {
+        "block": 46568414,
+        "index": 0,
+        "gasUsed": 7410629,
+        "from": "0xDe52dd7f81F67D2124ae0fBd8567f405cFAEeaAB",
+        "to": "0xdF73BBbB6517B712BBeD9bfAe6253A5E1FCDE154",
+        "method": "follow",
+        "args": {
+          "kind": "Trader"
+        },
+        "value": "2000000000000000000",
+        "events": [
+          {
+            "name": "GroupOpened",
+            "args": {
+              "sourceId": "0xbcfa0347e457d0d8554296e51d24ef136d00bb96f09a2455c862d551355547cd"
+            }
+          },
+          {
+            "name": "Followed",
+            "args": {
+              "follower": "0xDe52dd7f81F67D2124ae0fBd8567f405cFAEeaAB",
+              "sourceId": "0xbcfa0347e457d0d8554296e51d24ef136d00bb96f09a2455c862d551355547cd",
+              "kind": "Trader"
+            }
+          },
+          {
+            "name": "Copied",
+            "args": {
+              "follower": "0xDe52dd7f81F67D2124ae0fBd8567f405cFAEeaAB",
+              "pool": "0xD6Cb1DD58580B84D76068aC21594219ce03aeddf",
+              "fromSize": "0",
+              "toSize": "-4700000000000000"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "chain": "hideki",
+      "run": "refresh",
+      "hash": "0xc44a74d020b5907e369d302055b8e2f6f38c973debbac0e2c691261cde629c94",
+      "id": "refresh-follower-stt",
+      "section": "other",
+      "source": "refresh 2026-11-10",
+      "label": "The owner sends demo follower 0x7d73…1932 5 STT for its tank",
+      "expect": {
+        "block": 46571377,
+        "index": 0,
+        "gasUsed": 21000,
+        "from": "0x5397812d66F3233E0972b7AEB5e195a945504632",
+        "to": "0x7d736A88978e94E60494Ff91C49Ba838EDfb1932",
+        "value": "5000000000000000000"
+      }
+    },
+    {
+      "chain": "hideki",
+      "run": "refresh",
+      "hash": "0x12de7546d3b6b35fb5d3437be214a9e9f111910dabb91487123a564f27f0b575",
+      "id": "refresh-follower-tank",
+      "section": "other",
+      "source": "refresh 2026-11-10",
+      "label": "Demo follower 0x7d73…1932 adds 5 STT to its gas tank (fundTank)",
+      "expect": {
+        "block": 46571943,
+        "index": 0,
+        "gasUsed": 25325,
+        "from": "0x7d736A88978e94E60494Ff91C49Ba838EDfb1932",
+        "to": "0xdF73BBbB6517B712BBeD9bfAe6253A5E1FCDE154",
+        "method": "fundTank",
+        "value": "5000000000000000000"
+      }
+    },
+    {
+      "chain": "hideki",
+      "run": "refresh",
+      "hash": "0xd322b539ee736dcca57d43cc7b5b7868b7c5698fd61b3f5394f490d1bf4f8b20",
+      "id": "refresh-leader-stt",
+      "section": "other",
+      "source": "refresh 2026-11-10",
+      "label": "The owner sends the demo leader 4 STT for the bot's gas",
+      "expect": {
+        "block": 46572528,
+        "index": 1,
+        "gasUsed": 21000,
+        "from": "0x5397812d66F3233E0972b7AEB5e195a945504632",
+        "to": "0xA1d0CB85c869e534Fe1e0c22af3b238301157b5d",
+        "value": "4000000000000000000"
       }
     }
   ]

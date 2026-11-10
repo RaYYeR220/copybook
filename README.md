@@ -5,6 +5,10 @@ dreamDEX perps account, in the same block.
 
 - **Same block, no server or bot key.** Somnia's validators run the hub's reactive handler in the block of the
   source's move, and the hub itself sends the copy ([23 of 23 recorded pairs](docs/PROOF.md#same-block-copies)).
+- **Live since 2026-10-29: 651 copies, all in the leader's block.** Every move of the demo leader from its bot's
+  first trade to Hideki block 46,570,615 (2026-11-10), read back from the chain: 709 handler runs, 651 copies into its
+  follower's account, each in the leader's block, 8 `BandUnfilled` refusals, no deferrals
+  ([numbers](docs/PROOF.md#live-since-the-bot-started)).
 - **A refusal is an on-chain record.** An increase your policy refuses is written as `Refused(reason)` in the move's
   block, and your position stays where it was ([a band refusal](docs/PROOF.md#refusal-band)).
 - **A validator-run AI guard.** A committee of Somnia validators on Shannon reviews a trader's 30-day record, and the
@@ -13,8 +17,9 @@ dreamDEX perps account, in the same block.
 Each copy is a page and a 1200×630 share card that carries its block proof, made to be posted. Traders gain followers
 and climb a leaderboard ranked by followers and copy fidelity, thesis creators publish baskets for others to follow,
 and agents follow through the MCP server ([claims map](docs/CLAIMS.md#the-app)). There are no outside users yet: every
-wallet that follows, leads or creates a thesis in the recorded runs is one of ours (`demoWallets` in
-[`deployments/hideki.json`](deployments/hideki.json)).
+wallet that follows or creates a thesis in the recorded runs is one of ours, and so is the demo leader (`demoWallets`
+in [`deployments/hideki.json`](deployments/hideki.json)). The one trader followed that is not ours signed nothing and
+does not know it is followed ([LIMITS](docs/LIMITS.md#our-wallets-no-outside-users)).
 
 Copybook runs on [dreamDEX](https://app.testnet.dreamdex.io/) perps on Hideki (Somnia's Tokyo testnet, chain 50383),
 where STT and USDso have no market value. A wallet follows one source: a trader's account, or a thesis (a weighted

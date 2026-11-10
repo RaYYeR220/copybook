@@ -1,0 +1,66 @@
+{
+  "about": "The demo leader's followers since the demo-leader bot's first trade, read from Hideki by `npm run uptime` (in e2e/). A move is a transaction that emitted dreamDEX's PositionUpdated for the leader; a handler run is a transaction the hub sent in a move's block, after the move; a handler copy is a Copied for the leader's source in a transaction the hub sent.",
+  "leader": "0xA1d0CB85c869e534Fe1e0c22af3b238301157b5d",
+  "sourceId": "0x6744c2cdbcc5b0f6ad21719c8964204a5ffadf668d2b84479c9b14c029b0a40f",
+  "fromBlock": 36410390,
+  "asOfBlock": 46570615,
+  "fromTime": "2026-10-29T17:17:28.000Z",
+  "asOfTime": "2026-11-10T11:45:07.000Z",
+  "moves": {
+    "transactions": 665,
+    "positionUpdates": 709
+  },
+  "handlerRuns": {
+    "total": 709,
+    "withCopy": 651,
+    "refusedOnly": 8,
+    "nothing": 50
+  },
+  "handlerCopies": {
+    "total": 651,
+    "inLeadersBlock": 651,
+    "notInLeadersBlock": 0,
+    "byFollower": {
+      "0x7d736A88978e94E60494Ff91C49Ba838EDfb1932": 651
+    }
+  },
+  "directCopies": 0,
+  "refusals": {
+    "BandUnfilled": 8
+  },
+  "deferred": 0,
+  "groupDeferred": 0,
+  "tankCharged": {
+    "0x7d736A88978e94E60494Ff91C49Ba838EDfb1932": "7370023848000000000"
+  },
+  "samples": [
+    {
+      "label": "the first handler copy after the bot started",
+      "move": {
+        "hash": "0x8cc34704fb5596fdc9ba78802cb4986141e373cd51d118af13e8239475a81690",
+        "block": 36410390,
+        "index": 0
+      },
+      "copy": {
+        "hash": "0x18d3cc070f568a9242429b5cb893ce117d8a21c024f1bfed8790803aa4ffdd32",
+        "block": 36410390,
+        "index": 29,
+        "follower": "0x7d736A88978e94E60494Ff91C49Ba838EDfb1932"
+      }
+    },
+    {
+      "label": "the last handler copy before the as-of block",
+      "move": {
+        "hash": "0x1c85a0b395e32d70e75f36ca3300f9402cda445ee4964692d29b4862c63f7665",
+        "block": 46559342,
+        "index": 2
+      },
+      "copy": {
+        "hash": "0x84ffc26aa903fcf0bff7c3a8fd008db81c51f1e74be10f42778831b87e5f86b8",
+        "block": 46559342,
+        "index": 4,
+        "follower": "0x7d736A88978e94E60494Ff91C49Ba838EDfb1932"
+      }
+    }
+  ]
+}

@@ -9,6 +9,9 @@
 //   COPYBOOK_ENV=<keys> npm run outside -- follow <trader> <pool> <usdso>
 //                                                        the follower's margin deposit, guard on, operator approval, a
 //                                                        review of the trader paid at the gate's fee, then the follow
+//   COPYBOOK_ENV=<keys> npm run outside -- caps <maxNotional> <maxTotalNotional>
+//                                                        the follower raises or lowers its caps (USDso) with updatePolicy,
+//                                                        keeping every other field of its policy
 //   COPYBOOK_ENV=<keys> npm run outside -- tank <stt> [role]
 //                                                        the follower (UI_FOLLOWER, or FOLLOWER) adds STT to its gas tank
 //   npm run outside -- pairs <follower> <trader> <fromBlock> [toBlock]
@@ -176,6 +179,19 @@ async function follow(trader: Address, pool: Address, usdso: string) {
   console.log(`  margin bank ${MARGIN_BANK}; equity now ${formatEther(await cb.accountEquity(me))} USDso; tank ${formatEther(await cb.tankOf(me))} STT`);
 }
 
+async function caps(maxNotional: string, maxTotalNotional: string) {
+  const cb = client("UI_FOLLOWER");
+  const me = follower();
+  const f = await cb.followOf(me);
+  if (!f) throw new Error(`${me} follows nothing`);
+  const policy: Policy = { ...f.policy, maxNotional: parseEther(maxNotional), maxTotalNotional: parseEther(maxTotalNotional) };
+  console.log(`  ${me}: caps ${formatEther(f.policy.maxNotional)} / ${formatEther(f.policy.maxTotalNotional)} → ${maxNotional} / ${maxTotalNotional} USDso; equity ${formatEther(await cb.accountEquity(me))} USDso`);
+  const r = await (await cb.updatePolicy(policy)).wait();
+  track(`updatePolicy: at most ${maxNotional} USDso a position, ${maxTotalNotional} in all`, r.receipt, r.events);
+  const after = await cb.followOf(me);
+  console.log(`  policy now ${JSON.stringify(after?.policy, big)}`);
+}
+
 async function tank(stt: string, role: "UI_FOLLOWER" | "FOLLOWER") {
   const cb = client(role);
   const me = account(role).address;
@@ -259,7 +275,7 @@ async function pairs(who: Address, trader: Address, fromBlock: bigint, toBlock?:
 // ---------------------------------------------------------------- main
 
 const [cmd, ...args] = process.argv.slice(2);
-const usage = "steps: stats <trader> | fund <stt> <usdso> [to] | follow <trader> <pool> <usdso> | tank <stt> [role] | pairs <follower> <trader> <fromBlock> [toBlock]";
+const usage = "steps: stats <trader> | fund <stt> <usdso> [to] | follow <trader> <pool> <usdso> | caps <maxNotional> <maxTotalNotional> | tank <stt> [role] | pairs <follower> <trader> <fromBlock> [toBlock]";
 try {
   switch (cmd) {
     case "stats":
@@ -270,6 +286,9 @@ try {
       break;
     case "follow":
       await follow(getAddress(args[0]), getAddress(args[1]), args[2] ?? "10");
+      break;
+    case "caps":
+      await caps(args[0], args[1]);
       break;
     case "tank":
       if (args[1] && args[1] !== "UI_FOLLOWER" && args[1] !== "FOLLOWER") throw new Error("tank: role is UI_FOLLOWER or FOLLOWER");

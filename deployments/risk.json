@@ -4495,6 +4495,126 @@
       "from": "0xcCC32990233cB34008777b2eDB62236F8e432046",
       "to": "0xD7C2E95c62De3c0ad95b2C1cf08E4B85DF6b332D",
       "url": "https://explorer.testnet.somnia.network/tokyo/tx/0x8a70ffe570747dc782f2557cedfc22826ddda0b94912b624149cb68b6e9c28af"
+    },
+    {
+      "chain": "hideki",
+      "step": "adopt",
+      "label": "requestReview(0xD3Ecd94b11Dfe7515d5614b0458Bf22175aDE619) by 0xDe52dd7f81F67D2124ae0fBd8567f405cFAEeaAB",
+      "hash": "0x1ba3aa30d51666e580dff75db687c1706a4067bbc843c4eca68576f6184c66bf",
+      "block": 46568377,
+      "gasUsed": 401262,
+      "status": "success",
+      "from": "0xDe52dd7f81F67D2124ae0fBd8567f405cFAEeaAB",
+      "to": "0xEe54c49E9e70a0e5C2218Eec1b1BDBd4e1Cb20f1",
+      "url": "https://explorer.testnet.somnia.network/tokyo/tx/0x1ba3aa30d51666e580dff75db687c1706a4067bbc843c4eca68576f6184c66bf"
+    },
+    {
+      "chain": "shannon",
+      "step": "adopt",
+      "label": "review 68 delivered to the reviewer",
+      "hash": "0x30f91373024cc92394d16c2480784fcca1000a7ce3f2df9ddfcfac29b29a7103",
+      "block": 537363727,
+      "gasUsed": 931340,
+      "status": "success",
+      "from": "0xcCC32990233cB34008777b2eDB62236F8e432046",
+      "to": "0xF805734aAC42cf238eAef9E905e3A04F2Ab554f9",
+      "url": "https://shannon-explorer.somnia.network/tx/0x30f91373024cc92394d16c2480784fcca1000a7ce3f2df9ddfcfac29b29a7103"
+    },
+    {
+      "chain": "shannon",
+      "step": "adopt",
+      "label": "review 68 committee callback",
+      "hash": "0x4021d1db977c98af637fc31210ac67f3ce99dfd5a85bd5fd2e3733dec467242c",
+      "block": 537363767,
+      "gasUsed": 1155755,
+      "status": "success",
+      "from": "0x1Cb38b3ee632B5dCc0347dB81766606d6Aad4926",
+      "to": "0x037Bb9C718F3f7fe5eCBDB0b600D607b52706776",
+      "url": "https://shannon-explorer.somnia.network/tx/0x4021d1db977c98af637fc31210ac67f3ce99dfd5a85bd5fd2e3733dec467242c"
+    },
+    {
+      "chain": "shannon",
+      "step": "adopt",
+      "label": "review 68 committee callback",
+      "hash": "0xf5ce66e1836803a7ca7f85739e3bd542a180254f22de6ccf1564cdd1caad1237",
+      "block": 537363774,
+      "gasUsed": 601355,
+      "status": "success",
+      "from": "0x3E05e29029C60E000C8F01EB5AC9cEE6b242D7e0",
+      "to": "0x037Bb9C718F3f7fe5eCBDB0b600D607b52706776",
+      "url": "https://shannon-explorer.somnia.network/tx/0xf5ce66e1836803a7ca7f85739e3bd542a180254f22de6ccf1564cdd1caad1237"
+    },
+    {
+      "chain": "hideki",
+      "step": "adopt",
+      "label": "review 68 verdict delivered to the gate",
+      "hash": "0xe79c378ab2949589dfd965e41ebb2cd237e745c1f4b445e32bf8104d02f37d02",
+      "block": 46568497,
+      "gasUsed": 1170872,
+      "status": "success",
+      "from": "0xcCC32990233cB34008777b2eDB62236F8e432046",
+      "to": "0xD7C2E95c62De3c0ad95b2C1cf08E4B85DF6b332D",
+      "url": "https://explorer.testnet.somnia.network/tokyo/tx/0xe79c378ab2949589dfd965e41ebb2cd237e745c1f4b445e32bf8104d02f37d02"
+    },
+    {
+      "chain": "hideki",
+      "step": "review 0xA1d0CB85c869e534Fe1e0c22af3b238301157b5d",
+      "label": "requestReview(0xA1d0CB85c869e534Fe1e0c22af3b238301157b5d)",
+      "hash": "0x03c0871b0ba45f543c70c38b054e38cef1f4399b332451801a80a3b565c07098",
+      "block": 46569088,
+      "gasUsed": 194592,
+      "status": "success",
+      "from": "0x5397812d66F3233E0972b7AEB5e195a945504632",
+      "to": "0xEe54c49E9e70a0e5C2218Eec1b1BDBd4e1Cb20f1",
+      "url": "https://explorer.testnet.somnia.network/tokyo/tx/0x03c0871b0ba45f543c70c38b054e38cef1f4399b332451801a80a3b565c07098"
+    },
+    {
+      "chain": "shannon",
+      "step": "review 0xA1d0CB85c869e534Fe1e0c22af3b238301157b5d",
+      "label": "review 69 delivered to the reviewer",
+      "hash": "0x762e832ed2f8ede80a2ae3657effd72907dec9fb7015154fbd90452c039a4452",
+      "block": 537364436,
+      "gasUsed": 931340,
+      "status": "success",
+      "from": "0xcCC32990233cB34008777b2eDB62236F8e432046",
+      "to": "0xF805734aAC42cf238eAef9E905e3A04F2Ab554f9",
+      "url": "https://shannon-explorer.somnia.network/tx/0x762e832ed2f8ede80a2ae3657effd72907dec9fb7015154fbd90452c039a4452"
+    },
+    {
+      "chain": "shannon",
+      "step": "review 0xA1d0CB85c869e534Fe1e0c22af3b238301157b5d",
+      "label": "review 69 committee callback",
+      "hash": "0x1db214bbf32d743827fe46f453bf6ff784e0356359aac24cd5dab1fbccf69a5c",
+      "block": 537364463,
+      "gasUsed": 1155755,
+      "status": "success",
+      "from": "0x1Cb38b3ee632B5dCc0347dB81766606d6Aad4926",
+      "to": "0x037Bb9C718F3f7fe5eCBDB0b600D607b52706776",
+      "url": "https://shannon-explorer.somnia.network/tx/0x1db214bbf32d743827fe46f453bf6ff784e0356359aac24cd5dab1fbccf69a5c"
+    },
+    {
+      "chain": "shannon",
+      "step": "review 0xA1d0CB85c869e534Fe1e0c22af3b238301157b5d",
+      "label": "review 69 committee callback",
+      "hash": "0xc24ae27c2de7bfce3f255aa7fb52aae57de5916a6692c76af147925914063e44",
+      "block": 537364469,
+      "gasUsed": 587613,
+      "status": "success",
+      "from": "0x3E05e29029C60E000C8F01EB5AC9cEE6b242D7e0",
+      "to": "0x037Bb9C718F3f7fe5eCBDB0b600D607b52706776",
+      "url": "https://shannon-explorer.somnia.network/tx/0xc24ae27c2de7bfce3f255aa7fb52aae57de5916a6692c76af147925914063e44"
+    },
+    {
+      "chain": "hideki",
+      "step": "review 0xA1d0CB85c869e534Fe1e0c22af3b238301157b5d",
+      "label": "review 69 verdict delivered to the gate",
+      "hash": "0xff278cea407f632ca553804f613f1c157ed9355ebec7d3530863c501e1157271",
+      "block": 46569235,
+      "gasUsed": 570872,
+      "status": "success",
+      "from": "0xcCC32990233cB34008777b2eDB62236F8e432046",
+      "to": "0xD7C2E95c62De3c0ad95b2C1cf08E4B85DF6b332D",
+      "url": "https://explorer.testnet.somnia.network/tokyo/tx/0xff278cea407f632ca553804f613f1c157ed9355ebec7d3530863c501e1157271"
     }
   ],
   "checks": {
@@ -4694,10 +4814,10 @@
       "ok: review 42: the gate settled it (VerdictReceived)"
     ],
     "review 0xA1d0CB85c869e534Fe1e0c22af3b238301157b5d": [
-      "ok: review 44 delivered to the reviewer: delivered on shannon (found after ~4s of polling)",
-      "ok: review 44: the reviewer replied (tier Ok)",
-      "ok: review 44 verdict delivered to the gate: delivered on hideki (found after ~7s of polling)",
-      "ok: review 44: the gate settled it (VerdictReceived)"
+      "ok: review 69 delivered to the reviewer: delivered on shannon (found after ~4s of polling)",
+      "ok: review 69: the reviewer replied (tier Ok)",
+      "ok: review 69 verdict delivered to the gate: delivered on hideki (found after ~7s of polling)",
+      "ok: review 69: the gate settled it (VerdictReceived)"
     ],
     "swap-reviewer": [
       "ok: deploy RiskReviewer succeeded",
@@ -4856,6 +4976,12 @@
       "ok: review 67: the reviewer replied (tier Block)",
       "ok: review 67 verdict delivered to the gate: delivered on hideki (found after ~4s of polling)",
       "ok: review 67: the gate settled it (VerdictReceived)"
+    ],
+    "adopt": [
+      "ok: review 68 delivered to the reviewer: delivered on shannon (found after ~0s of polling)",
+      "ok: review 68: the reviewer replied (tier Caution)",
+      "ok: review 68 verdict delivered to the gate: delivered on hideki (found after ~1s of polling)",
+      "ok: review 68: the gate settled it (VerdictReceived)"
     ]
   },
   "measurements": {
@@ -17786,6 +17912,415 @@
         "summaryHash": "0x6cadb4d6046ade18af6845fbdffea1af6b34a90e1373f72019bd030721381366"
       },
       "summary": "liquidations30d=2 trades30d=298 history=yes partial=0"
+    },
+    {
+      "trader": "0xD3Ecd94b11Dfe7515d5614b0458Bf22175aDE619",
+      "at": "2026-11-10T11:41:23.000Z",
+      "fee": "0.5",
+      "reviewer": "0xc999B6924179a0dc9649DA7eBa8F3aC8b7CF7c25",
+      "requester": "0xDe52dd7f81F67D2124ae0fBd8567f405cFAEeaAB",
+      "nonce": 68,
+      "requestTx": "0x1ba3aa30d51666e580dff75db687c1706a4067bbc843c4eca68576f6184c66bf",
+      "requestBlock": 46568377,
+      "messageToShannon": "0xfb17397c346f836048cafd596fabd2e8635004f14703c215943c4e7220223d15",
+      "shannonFrom": 537362484,
+      "deliveryToShannon": "0x30f91373024cc92394d16c2480784fcca1000a7ce3f2df9ddfcfac29b29a7103",
+      "summaryRequest": [
+        {
+          "agentId": "13174292974160097713",
+          "committee": 3,
+          "threshold": 2,
+          "call": "fetchString",
+          "args": [
+            "https://copybook-eosin.vercel.app/api/risk/0xd3ecd94b11dfe7515d5614b0458bf22175ade619",
+            "rubric"
+          ]
+        }
+      ],
+      "shannonEvents": [
+        {
+          "event": "ReviewReceived",
+          "tx": "0x30f91373024cc92394d16c2480784fcca1000a7ce3f2df9ddfcfac29b29a7103",
+          "block": 537363727,
+          "args": {
+            "trader": "0xD3Ecd94b11Dfe7515d5614b0458Bf22175aDE619",
+            "nonce": "68"
+          }
+        },
+        {
+          "event": "SummaryRequested",
+          "tx": "0x30f91373024cc92394d16c2480784fcca1000a7ce3f2df9ddfcfac29b29a7103",
+          "block": 537363727,
+          "args": {
+            "trader": "0xD3Ecd94b11Dfe7515d5614b0458Bf22175aDE619",
+            "requestId": "19216143",
+            "nonce": "68",
+            "deposit": "120000000000000000"
+          }
+        },
+        {
+          "event": "SummaryReceived",
+          "tx": "0x4021d1db977c98af637fc31210ac67f3ce99dfd5a85bd5fd2e3733dec467242c",
+          "block": 537363767,
+          "args": {
+            "trader": "0xD3Ecd94b11Dfe7515d5614b0458Bf22175aDE619",
+            "requestId": "19216143",
+            "nonce": "68",
+            "summaryHash": "0x95e132c57a0ae15a026a1016d1fb5d1625c7ec58aafb8dbde86238a9d0df89d1",
+            "summary": "liquidations30d=0 trades30d=2000 history=yes partial=1"
+          }
+        },
+        {
+          "event": "VerdictRequested",
+          "tx": "0x4021d1db977c98af637fc31210ac67f3ce99dfd5a85bd5fd2e3733dec467242c",
+          "block": 537363767,
+          "args": {
+            "trader": "0xD3Ecd94b11Dfe7515d5614b0458Bf22175aDE619",
+            "requestId": "19216148",
+            "nonce": "68",
+            "deposit": "240000000000000000"
+          }
+        },
+        {
+          "event": "VerdictTallied",
+          "tx": "0xf5ce66e1836803a7ca7f85739e3bd542a180254f22de6ccf1564cdd1caad1237",
+          "block": 537363774,
+          "args": {
+            "trader": "0xD3Ecd94b11Dfe7515d5614b0458Bf22175aDE619",
+            "requestId": "19216148",
+            "nonce": "68",
+            "tier": 2,
+            "ok": 0,
+            "caution": 3,
+            "blocked": 0,
+            "responded": 3
+          }
+        },
+        {
+          "event": "VerdictSent",
+          "tx": "0xf5ce66e1836803a7ca7f85739e3bd542a180254f22de6ccf1564cdd1caad1237",
+          "block": 537363774,
+          "args": {
+            "trader": "0xD3Ecd94b11Dfe7515d5614b0458Bf22175aDE619",
+            "nonce": "68",
+            "tier": 2,
+            "messageId": "0x444ba7516db99c590fa8e1af2d1b3e51965056df20d30918762232bf4befa3ae"
+          }
+        }
+      ],
+      "callbacks": [
+        {
+          "tx": "0x4021d1db977c98af637fc31210ac67f3ce99dfd5a85bd5fd2e3733dec467242c",
+          "submittedBy": "0x1cb38b3ee632b5dcc0347db81766606d6aad4926",
+          "committee": [
+            {
+              "callback": "handleSummary",
+              "requestId": "19216143",
+              "status": 2,
+              "responses": [
+                {
+                  "validator": "0x3E05e29029C60E000C8F01EB5AC9cEE6b242D7e0",
+                  "status": 2,
+                  "receipt": "0",
+                  "executionCost": "300000000000000",
+                  "result": "liquidations30d=0 trades30d=2000 history=yes partial=1"
+                },
+                {
+                  "validator": "0x55Acbe370872c7D90F504eF169217a00c29E2A33",
+                  "status": 2,
+                  "receipt": "0",
+                  "executionCost": "300000000000000",
+                  "result": "liquidations30d=0 trades30d=2000 history=yes partial=1"
+                },
+                {
+                  "validator": "0x1Cb38b3ee632B5dCc0347dB81766606d6Aad4926",
+                  "status": 2,
+                  "receipt": "0",
+                  "executionCost": "300000000000000",
+                  "result": "liquidations30d=0 trades30d=2000 history=yes partial=1"
+                }
+              ]
+            }
+          ],
+          "agentRequests": [
+            {
+              "agentId": "12847293847561029384",
+              "committee": 3,
+              "threshold": 2,
+              "call": "inferString",
+              "args": [
+                "Stats: liquidations30d=0 trades30d=2000 history=yes partial=1",
+                "You review perpetual-futures traders for people who copy their positions automatically. Apply this rubric exactly to the 30-day stats (key=value; n/a means unknown, not safe). BLOCK if liquidations30d is 2 or more, or maxDrawdownPct30d is present and at least 50. Otherwise CAUTION if liquidations30d is 1, or trades30d is below 10, or history=none, or partial=1, or maxDrawdownPct30d is present and at least 25. Otherwise OK. Answer with exactly one word: OK, CAUTION or BLOCK.",
+                false,
+                [
+                  "OK",
+                  "CAUTION",
+                  "BLOCK"
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "tx": "0xf5ce66e1836803a7ca7f85739e3bd542a180254f22de6ccf1564cdd1caad1237",
+          "submittedBy": "0x3e05e29029c60e000c8f01eb5ac9cee6b242d7e0",
+          "committee": [
+            {
+              "callback": "handleVerdict",
+              "requestId": "19216148",
+              "status": 2,
+              "responses": [
+                {
+                  "validator": "0x55Acbe370872c7D90F504eF169217a00c29E2A33",
+                  "status": 2,
+                  "receipt": "0",
+                  "executionCost": "70000000000000000",
+                  "result": "CAUTION"
+                },
+                {
+                  "validator": "0x1Cb38b3ee632B5dCc0347dB81766606d6Aad4926",
+                  "status": 2,
+                  "receipt": "0",
+                  "executionCost": "70000000000000000",
+                  "result": "CAUTION"
+                },
+                {
+                  "validator": "0x3E05e29029C60E000C8F01EB5AC9cEE6b242D7e0",
+                  "status": 2,
+                  "receipt": "0",
+                  "executionCost": "70000000000000000",
+                  "result": "CAUTION"
+                }
+              ]
+            }
+          ],
+          "agentRequests": []
+        }
+      ],
+      "deliveryToHideki": "0xe79c378ab2949589dfd965e41ebb2cd237e745c1f4b445e32bf8104d02f37d02",
+      "gateEvents": [
+        {
+          "event": "VerdictReceived",
+          "args": {
+            "sourceId": "0xbcfa0347e457d0d8554296e51d24ef136d00bb96f09a2455c862d551355547cd",
+            "trader": "0xD3Ecd94b11Dfe7515d5614b0458Bf22175aDE619",
+            "tier": 2,
+            "shannonRequestId": "19216148",
+            "summaryHash": "0x95e132c57a0ae15a026a1016d1fb5d1625c7ec58aafb8dbde86238a9d0df89d1"
+          }
+        }
+      ],
+      "verdict": {
+        "tier": "Caution",
+        "reviewedAt": 1794310895,
+        "shannonRequestId": "19216148",
+        "summaryHash": "0x95e132c57a0ae15a026a1016d1fb5d1625c7ec58aafb8dbde86238a9d0df89d1"
+      },
+      "summary": "liquidations30d=0 trades30d=2000 history=yes partial=1"
+    },
+    {
+      "trader": "0xA1d0CB85c869e534Fe1e0c22af3b238301157b5d",
+      "at": "2026-11-10T11:42:31.480Z",
+      "fee": "0.5",
+      "reviewer": "0xc999B6924179a0dc9649DA7eBa8F3aC8b7CF7c25",
+      "nonce": 69,
+      "requestTx": "0x03c0871b0ba45f543c70c38b054e38cef1f4399b332451801a80a3b565c07098",
+      "requestBlock": 46569088,
+      "messageToShannon": "0xff2b085700f55ef2cee853c62d142418dfce7c3cc66c806221531803c51f033b",
+      "shannonFrom": 537364366,
+      "deliveryToShannon": "0x762e832ed2f8ede80a2ae3657effd72907dec9fb7015154fbd90452c039a4452",
+      "summaryRequest": [
+        {
+          "agentId": "13174292974160097713",
+          "committee": 3,
+          "threshold": 2,
+          "call": "fetchString",
+          "args": [
+            "https://copybook-eosin.vercel.app/api/risk/0xa1d0cb85c869e534fe1e0c22af3b238301157b5d",
+            "rubric"
+          ]
+        }
+      ],
+      "shannonEvents": [
+        {
+          "event": "ReviewReceived",
+          "tx": "0x762e832ed2f8ede80a2ae3657effd72907dec9fb7015154fbd90452c039a4452",
+          "block": 537364436,
+          "args": {
+            "trader": "0xA1d0CB85c869e534Fe1e0c22af3b238301157b5d",
+            "nonce": "69"
+          }
+        },
+        {
+          "event": "SummaryRequested",
+          "tx": "0x762e832ed2f8ede80a2ae3657effd72907dec9fb7015154fbd90452c039a4452",
+          "block": 537364436,
+          "args": {
+            "trader": "0xA1d0CB85c869e534Fe1e0c22af3b238301157b5d",
+            "requestId": "19216220",
+            "nonce": "69",
+            "deposit": "120000000000000000"
+          }
+        },
+        {
+          "event": "SummaryReceived",
+          "tx": "0x1db214bbf32d743827fe46f453bf6ff784e0356359aac24cd5dab1fbccf69a5c",
+          "block": 537364463,
+          "args": {
+            "trader": "0xA1d0CB85c869e534Fe1e0c22af3b238301157b5d",
+            "requestId": "19216220",
+            "nonce": "69",
+            "summaryHash": "0x5b9702568ec86db2b730c66e074d5072d7a20bdb9d4cb95af455cbee0eaeb76d",
+            "summary": "liquidations30d=0 trades30d=761 history=yes partial=0"
+          }
+        },
+        {
+          "event": "VerdictRequested",
+          "tx": "0x1db214bbf32d743827fe46f453bf6ff784e0356359aac24cd5dab1fbccf69a5c",
+          "block": 537364463,
+          "args": {
+            "trader": "0xA1d0CB85c869e534Fe1e0c22af3b238301157b5d",
+            "requestId": "19216223",
+            "nonce": "69",
+            "deposit": "240000000000000000"
+          }
+        },
+        {
+          "event": "VerdictTallied",
+          "tx": "0xc24ae27c2de7bfce3f255aa7fb52aae57de5916a6692c76af147925914063e44",
+          "block": 537364469,
+          "args": {
+            "trader": "0xA1d0CB85c869e534Fe1e0c22af3b238301157b5d",
+            "requestId": "19216223",
+            "nonce": "69",
+            "tier": 1,
+            "ok": 3,
+            "caution": 0,
+            "blocked": 0,
+            "responded": 3
+          }
+        },
+        {
+          "event": "VerdictSent",
+          "tx": "0xc24ae27c2de7bfce3f255aa7fb52aae57de5916a6692c76af147925914063e44",
+          "block": 537364469,
+          "args": {
+            "trader": "0xA1d0CB85c869e534Fe1e0c22af3b238301157b5d",
+            "nonce": "69",
+            "tier": 1,
+            "messageId": "0x9cc61a6e5b01ce4a59b625bd72e58efe9fc73b7b4ad97cad42eee98cea37df48"
+          }
+        }
+      ],
+      "callbacks": [
+        {
+          "tx": "0x1db214bbf32d743827fe46f453bf6ff784e0356359aac24cd5dab1fbccf69a5c",
+          "submittedBy": "0x1cb38b3ee632b5dcc0347db81766606d6aad4926",
+          "committee": [
+            {
+              "callback": "handleSummary",
+              "requestId": "19216220",
+              "status": 2,
+              "responses": [
+                {
+                  "validator": "0x55Acbe370872c7D90F504eF169217a00c29E2A33",
+                  "status": 2,
+                  "receipt": "0",
+                  "executionCost": "300000000000000",
+                  "result": "liquidations30d=0 trades30d=761 history=yes partial=0"
+                },
+                {
+                  "validator": "0x3E05e29029C60E000C8F01EB5AC9cEE6b242D7e0",
+                  "status": 2,
+                  "receipt": "0",
+                  "executionCost": "300000000000000",
+                  "result": "liquidations30d=0 trades30d=761 history=yes partial=0"
+                },
+                {
+                  "validator": "0x1Cb38b3ee632B5dCc0347dB81766606d6Aad4926",
+                  "status": 2,
+                  "receipt": "0",
+                  "executionCost": "300000000000000",
+                  "result": "liquidations30d=0 trades30d=761 history=yes partial=0"
+                }
+              ]
+            }
+          ],
+          "agentRequests": [
+            {
+              "agentId": "12847293847561029384",
+              "committee": 3,
+              "threshold": 2,
+              "call": "inferString",
+              "args": [
+                "Stats: liquidations30d=0 trades30d=761 history=yes partial=0",
+                "You review perpetual-futures traders for people who copy their positions automatically. Apply this rubric exactly to the 30-day stats (key=value; n/a means unknown, not safe). BLOCK if liquidations30d is 2 or more, or maxDrawdownPct30d is present and at least 50. Otherwise CAUTION if liquidations30d is 1, or trades30d is below 10, or history=none, or partial=1, or maxDrawdownPct30d is present and at least 25. Otherwise OK. Answer with exactly one word: OK, CAUTION or BLOCK.",
+                false,
+                [
+                  "OK",
+                  "CAUTION",
+                  "BLOCK"
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "tx": "0xc24ae27c2de7bfce3f255aa7fb52aae57de5916a6692c76af147925914063e44",
+          "submittedBy": "0x3e05e29029c60e000c8f01eb5ac9cee6b242d7e0",
+          "committee": [
+            {
+              "callback": "handleVerdict",
+              "requestId": "19216223",
+              "status": 2,
+              "responses": [
+                {
+                  "validator": "0x55Acbe370872c7D90F504eF169217a00c29E2A33",
+                  "status": 2,
+                  "receipt": "0",
+                  "executionCost": "70000000000000000",
+                  "result": "OK"
+                },
+                {
+                  "validator": "0x1Cb38b3ee632B5dCc0347dB81766606d6Aad4926",
+                  "status": 2,
+                  "receipt": "0",
+                  "executionCost": "70000000000000000",
+                  "result": "OK"
+                },
+                {
+                  "validator": "0x3E05e29029C60E000C8F01EB5AC9cEE6b242D7e0",
+                  "status": 2,
+                  "receipt": "0",
+                  "executionCost": "70000000000000000",
+                  "result": "OK"
+                }
+              ]
+            }
+          ],
+          "agentRequests": []
+        }
+      ],
+      "deliveryToHideki": "0xff278cea407f632ca553804f613f1c157ed9355ebec7d3530863c501e1157271",
+      "gateEvents": [
+        {
+          "event": "VerdictReceived",
+          "args": {
+            "sourceId": "0x6744c2cdbcc5b0f6ad21719c8964204a5ffadf668d2b84479c9b14c029b0a40f",
+            "trader": "0xA1d0CB85c869e534Fe1e0c22af3b238301157b5d",
+            "tier": 1,
+            "shannonRequestId": "19216223",
+            "summaryHash": "0x5b9702568ec86db2b730c66e074d5072d7a20bdb9d4cb95af455cbee0eaeb76d"
+          }
+        }
+      ],
+      "verdict": {
+        "tier": "Ok",
+        "reviewedAt": 1794310969,
+        "shannonRequestId": "19216223",
+        "summaryHash": "0x5b9702568ec86db2b730c66e074d5072d7a20bdb9d4cb95af455cbee0eaeb76d"
+      },
+      "summary": "liquidations30d=0 trades30d=761 history=yes partial=0"
     }
   ],
   "previousReviewers": [

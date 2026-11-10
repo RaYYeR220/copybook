@@ -19,6 +19,8 @@
 //                       picks up a recorded review whose Hyperlane delivery outlasted the wait, from its Shannon
 //                       delivery (searched from the given block, default the one recorded with the request) to the
 //                       gate's answer
+//   adopt <request tx>  records a review someone else paid for (a follower, the app's trader page) from its request
+//                       transaction and follows it across both chains
 //   guard               the follower's guard against the leader's verdict
 // Every transaction goes to deployments/risk.json with its explorer link.
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
@@ -793,6 +795,51 @@ async function review(traders: Address[]) {
   }
 }
 
+/** The first Shannon block at or after a unix time, by binary search over block timestamps. */
+async function shannonBlockAt(ts: bigint): Promise<bigint> {
+  let lo = 0n;
+  let hi = await shannonPub.getBlockNumber();
+  while (lo < hi) {
+    const mid = (lo + hi) / 2n;
+    if ((await shannonPub.getBlock({ blockNumber: mid })).timestamp < ts) lo = mid + 1n;
+    else hi = mid;
+  }
+  return lo;
+}
+
+/**
+ * A review someone else paid for (a follower in a script, the app's trader page): recorded from its request
+ * transaction and followed across both chains like one this tool sent.
+ */
+async function adopt(requestTx: Hex) {
+  if (rec.reviews.some((x) => (x.requestTx as string)?.toLowerCase() === requestTx.toLowerCase())) throw new Error(`review ${requestTx} is already recorded`);
+  const r = await pub.getTransactionReceipt({ hash: requestTx });
+  const requested = r.logs.map((l) => decode(gateAbi, l as never)).find((d) => d?.eventName === "ReviewRequested");
+  if (r.status !== "success" || !requested) throw new Error(`${requestTx} is not a successful review request`);
+  const trader = getAddress(requested.args.trader as string);
+  const nonce = requested.args.nonce as bigint;
+  const tx = await pub.getTransaction({ hash: requestTx });
+  const at = (await pub.getBlock({ blockNumber: r.blockNumber })).timestamp;
+  const shannonFrom = await shannonBlockAt(at - 120n);
+  track("hideki", `requestReview(${trader}) by ${getAddress(r.from)}`, r);
+  const [toShannon] = dispatchedIds(r, "hideki");
+  const entry: Record<string, unknown> = {
+    trader,
+    at: new Date(Number(at) * 1000).toISOString(),
+    fee: formatEther(tx.value),
+    reviewer: reviewerAddr(),
+    requester: getAddress(r.from),
+    nonce: Number(nonce),
+    requestTx,
+    requestBlock: Number(r.blockNumber),
+    messageToShannon: toShannon,
+    shannonFrom: Number(shannonFrom),
+  };
+  rec.reviews.push(entry);
+  save();
+  if (toShannon) await followReview(entry, trader, nonce, toShannon, shannonFrom, r.blockNumber);
+}
+
 /** A recorded review whose delivery to Shannon outlasted the wait: followed again from its Shannon delivery. */
 async function followRecorded(nonceArg: string, shannonFromArg?: string) {
   const entry = rec.reviews.find((x) => Number(x.nonce) === Number(nonceArg));
@@ -983,11 +1030,14 @@ try {
     case "follow":
       await followRecorded(args[0], args[1]);
       break;
+    case "adopt":
+      await adopt(args[0] as Hex);
+      break;
     case "guard":
       await guard();
       break;
     default:
-      throw new Error("steps: bridge <stt> | record | swap-reviewer [stt] | wire | fund <stt> | refill [stt] | check | trade | base-url <url> | prompt | review [trader ...] | follow <nonce> [shannon block] | guard");
+      throw new Error("steps: bridge <stt> | record | swap-reviewer [stt] | wire | fund <stt> | refill [stt] | check | trade | base-url <url> | prompt | review [trader ...] | follow <nonce> [shannon block] | adopt <request tx> | guard");
   }
 } catch (e) {
   failed = true;

@@ -4,14 +4,14 @@ Follow a trader or a thesis on dreamDEX perps. When the source moves, the Copybo
 dreamDEX perps account, in the same block.
 
 - **Same block, no server or bot key.** Somnia's validators run the hub's reactive handler in the block of the
-  source's move, and the hub itself sends the copy ([36 of 36 recorded pairs](docs/PROOF.md#same-block-copies)).
+  source's move, and the hub itself sends the copy ([40 of 40 recorded pairs](docs/PROOF.md#same-block-copies)).
 - **Live since 2026-10-29: 651 copies, all in the leader's block.** Every move of the demo leader from its bot's
   first trade to Hideki block 46,570,615 (2026-11-10), read back from the chain: 709 handler runs, 651 copies into its
   follower's account, each in the leader's block, 8 `BandUnfilled` refusals, no deferrals
   ([numbers](docs/PROOF.md#live-since-the-bot-started)).
 - **A trader we don't control.** Our demo follower follows dreamDEX account 0xD3Ec…E619, which signed nothing and
   does not know; each of its moves is copied or refused in the move's own block
-  ([11 moves](docs/PROOF.md#copying-a-trader-we-dont-control), [a copy](https://copybook-eosin.vercel.app/copy/0x9af7c988c855301d498b0dbda053f6eda8198875eff45be46d7d50325b7cc755)).
+  ([15 moves](docs/PROOF.md#copying-a-trader-we-dont-control), [a copy](https://copybook-eosin.vercel.app/copy/0x9af7c988c855301d498b0dbda053f6eda8198875eff45be46d7d50325b7cc755)).
 - **A refusal is an on-chain record.** An increase your policy refuses is written as `Refused(reason)` in the move's
   block, and your position stays where it was ([a band refusal](docs/PROOF.md#refusal-band)).
 - **A validator-run AI guard.** A committee of Somnia validators on Shannon reviews a trader's 30-day record, and the
@@ -33,7 +33,7 @@ basket of perps, long and short, that its creator rebalances).
 | App | https://copybook-eosin.vercel.app |
 | Demo video | https://youtu.be/HpLdCtyvta0 (2:22) |
 | For judges | [JUDGES.md](JUDGES.md): a five-minute path |
-| Proof ledger | [docs/PROOF.md](docs/PROOF.md): 510 transactions read back from the chain, 510 verified (Hideki block 46,656,830, 2026-11-10) |
+| Proof ledger | [docs/PROOF.md](docs/PROOF.md): 519 transactions read back from the chain, 519 verified (Hideki block 46,676,105, 2026-11-10) |
 | Claims and their evidence | [docs/CLAIMS.md](docs/CLAIMS.md) |
 | Contracts | `CopybookHub` [0xdF73…E154](https://explorer.testnet.somnia.network/tokyo/address/0xdF73BBbB6517B712BBeD9bfAe6253A5E1FCDE154) and `RiskGate` [0xEe54…20f1](https://explorer.testnet.somnia.network/tokyo/address/0xEe54c49E9e70a0e5C2218Eec1b1BDBd4e1Cb20f1) on Hideki, `RiskReviewer` [0xc999…7c25](https://shannon-explorer.somnia.network/address/0xc999B6924179a0dc9649DA7eBa8F3aC8b7CF7c25) on Shannon; all addresses in [`deployments/`](deployments/) |
 | How it is built | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
@@ -67,7 +67,7 @@ basket of perps, long and short, that its creator rebalances).
 3. **The source moves.** dreamDEX's margin bank emits `PositionUpdated` for the trader, or the thesis registry emits a
    rebalance. Somnia's validators call the group's relay in the same block, and the hub reads the source's position
    and resizes each follower: exits first, never gated, then increases as fill-or-kill orders inside the follower's
-   price band, after every policy check. Each follower's gas is charged to its own tank. 36 of 36 recorded pairs have
+   price band, after every policy check. Each follower's gas is charged to its own tank. 40 of 40 recorded pairs have
    the copy in the move's block, sent by the hub ([pairs](docs/PROOF.md#same-block-copies)). A follower the handler's
    gas cannot cover in that block is deferred and synced later by `catchUp`, which is not a same-block copy and is
    never labelled one ([limits](docs/LIMITS.md)).

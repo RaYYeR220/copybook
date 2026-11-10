@@ -35,7 +35,9 @@ The other is dreamDEX account `0xD3Ecd94b11Dfe7515d5614b0458Bf22175aDE619`, whic
 ([PROOF](PROOF.md#copying-a-trader-we-dont-control)). That trader signed nothing, granted nothing and does not know it
 is followed, because a follow needs nothing from the trader. Its moves are its own, and their size, timing and outcome
 are not ours to choose. It is a source we do not control, not a user: the follower, its margin, its policy and its gas
-tank are ours.
+tank are ours. Its first cap, 10 USDso a position, held the copy at about one minimum order, so most of the first 11
+moves were refused `BelowMinimum` and only the flips copied; from move 12 the cap is 20 USDso and the trader's usual
+swings copy. The leaderboard's copy fidelity for this source counts those early refusals.
 
 ## What is mocked
 
@@ -63,7 +65,7 @@ exit ([row](PROOF.md#guard-exit)).
 
 - **Same block is the rule, not a guarantee.** A copy is placed in the source's block when Reactivity delivers the
   event and the handler's gas covers the follower. A follower it cannot cover is deferred and synced by `catchUp`, which is
-  not a same-block copy and is never labelled one. All 36 recorded pairs are same-block
+  not a same-block copy and is never labelled one. All 40 recorded pairs are same-block
   ([PROOF](PROOF.md#same-block-copies)). The hub's whole event log through Hideki block 36,282,657 (read from
   `/api/history` on 2026-10-29) holds no `Deferred` or `GroupDeferred`, and neither do the demo leader's 709 handler runs from its bot's first trade
   to block 46,570,615 ([live](PROOF.md#live-since-the-bot-started)), so the deferral path is shown by tests only
@@ -104,8 +106,8 @@ Every refusal reason is written on chain as `Refused(reason)` when it happens. F
 The hub's whole log through block 36,282,657 holds 6 refusals, 1 `BandUnfilled` and 5 `RiskGate`, and 1 `Stopped`.
 From the demo-leader bot's first trade to block 46,570,615, its follower's handler runs hold 8 more, all
 `BandUnfilled` ([live](PROOF.md#live-since-the-bot-started)).
-Since 2026-11-10 the follower of the trader we don't control has been refused `BelowMinimum` at most of that trader's
-moves ([rows](PROOF.md#copying-a-trader-we-dont-control)). TotalCap, EquityFloor (as a refusal), TankEmpty, AtCap,
+Since 2026-11-10 the follower of the trader we don't control has been refused `BelowMinimum` at 9 of that trader's first
+15 moves, most of them under its first, 10 USDso cap ([rows](PROOF.md#copying-a-trader-we-dont-control)). TotalCap, EquityFloor (as a refusal), TankEmpty, AtCap,
 MarketNotAllowed, VenueRejected, LegFailed and Paused are shown by contract tests only, each listed in [CLAIMS.md](CLAIMS.md#exits-policy-and-refusals).
 
 ## The operator grant

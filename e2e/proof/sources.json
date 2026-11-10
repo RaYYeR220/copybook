@@ -5,7 +5,7 @@
     "e2e": "The end-to-end run against the current hub (`npm run live`), 2026-10-28",
     "risk": "The risk module's runs (`npm run risk`), 2026-10-28, recorded in deployments/risk.json",
     "app": "A run through the web app's pages (a preview deployment) and the MCP server, 2026-10-29",
-    "outside": "A demo follower of ours following dreamDEX trader 0xD3Ec…E619 on ETH since 2026-11-10, set up with `npm run outside` (in e2e/). Its policy copies 1.5% of the trader's size with at most 10 USDso a position, a little above the venue's minimum order of 0.004 ETH, so the copy holds 0.0047 or 0.0048 ETH (whole 0.0001 ETH lots, as the mark moves) while the trader's scaled size is above the cap. A move that leaves it there asks for less than one lot more and is refused as `BelowMinimum`; the copy changes when the trader's position crosses zero or falls far enough for a reduction of at least the venue minimum",
+    "outside": "A demo follower of ours following dreamDEX trader 0xD3Ec…E619 on ETH since 2026-11-10, set up with `npm run outside` (in e2e/). It copies 1.5% of the trader's size. For moves 1–11 its cap was 10 USDso a position, a little above the venue's minimum order of 0.004 ETH, so the copy held 0.0047 or 0.0048 ETH (whole 0.0001 ETH lots, as the mark moved) while the trader's scaled size was above the cap: a move that left it there asked for less than one lot more and was refused as `BelowMinimum`, and the copy changed only when the trader's position crossed zero. From block 46,658,759 the cap is 20 USDso a position and 25 in all (`npm run outside -- caps 20 25`), which holds 1.5% of the trader's usual 0.54 ETH short (about 0.0081 ETH) uncapped, so its swings between about 0.54 and 0.11 ETH short are copied too (move 15)",
     "refresh": "Top-ups on 2026-11-10 so the demo runs last through 2026-11-25",
     "uptime": "`npm run uptime` (in e2e/) on 2026-11-10: the demo leader's moves and the hub's handler runs since the demo-leader bot's first trade (e2e/proof/uptime.json)"
   },
@@ -2943,6 +2943,31 @@
     },
     {
       "chain": "hideki",
+      "run": "outside",
+      "hash": "0x637ac1422570114fb48dbff2091f10ac383b5781a65e3800ae9f08fd29bca33c",
+      "id": "outside-caps",
+      "section": "outside",
+      "context": true,
+      "label": "After move 11, the follower raises its caps to 20 USDso a position and 25 in all (updatePolicy; scale, band and floor unchanged), so a swing between about 0.54 and 0.11 ETH short is big enough to copy",
+      "expect": {
+        "block": 46658759,
+        "index": 5,
+        "gasUsed": 70169,
+        "from": "0xDe52dd7f81F67D2124ae0fBd8567f405cFAEeaAB",
+        "to": "0xdF73BBbB6517B712BBeD9bfAe6253A5E1FCDE154",
+        "method": "updatePolicy",
+        "events": [
+          {
+            "name": "PolicyUpdated",
+            "args": {
+              "follower": "0xDe52dd7f81F67D2124ae0fBd8567f405cFAEeaAB"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "chain": "hideki",
       "run": "refresh",
       "hash": "0xc44a74d020b5907e369d302055b8e2f6f38c973debbac0e2c691261cde629c94",
       "id": "refresh-follower-stt",
@@ -3565,6 +3590,199 @@
         "to": "0xdF73BBbB6517B712BBeD9bfAe6253A5E1FCDE154",
         "method": "fundTank",
         "value": "1500000000000000000"
+      }
+    },
+    {
+      "chain": "hideki",
+      "run": "outside",
+      "hash": "0x90dcde736c59e0bc6e4f82c9c212afe3c3de2cb0d28e4ab95bd5908e0a6d9d86",
+      "id": "outside-12-move",
+      "section": "outside",
+      "pair": "outside-12",
+      "role": "move",
+      "label": "The trader goes from 0.1097 ETH short to 0.3253 ETH long (a transaction sent by 0x3fD2…3c4a, not by us)",
+      "expect": {
+        "block": 46665438,
+        "index": 3,
+        "from": "0x3fd27cd3cd1432da855db40af1f518fd0ef23c4a",
+        "to": "0xfa4b763c3303248cbef7457646c5e209772478a7"
+      }
+    },
+    {
+      "chain": "hideki",
+      "run": "outside",
+      "hash": "0xdd4b06a0a5662c863dbb789c6c9bad9eccd05775f53c7c81579b279f3b4ef4c2",
+      "id": "outside-12-copy",
+      "section": "outside",
+      "pair": "outside-12",
+      "role": "copy",
+      "label": "the hub's handler: copied flat → 0.0048 ETH long",
+      "expect": {
+        "block": 46665438,
+        "index": 4,
+        "gasUsed": 1940178,
+        "from": "0xdF73BBbB6517B712BBeD9bfAe6253A5E1FCDE154",
+        "to": "0x8ad873ec67d450ec4a9e7c159a9cd6bf72b15404",
+        "method": "onEvent",
+        "events": [
+          {
+            "name": "Copied",
+            "args": {
+              "follower": "0xDe52dd7f81F67D2124ae0fBd8567f405cFAEeaAB",
+              "sourceId": "0xbcfa0347e457d0d8554296e51d24ef136d00bb96f09a2455c862d551355547cd",
+              "pool": "0xD6Cb1DD58580B84D76068aC21594219ce03aeddf",
+              "fromSize": "0",
+              "toSize": "4800000000000000"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "chain": "hideki",
+      "run": "outside",
+      "hash": "0xdff95f8312d13d2f7c4f572085d00df10670cb63e288bd662e8c83dee16a53d8",
+      "id": "outside-13-move",
+      "section": "outside",
+      "pair": "outside-13",
+      "role": "move",
+      "label": "The trader goes from 0.3253 ETH long to 0.1115 ETH short (a transaction sent by 0x3fD2…3c4a, not by us)",
+      "expect": {
+        "block": 46666601,
+        "index": 3,
+        "from": "0x3fd27cd3cd1432da855db40af1f518fd0ef23c4a",
+        "to": "0xfa4b763c3303248cbef7457646c5e209772478a7"
+      }
+    },
+    {
+      "chain": "hideki",
+      "run": "outside",
+      "hash": "0x58e989dad24b6a05544ce14edd0a2cc8e4274cbd3d9ec9fd449a8b262c9018cc",
+      "id": "outside-13-copy",
+      "section": "outside",
+      "pair": "outside-13",
+      "role": "copy",
+      "label": "the hub's handler: copied 0.0048 ETH long → flat, then refused `BelowMinimum`",
+      "expect": {
+        "block": 46666601,
+        "index": 7,
+        "gasUsed": 1962070,
+        "from": "0xdF73BBbB6517B712BBeD9bfAe6253A5E1FCDE154",
+        "to": "0x8ad873ec67d450ec4a9e7c159a9cd6bf72b15404",
+        "method": "onEvent",
+        "events": [
+          {
+            "name": "Copied",
+            "args": {
+              "follower": "0xDe52dd7f81F67D2124ae0fBd8567f405cFAEeaAB",
+              "sourceId": "0xbcfa0347e457d0d8554296e51d24ef136d00bb96f09a2455c862d551355547cd",
+              "pool": "0xD6Cb1DD58580B84D76068aC21594219ce03aeddf",
+              "fromSize": "4800000000000000",
+              "toSize": "0"
+            }
+          },
+          {
+            "name": "Refused",
+            "args": {
+              "follower": "0xDe52dd7f81F67D2124ae0fBd8567f405cFAEeaAB",
+              "sourceId": "0xbcfa0347e457d0d8554296e51d24ef136d00bb96f09a2455c862d551355547cd",
+              "pool": "0xD6Cb1DD58580B84D76068aC21594219ce03aeddf",
+              "reason": "BelowMinimum"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "chain": "hideki",
+      "run": "outside",
+      "hash": "0x45672de1ee1b5a6c87d94487ddc8da3dd8878ea024a807669a710d9f5ef542b4",
+      "id": "outside-14-move",
+      "section": "outside",
+      "pair": "outside-14",
+      "role": "move",
+      "label": "The trader goes from 0.1115 ETH short to 0.5455 ETH short (a transaction sent by 0x4C4a…7454, not by us)",
+      "expect": {
+        "block": 46672800,
+        "index": 9,
+        "from": "0x4c4aea82b10b93fb9540b0bc80d8cc08d45a7454",
+        "to": "0xfa4b763c3303248cbef7457646c5e209772478a7"
+      }
+    },
+    {
+      "chain": "hideki",
+      "run": "outside",
+      "hash": "0xda9428b54ca3599539b9bdbdaefbac456f2b2b1506757111b896e41b063c27e8",
+      "id": "outside-14-copy",
+      "section": "outside",
+      "pair": "outside-14",
+      "role": "copy",
+      "label": "the hub's handler: copied flat → 0.0081 ETH short",
+      "expect": {
+        "block": 46672800,
+        "index": 14,
+        "gasUsed": 1968632,
+        "from": "0xdF73BBbB6517B712BBeD9bfAe6253A5E1FCDE154",
+        "to": "0x8ad873ec67d450ec4a9e7c159a9cd6bf72b15404",
+        "method": "onEvent",
+        "events": [
+          {
+            "name": "Copied",
+            "args": {
+              "follower": "0xDe52dd7f81F67D2124ae0fBd8567f405cFAEeaAB",
+              "sourceId": "0xbcfa0347e457d0d8554296e51d24ef136d00bb96f09a2455c862d551355547cd",
+              "pool": "0xD6Cb1DD58580B84D76068aC21594219ce03aeddf",
+              "fromSize": "0",
+              "toSize": "-8100000000000000"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "chain": "hideki",
+      "run": "outside",
+      "hash": "0x3753adfa195a02d4812cfb000fbe8e2afa125c6dea1ddf5c320f6c6d8275d0f5",
+      "id": "outside-15-move",
+      "section": "outside",
+      "pair": "outside-15",
+      "role": "move",
+      "label": "The trader goes from 0.5455 ETH short to 0.113 ETH short (a transaction sent by 0x3fD2…3c4a, not by us)",
+      "expect": {
+        "block": 46674824,
+        "index": 7,
+        "from": "0x3fd27cd3cd1432da855db40af1f518fd0ef23c4a",
+        "to": "0xfa4b763c3303248cbef7457646c5e209772478a7"
+      }
+    },
+    {
+      "chain": "hideki",
+      "run": "outside",
+      "hash": "0x44c328b898566a7fa6f68c683e4d0fde068a30ebd86ce7767fa83d163455cb20",
+      "id": "outside-15-copy",
+      "section": "outside",
+      "pair": "outside-15",
+      "role": "copy",
+      "label": "the hub's handler: copied 0.0081 ETH short → 0.0017 ETH short",
+      "expect": {
+        "block": 46674824,
+        "index": 28,
+        "gasUsed": 1780992,
+        "from": "0xdF73BBbB6517B712BBeD9bfAe6253A5E1FCDE154",
+        "to": "0x8ad873ec67d450ec4a9e7c159a9cd6bf72b15404",
+        "method": "onEvent",
+        "events": [
+          {
+            "name": "Copied",
+            "args": {
+              "follower": "0xDe52dd7f81F67D2124ae0fBd8567f405cFAEeaAB",
+              "sourceId": "0xbcfa0347e457d0d8554296e51d24ef136d00bb96f09a2455c862d551355547cd",
+              "pool": "0xD6Cb1DD58580B84D76068aC21594219ce03aeddf",
+              "fromSize": "-8100000000000000",
+              "toSize": "-1700000000000000"
+            }
+          }
+        ]
       }
     }
   ]

@@ -250,7 +250,8 @@ async function pairs(who: Address, trader: Address, fromBlock: bigint, toBlock?:
   save();
   const copied = out.filter((r) => String(r.result).includes("Copied")).length;
   const refused = out.filter((r) => String(r.result).includes("Refused")).length;
-  console.log(`\n${out.length} moves in blocks ${fromBlock}–${to}: ${copied} with a copy, ${refused} with a refusal, ${out.length - copied - refused} with neither`);
+  const neither = out.filter((r) => !String(r.result).includes("Copied") && !String(r.result).includes("Refused")).length;
+  console.log(`\n${out.length} moves in blocks ${fromBlock}–${to}: ${copied} with a copy, ${refused} with a refusal (a move can have both), ${neither} with neither`);
   const tankLeft = await client().tankOf(who);
   console.log(`tank ${formatEther(tankLeft)} STT`);
 }

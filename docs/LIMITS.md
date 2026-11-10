@@ -63,7 +63,7 @@ exit ([row](PROOF.md#guard-exit)).
 
 - **Same block is the rule, not a guarantee.** A copy is placed in the source's block when Reactivity delivers the
   event and the handler's gas covers the follower. A follower it cannot cover is deferred and synced by `catchUp`, which is
-  not a same-block copy and is never labelled one. All 23 recorded pairs are same-block
+  not a same-block copy and is never labelled one. All 36 recorded pairs are same-block
   ([PROOF](PROOF.md#same-block-copies)). The hub's whole event log through Hideki block 36,282,657 (read from
   `/api/history` on 2026-10-29) holds no `Deferred` or `GroupDeferred`, and neither do the demo leader's 709 handler runs from its bot's first trade
   to block 46,570,615 ([live](PROOF.md#live-since-the-bot-started)), so the deferral path is shown by tests only
@@ -92,19 +92,21 @@ exit ([row](PROOF.md#guard-exit)).
 
 ## Refusals: what is on chain and what is tested
 
-Every refusal reason is written on chain as `Refused(reason)` when it happens. Three have been recorded live:
+Every refusal reason is written on chain as `Refused(reason)` when it happens. Four have been recorded live:
 
 | Reason | Recorded |
 | --- | --- |
 | `BandUnfilled` | [the 1000PEPE increase with a 5 bps band](PROOF.md#refusal-band) |
 | `RiskGate` | [a guarded follower under a BLOCK](PROOF.md#guard-blocked), and [the app run's guarded follower](PROOF.md#app-live) |
+| `BelowMinimum` | [a trader we don't control](PROOF.md#outside-1): the follower already holds its cap in whole lots, and the cap leaves room for less than one lot more |
 | The equity floor | as a `Stopped` from `poke`, which closed the copy ([row](PROOF.md#floor-poke)); no `Refused(EquityFloor)` has been recorded |
 
 The hub's whole log through block 36,282,657 holds 6 refusals, 1 `BandUnfilled` and 5 `RiskGate`, and 1 `Stopped`.
 From the demo-leader bot's first trade to block 46,570,615, its follower's handler runs hold 8 more, all
 `BandUnfilled` ([live](PROOF.md#live-since-the-bot-started)).
-TotalCap, EquityFloor (as a refusal), TankEmpty, BelowMinimum, AtCap, MarketNotAllowed, VenueRejected, LegFailed and
-Paused are shown by contract tests only, each listed in [CLAIMS.md](CLAIMS.md#exits-policy-and-refusals).
+Since 2026-11-10 the follower of the trader we don't control has been refused `BelowMinimum` at most of that trader's
+moves ([rows](PROOF.md#copying-a-trader-we-dont-control)). TotalCap, EquityFloor (as a refusal), TankEmpty, AtCap,
+MarketNotAllowed, VenueRejected, LegFailed and Paused are shown by contract tests only, each listed in [CLAIMS.md](CLAIMS.md#exits-policy-and-refusals).
 
 ## The operator grant
 

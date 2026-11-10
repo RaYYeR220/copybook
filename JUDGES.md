@@ -15,8 +15,16 @@ What Copybook does not do: [docs/LIMITS.md](docs/LIMITS.md).
    account is position 22 of the same block. On the explorer:
    [the move](https://explorer.testnet.somnia.network/tokyo/tx/0x6880ee77710e3156184063cce42be51517df7ca1bb835d25037ebe5556b7f44d),
    [the copy](https://explorer.testnet.somnia.network/tokyo/tx/0xd012c9ad808025ba8ff880bde67e6972b661b3824e839754bb8681cc1b878cbc).
-2. Read the top of [docs/PROOF.md](docs/PROOF.md): 461 of 461 cited transactions verified on chain, 23 of 23
-   same-block pairs, 8 of 8 contracts, as of Hideki block 36,407,680 (2026-10-29).
+   A copy of a trader we don't control:
+   [copybook-eosin.vercel.app/copy/0x9af7…c755](https://copybook-eosin.vercel.app/copy/0x9af7c988c855301d498b0dbda053f6eda8198875eff45be46d7d50325b7cc755).
+   dreamDEX account 0xD3Ec…E619, which signed nothing and does not know it is followed, flips its ETH short to a long
+   at position 0 of block 46,651,004; the hub closes our follower's short and opens its long at position 4 of the same
+   block. On the explorer:
+   [the move](https://explorer.testnet.somnia.network/tokyo/tx/0x6eb14100e9fd35cde32d1e72f35bd49796fae3792e47e649ac7714e86b719306),
+   [the copy](https://explorer.testnet.somnia.network/tokyo/tx/0x9af7c988c855301d498b0dbda053f6eda8198875eff45be46d7d50325b7cc755);
+   every move of that trader since we followed it: [PROOF](docs/PROOF.md#copying-a-trader-we-dont-control).
+2. Read the top of [docs/PROOF.md](docs/PROOF.md): 508 of 508 cited transactions verified on chain, 36 of 36
+   same-block pairs, 9 of 9 contracts, as of Hideki block 46,655,446 (2026-11-10).
 3. Skim [docs/LIMITS.md](docs/LIMITS.md).
 
 ## 1. MVP potential (2 minutes)
@@ -69,7 +77,9 @@ block, position, sender, target, function, gas and events checked.
 
 | What | Where |
 | --- | --- |
-| Copies sent by the hub into followers' accounts, in the source's block | [23 same-block pairs](docs/PROOF.md#same-block-copies) |
+| Copies sent by the hub into followers' accounts, in the source's block | [36 same-block pairs](docs/PROOF.md#same-block-copies) |
+| Every move of the demo leader since its bot started, read from the chain: handler runs, copies and whether each landed in the leader's block, refusals by reason | [Live since the bot started](docs/PROOF.md#live-since-the-bot-started) |
+| A trader we don't control: our demo follower copies a dreamDEX account that signed nothing, each move copied or refused in its block | [Copying a trader we don't control](docs/PROOF.md#copying-a-trader-we-dont-control) |
 | The app run: approval, guard off, follow, `catchUp`, a live copy, top-up, unfollow with flatten, withdraw, revoke, all sent from the app's pages | [In the app](docs/PROOF.md#in-the-app) |
 | Refusals on chain, in the move's block | [Refusals](docs/PROOF.md#refusals-on-chain) |
 | Theses: created, followed (both legs in one transaction), rebalanced and copied in the rebalance's block | [Theses](docs/PROOF.md#theses) |
@@ -114,7 +124,7 @@ Tests, run on 2026-10-29, all passing:
 | SDK | `npm test -w @copybook/sdk` | 96, plus 5 live ones run with `COPYBOOK_LIVE=1` |
 | MCP server | `npm test -w @copybook/mcp` | 56 |
 | Trader statistics | `npm test -w @copybook/stats` | 35 |
-| Proof ledger, eval tooling and demo-leader bot | `cd e2e && npm test` | 41 |
+| Proof ledger, eval tooling and demo-leader bot | `cd e2e && npm test` | 41; 43 in a run on 2026-11-10 |
 | AI-guard rubric | `cd e2e && npm run eval:test` | 8 |
 
 ## 4. Communication

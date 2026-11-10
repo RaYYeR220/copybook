@@ -240,7 +240,7 @@ started") and whose first and last handler copies it re-checks as same-block pai
 ## A trader we do not control
 
 `npm run outside` runs one of our demo followers (`UI_FOLLOWER`) against a dreamDEX trader Copybook does not control:
-the trader signs nothing and does not know it is followed.
+Copybook asks nothing of the trader, since a follow needs no action from it.
 
 | step | what it does |
 |---|---|

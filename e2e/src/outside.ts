@@ -1,6 +1,6 @@
-// Copying a trader Copybook does not control: one of our demo followers (UI_FOLLOWER) follows a dreamDEX trader who
-// signed nothing and does not know, and the hub's handler copies (or refuses, with its reason) each of the trader's
-// moves in the move's block.
+// Copying a trader Copybook does not control: one of our demo followers (UI_FOLLOWER) follows a dreamDEX trader Copybook
+// asks nothing of (a follow needs no action from the trader), and the hub's handler handles each of the trader's moves
+// in the move's block: a copy, a refusal with its reason, or nothing when the change is too small to send.
 //
 //   npm run outside -- stats <trader>                    the trader's position changes over the last 24 h (indexer, no key)
 //   COPYBOOK_ENV=<keys> npm run outside -- fund <stt> <usdso> [to]

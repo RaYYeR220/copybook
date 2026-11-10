@@ -32,8 +32,8 @@ every 25 minutes.
 
 The other is dreamDEX account `0xD3Ecd94b11Dfe7515d5614b0458Bf22175aDE619`, which Copybook does not control. Since
 2026-11-10 the demo follower from the app run (`0xDe52…eaAB`, ours) follows it on ETH
-([PROOF](PROOF.md#copying-a-trader-we-dont-control)). That trader signed nothing, granted nothing and does not know it
-is followed, because a follow needs nothing from the trader. Its moves are its own, and their size, timing and outcome
+([PROOF](PROOF.md#copying-a-trader-we-dont-control)). Copybook asked nothing of it: a follow needs no action from the
+trader. Its moves are its own, and their size, timing and outcome
 are not ours to choose. It is a source we do not control, not a user: the follower, its margin, its policy and its gas
 tank are ours. Its first cap, 10 USDso a position, held the copy at about one minimum order, so most of the first 11
 moves were refused `BelowMinimum` and only the flips copied; from move 12 the cap is 20 USDso and the trader's usual

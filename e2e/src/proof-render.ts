@@ -381,7 +381,7 @@ export function renderProof(input: ProofInput): string {
   if (sectionRows("outside").length) {
     out.push("## Copying a trader we don't control", "");
     out.push(
-      `${ctx.runs.outside ? `${ctx.runs.outside}. ` : ""}The trader is a dreamDEX account Copybook does not control: it signed nothing, does not know it is followed, and every move below is its own. The follower is ours (\`demoWallets\`), so this is a source we do not control, not an outside user. Each pair is one of the trader's moves and the hub's handler transaction in its block, with what it did for our follower: a copy, or a refusal with its reason. The review of the trader that the follower paid for is in [every review](#every-review).`,
+      `${ctx.runs.outside ? `${ctx.runs.outside}. ` : ""}The trader is a dreamDEX account Copybook does not control, and Copybook asked nothing of it: a follow needs no action from the trader. Every move below is a transaction that changed the trader's own position. The follower is ours (\`demoWallets\`), so this is a source we do not control, not an outside user. Each pair is one of the trader's moves and the hub's handler transaction in its block, with what it did for our follower: a copy, or a refusal with its reason. The review of the trader that the follower paid for is in [every review](#every-review).`,
       "",
     );
     stepTable(sectionRows("outside").filter((r) => !r.pair));

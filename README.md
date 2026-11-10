@@ -8,10 +8,11 @@ dreamDEX perps account, in the same block.
 - **Live since 2026-10-29: 651 copies, all in the leader's block.** Every move of the demo leader from its bot's
   first trade to Hideki block 46,570,615 (2026-11-10), read back from the chain: 709 handler runs, 651 copies into its
   follower's account, each in the leader's block, 8 `BandUnfilled` refusals, no deferrals
-  ([numbers](docs/PROOF.md#live-since-the-bot-started)).
-- **A trader we don't control.** Our demo follower follows dreamDEX account 0xD3Ec…E619, which signed nothing and
-  does not know; each of its moves is copied or refused in the move's own block
-  ([15 moves](docs/PROOF.md#copying-a-trader-we-dont-control), [a copy](https://copybook-eosin.vercel.app/copy/0x9af7c988c855301d498b0dbda053f6eda8198875eff45be46d7d50325b7cc755)).
+  ([numbers](docs/PROOF.md#live-since-the-bot-started)). Our demo follower also follows dreamDEX account 0xD3Ec…E619,
+  a trader we don't control. Copybook asked nothing of it: a follow needs no action from the trader. Each of its moves
+  is handled in the move's own block: copied, refused, or too small to send
+  ([15 moves](docs/PROOF.md#copying-a-trader-we-dont-control), [a copy](https://copybook-eosin.vercel.app/copy/0x9af7c988c855301d498b0dbda053f6eda8198875eff45be46d7d50325b7cc755)); early moves were refused
+  `BelowMinimum` under a 10 USDso cap ([LIMITS](docs/LIMITS.md#our-wallets-no-outside-users)).
 - **A refusal is an on-chain record.** An increase your policy refuses is written as `Refused(reason)` in the move's
   block, and your position stays where it was ([a band refusal](docs/PROOF.md#refusal-band)).
 - **A validator-run AI guard.** A committee of Somnia validators on Shannon reviews a trader's 30-day record, and the
@@ -21,8 +22,9 @@ Each copy is a page and a 1200×630 share card that carries its block proof, mad
 and climb a leaderboard ranked by followers and copy fidelity, thesis creators publish baskets for others to follow,
 and agents follow through the MCP server ([claims map](docs/CLAIMS.md#the-app)). There are no outside users yet: every
 wallet that follows or creates a thesis in the recorded runs is one of ours, and so is the demo leader (`demoWallets`
-in [`deployments/hideki.json`](deployments/hideki.json)). The one trader followed that is not ours signed nothing and
-does not know it is followed ([LIMITS](docs/LIMITS.md#our-wallets-no-outside-users)).
+in [`deployments/hideki.json`](deployments/hideki.json)). The one trader followed that is not ours is a source we don't
+control, not a user: Copybook asked nothing of it, since a follow needs no action from the trader
+([LIMITS](docs/LIMITS.md#our-wallets-no-outside-users)).
 
 Copybook runs on [dreamDEX](https://app.testnet.dreamdex.io/) perps on Hideki (Somnia's Tokyo testnet, chain 50383),
 where STT and USDso have no market value. A wallet follows one source: a trader's account, or a thesis (a weighted
@@ -33,7 +35,7 @@ basket of perps, long and short, that its creator rebalances).
 | App | https://copybook-eosin.vercel.app |
 | Demo video | https://youtu.be/HpLdCtyvta0 (2:22) |
 | For judges | [JUDGES.md](JUDGES.md): a five-minute path |
-| Proof ledger | [docs/PROOF.md](docs/PROOF.md): 519 transactions read back from the chain, 519 verified (Hideki block 46,676,105, 2026-11-10) |
+| Proof ledger | [docs/PROOF.md](docs/PROOF.md): 519 transactions read back from the chain, 519 verified (Hideki block 46,681,223, 2026-11-10) |
 | Claims and their evidence | [docs/CLAIMS.md](docs/CLAIMS.md) |
 | Contracts | `CopybookHub` [0xdF73…E154](https://explorer.testnet.somnia.network/tokyo/address/0xdF73BBbB6517B712BBeD9bfAe6253A5E1FCDE154) and `RiskGate` [0xEe54…20f1](https://explorer.testnet.somnia.network/tokyo/address/0xEe54c49E9e70a0e5C2218Eec1b1BDBd4e1Cb20f1) on Hideki, `RiskReviewer` [0xc999…7c25](https://shannon-explorer.somnia.network/address/0xc999B6924179a0dc9649DA7eBa8F3aC8b7CF7c25) on Shannon; all addresses in [`deployments/`](deployments/) |
 | How it is built | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
@@ -162,7 +164,7 @@ cd e2e && npm ci && npm test && npm run eval:test && cd ..
 ```
 
 Every suite passed in a run on 2026-10-29: `forge test` 257 tests, app 377, SDK 96 (plus 5 live ones, skipped
-without `COPYBOOK_LIVE=1`), MCP 56, stats 35, the e2e tests 41 (the proof ledger, the eval tooling and the demo-leader bot, `npm test` in `e2e/`; 43 in a run on 2026-11-10) and the rubric 8
+without `COPYBOOK_LIVE=1`), MCP 56, stats 35, the e2e tests 43, 44 with `COPYBOOK_LIVE=1` (the proof ledger, the eval tooling and the demo-leader bot, `npm test` in `e2e/`, run on 2026-11-10) and the rubric 8
 (`npm run eval:test`).
 
 `npm run start -w @copybook/app` serves the production build on port 3000. `cd e2e && npm run proof` re-reads every

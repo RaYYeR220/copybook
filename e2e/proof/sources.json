@@ -3531,6 +3531,41 @@
           }
         ]
       }
+    },
+    {
+      "chain": "hideki",
+      "run": "refresh",
+      "hash": "0x6827abdefc59f1e384c75c6b04bb6cee81760c5c870ae6ea03e3abb444786660",
+      "id": "refresh-outside-stt-2",
+      "section": "other",
+      "source": "refresh 2026-11-10",
+      "label": "The owner sends demo follower 0xDe52…eaAB 1.5 STT more for its tank",
+      "expect": {
+        "block": 46656596,
+        "index": 0,
+        "gasUsed": 21000,
+        "from": "0x5397812d66F3233E0972b7AEB5e195a945504632",
+        "to": "0xDe52dd7f81F67D2124ae0fBd8567f405cFAEeaAB",
+        "value": "1500000000000000000"
+      }
+    },
+    {
+      "chain": "hideki",
+      "run": "refresh",
+      "hash": "0x44b8c7f2c6df550d40085d40ce9c8654403740a4df0f593d7c740d7d0577fd4b",
+      "id": "refresh-outside-tank-2",
+      "section": "other",
+      "source": "refresh 2026-11-10",
+      "label": "Demo follower 0xDe52…eaAB adds 1.5 STT to its gas tank (fundTank)",
+      "expect": {
+        "block": 46656677,
+        "index": 0,
+        "gasUsed": 25325,
+        "from": "0xDe52dd7f81F67D2124ae0fBd8567f405cFAEeaAB",
+        "to": "0xdF73BBbB6517B712BBeD9bfAe6253A5E1FCDE154",
+        "method": "fundTank",
+        "value": "1500000000000000000"
+      }
     }
   ]
 }

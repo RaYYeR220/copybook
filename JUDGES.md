@@ -23,8 +23,8 @@ What Copybook does not do: [docs/LIMITS.md](docs/LIMITS.md).
    [the move](https://explorer.testnet.somnia.network/tokyo/tx/0x6eb14100e9fd35cde32d1e72f35bd49796fae3792e47e649ac7714e86b719306),
    [the copy](https://explorer.testnet.somnia.network/tokyo/tx/0x9af7c988c855301d498b0dbda053f6eda8198875eff45be46d7d50325b7cc755);
    every move of that trader since we followed it: [PROOF](docs/PROOF.md#copying-a-trader-we-dont-control).
-2. Read the top of [docs/PROOF.md](docs/PROOF.md): 508 of 508 cited transactions verified on chain, 36 of 36
-   same-block pairs, 9 of 9 contracts, as of Hideki block 46,655,446 (2026-11-10).
+2. Read the top of [docs/PROOF.md](docs/PROOF.md): 510 of 510 cited transactions verified on chain, 36 of 36
+   same-block pairs, 9 of 9 contracts, as of Hideki block 46,656,830 (2026-11-10).
 3. Skim [docs/LIMITS.md](docs/LIMITS.md).
 
 ## 1. MVP potential (2 minutes)

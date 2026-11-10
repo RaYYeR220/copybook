@@ -1,8 +1,8 @@
 # Proof ledger
 
-Every transaction Copybook's documents cite, read back from the chain. `npm run proof` (in `e2e/`) wrote this file at **Hideki block 46,655,446** and **Shannon block 537,450,769**, 2026-11-10 14:06 UTC.
+Every transaction Copybook's documents cite, read back from the chain. `npm run proof` (in `e2e/`) wrote this file at **Hideki block 46,656,830** and **Shannon block 537,452,154**, 2026-11-10 14:08 UTC.
 
-**508 transactions checked: 508 verified, 0 failed, 0 unverified.** 36 of 36 same-block pairs check out. 9 of 9 contracts check out.
+**510 transactions checked: 510 verified, 0 failed, 0 unverified.** 36 of 36 same-block pairs check out. 9 of 9 contracts check out.
 
 Testnet only: Hideki (chain 50383; its explorer is the Tokyo explorer) and Shannon (chain 50312) are Somnia testnets, and STT and USDso have no market value. A wallet shown with a role (demo leader, demo follower, …) is one of Copybook's own (`demoWallets` in `deployments/hideki.json`); the traders in the review table are dreamDEX traders the AI guard reviewed, and the trader in [Copying a trader we don't control](#copying-a-trader-we-dont-control) is a dreamDEX account we do not control.
 
@@ -371,7 +371,7 @@ Every transaction the landing page shows (`app/content/proof.ts`), checked at th
 
 Everything else recorded in `deployments/*.json`, the app run's funding and cleanup, and transaction links in the docs. Another 711 rows re-check transactions shown above against what `deployments/*.json` recorded for them; all verified.
 
-<details><summary>32 transactions</summary>
+<details><summary>34 transactions</summary>
 
 | Source | Step | Chain | Tx | Block · position | Check |
 |---|---|---|---|---|---|
@@ -396,6 +396,8 @@ Everything else recorded in `deployments/*.json`, the app run's funding and clea
 | refresh 2026-11-10 | The owner sends the demo leader 4 STT for the bot's gas | Hideki | [0xd322b539…8b20](https://explorer.testnet.somnia.network/tokyo/tx/0xd322b539ee736dcca57d43cc7b5b7868b7c5698fd61b3f5394f490d1bf4f8b20) | 46,572,528 · #1 | ✓ |
 | refresh 2026-11-10 | The owner sends demo follower 0xDe52…eaAB 4 STT for its tank | Hideki | [0x18613d1e…02eb](https://explorer.testnet.somnia.network/tokyo/tx/0x18613d1eafe24dd7ac5ea3d7c87859c77eb7437f1219e978fef8623e33d902eb) | 46,634,469 · #0 | ✓ |
 | refresh 2026-11-10 | Demo follower 0xDe52…eaAB adds 4 STT to its gas tank (fundTank) | Hideki | [0xea85f53a…6c37](https://explorer.testnet.somnia.network/tokyo/tx/0xea85f53af89451caebfdada04d90fcfe465063e4379573010deb3a31d01b6c37) | 46,634,549 · #4 | ✓ |
+| refresh 2026-11-10 | The owner sends demo follower 0xDe52…eaAB 1.5 STT more for its tank | Hideki | [0x6827abde…6660](https://explorer.testnet.somnia.network/tokyo/tx/0x6827abdefc59f1e384c75c6b04bb6cee81760c5c870ae6ea03e3abb444786660) | 46,656,596 · #0 | ✓ |
+| refresh 2026-11-10 | Demo follower 0xDe52…eaAB adds 1.5 STT to its gas tank (fundTank) | Hideki | [0x44b8c7f2…fd4b](https://explorer.testnet.somnia.network/tokyo/tx/0x44b8c7f2c6df550d40085d40ce9c8654403740a4df0f593d7c740d7d0577fd4b) | 46,656,677 · #0 | ✓ |
 | deployments/risk.json | bridge 15 STT to Shannon (transferRemote) | Hideki | [0xc7aefa63…f85d](https://explorer.testnet.somnia.network/tokyo/tx/0xc7aefa63e066ae6fdcd00892bb5f5e9fb24d776143cee7083fcea5e00947f85d) | 35,358,283 · #1 | ✓ |
 | deployments/risk.json | bridge delivery on Shannon (15 STT) | Shannon | [0x0cc71fa8…d285](https://shannon-explorer.somnia.network/tx/0x0cc71fa8372c396f040cf86a8d4802bab84a879ea46945c75801dc50fc6ad285) | 526,147,605 · #0 | ✓ |
 | deployments/risk.json | RiskGate.setReviewer(address) | Hideki | [0xc003b9aa…42a5](https://explorer.testnet.somnia.network/tokyo/tx/0xc003b9aa29275797c526b2fd9b4b1458a4b3b2786387905c02672d1aa1b042a5) | 35,358,805 · #0 | ✓ |

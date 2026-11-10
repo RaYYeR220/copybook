@@ -33,7 +33,7 @@ basket of perps, long and short, that its creator rebalances).
 | App | https://copybook-eosin.vercel.app |
 | Demo video | https://youtu.be/HpLdCtyvta0 (2:22) |
 | For judges | [JUDGES.md](JUDGES.md): a five-minute path |
-| Proof ledger | [docs/PROOF.md](docs/PROOF.md): 508 transactions read back from the chain, 508 verified (Hideki block 46,655,446, 2026-11-10) |
+| Proof ledger | [docs/PROOF.md](docs/PROOF.md): 510 transactions read back from the chain, 510 verified (Hideki block 46,656,830, 2026-11-10) |
 | Claims and their evidence | [docs/CLAIMS.md](docs/CLAIMS.md) |
 | Contracts | `CopybookHub` [0xdF73…E154](https://explorer.testnet.somnia.network/tokyo/address/0xdF73BBbB6517B712BBeD9bfAe6253A5E1FCDE154) and `RiskGate` [0xEe54…20f1](https://explorer.testnet.somnia.network/tokyo/address/0xEe54c49E9e70a0e5C2218Eec1b1BDBd4e1Cb20f1) on Hideki, `RiskReviewer` [0xc999…7c25](https://shannon-explorer.somnia.network/address/0xc999B6924179a0dc9649DA7eBa8F3aC8b7CF7c25) on Shannon; all addresses in [`deployments/`](deployments/) |
 | How it is built | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |

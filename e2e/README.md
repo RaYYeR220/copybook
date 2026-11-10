@@ -247,6 +247,7 @@ the trader signs nothing and does not know it is followed.
 | `stats <trader>` | the trader's position changes over the last 24 h from the indexer: per hour, hours with a change, markets, opens, closes and flips (no key) |
 | `fund <stt> <usdso> [to]` | the hub owner sends STT and spot USDso to the follower, or to `to` (one of `demoWallets` only) |
 | `follow <trader> <pool> [usdso]` | the follower deposits margin, turns its guard on, grants the hub `placeOrderFor`, pays the gate's fee for a review of the trader, runs the SDK's preflight and follows the trader in that market: scale 1.5%, at most 10 USDso a position and 15 in all, band 0.5%, floor 3 USDso, tank 2 STT |
+| `caps <maxNotional> <maxTotalNotional>` | the follower changes its caps (USDso) with `updatePolicy`, keeping every other field of its policy |
 | `tank <stt> [role]` | the follower (`UI_FOLLOWER`, or `FOLLOWER`) adds STT to its gas tank |
 | `pairs <follower> <trader> <fromBlock> [toBlock]` | every move of the trader since `fromBlock`, the hub's handler run in its block and what it did for the follower: a copy, a refusal with its reason, or nothing (no key) |
 

@@ -10,6 +10,7 @@
     "live": "tsx src/live.ts",
     "risk": "tsx src/risk.ts",
     "leader-bot": "tsx src/leader-bot.ts",
+    "outside": "tsx src/outside.ts",
     "typecheck": "tsc --noEmit",
     "eval": "tsx src/eval.ts",
     "eval:v4": "tsx src/eval-v4.ts",

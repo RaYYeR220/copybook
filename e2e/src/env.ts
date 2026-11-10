@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { delimiter } from "node:path";
 import { createPublicClient, createWalletClient, http, type Hex, type PublicClient } from "viem";
 import { privateKeyToAccount, type PrivateKeyAccount } from "viem/accounts";
 import { SomniaMarkets, SOMNIA_HIDEKI_TESTNET_ADDRESSES } from "@somnia-chain/markets-sdk";
@@ -22,24 +23,27 @@ export const REACTIVITY = "0x0000000000000000000000000000000000000100" as const;
 
 /**
  * Keys are read from the file named by COPYBOOK_ENV (KEY=VALUE lines; names in .env.example), on first use only,
- * so tools that need no key (record-deploy, the RPC shim, typecheck) run without it.
+ * so tools that need no key (record-deploy, the RPC shim, typecheck) run without it. COPYBOOK_ENV may name several
+ * files, separated like PATH entries (`;` on Windows, `:` elsewhere); a later file's key wins.
  */
 let loaded: Record<string, string> | undefined;
 function env(): Record<string, string> {
   if (loaded) return loaded;
-  const path = process.env.COPYBOOK_ENV;
-  if (!path) throw new Error("set COPYBOOK_ENV to the env file holding the wallet keys (see .env.example)");
+  const paths = (process.env.COPYBOOK_ENV ?? "").split(delimiter).filter(Boolean);
+  if (!paths.length) throw new Error("set COPYBOOK_ENV to the env file holding the wallet keys (see .env.example)");
   const out: Record<string, string> = {};
-  for (const line of readFileSync(path, "utf8").split(/\r?\n/)) {
-    const t = line.trim();
-    if (!t || t.startsWith("#") || !t.includes("=")) continue;
-    const i = t.indexOf("=");
-    out[t.slice(0, i).trim()] = t.slice(i + 1).trim();
-  }
+  for (const path of paths)
+    for (const line of readFileSync(path, "utf8").split(/\r?\n/)) {
+      const t = line.trim();
+      if (!t || t.startsWith("#") || !t.includes("=")) continue;
+      const i = t.indexOf("=");
+      out[t.slice(0, i).trim()] = t.slice(i + 1).trim();
+    }
   return (loaded = out);
 }
 
-export type Role = "HUB_OWNER" | "LEADER" | "FOLLOWER" | "FOLLOWER2";
+/** UI_FOLLOWER: the app run's demo follower, which also follows a trader Copybook does not control (`npm run outside`). */
+export type Role = "HUB_OWNER" | "LEADER" | "FOLLOWER" | "FOLLOWER2" | "UI_FOLLOWER";
 
 function key(role: Role): Hex {
   const pk = env()[`${role}_PK`];

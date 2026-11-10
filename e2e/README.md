@@ -37,7 +37,8 @@ FOLLOWER2_PK=0x...
 ```
 
 The file is read only when a key is first needed, so `record-deploy`, the RPC shim and `typecheck` run
-without it.
+without it. `COPYBOOK_ENV` may name several files, separated like `PATH` entries (`;` on Windows, `:` elsewhere); a
+later file's key wins. `npm run outside` also reads `UI_FOLLOWER_PK`, the key of the demo follower from the app run.
 
 ## 1. Build
 
@@ -187,6 +188,7 @@ forge verify-contract <gate> src/risk/RiskGate.sol:RiskGate --verifier blockscou
 | `prompt` | sets the reviewer's system prompt to the published rubric in `eval/rubric.ts` |
 | `review [trader ...]` | pays for reviews and follows each one: the Hyperlane delivery to Shannon, both agent requests as sent (URL and field; user prompt, system message and allowed answers), both committee stages with every validator's answer, the reply, and the gate's verdict on Hideki |
 | `follow <nonce> [shannon block]` | picks up a recorded review whose Hyperlane delivery outlasted the wait and follows it from chain to the gate's answer |
+| `adopt <request tx>` | records a review someone else paid for (a follower, the app's trader page) from its request transaction and follows it across both chains |
 | `guard` | with a live `Block` on the leader: an unguarded increase copies, a guarded one is refused `RiskGate`, the exit copies; without one, only the guard switch |
 
 Every transaction lands in `deployments/risk.json` with its explorer link (a deployment with its contract address);
@@ -227,6 +229,29 @@ exists. It only reads (public RPCs, no key, no `contracts/out`), so it runs righ
 transactions are in `proof/sources.json`; it also checks everything in `deployments/*.json` and `eval/*/anchor.json`
 and every explorer link in the docs. Exit code 0 when all verify, 1 when any fails, 2 when the RPC kept failing.
 `npm test` runs the ledger's own tests (`COPYBOOK_LIVE=1` adds one against the live RPC). PROOF.md is written only when everything verifies; `npm run proof -- --write-anyway` writes it with the failures marked.
+
+`npm run uptime [fromBlock] [toBlock]` reads, from Hideki only, every move of the demo leader since the demo-leader
+bot's first trade (block 36,410,390, 2026-10-29) and the hub's log: the handler runs in each move's block, the copies
+they made for each follower and whether each landed in the leader's block, refusals by reason, deferrals, and the gas
+charged to the tanks. It writes `proof/uptime.json`, which `npm run proof` renders into PROOF.md ("Live since the bot
+started") and whose first and last handler copies it re-checks as same-block pairs. It reads in 1000-block windows
+(the node's `eth_getLogs` limit), two reads per window, so a run over ten million blocks takes several minutes.
+
+## A trader we do not control
+
+`npm run outside` runs one of our demo followers (`UI_FOLLOWER`) against a dreamDEX trader Copybook does not control:
+the trader signs nothing and does not know it is followed.
+
+| step | what it does |
+|---|---|
+| `stats <trader>` | the trader's position changes over the last 24 h from the indexer: per hour, hours with a change, markets, opens, closes and flips (no key) |
+| `fund <stt> <usdso> [to]` | the hub owner sends STT and spot USDso to the follower, or to `to` (one of `demoWallets` only) |
+| `follow <trader> <pool> [usdso]` | the follower deposits margin, turns its guard on, grants the hub `placeOrderFor`, pays the gate's fee for a review of the trader, runs the SDK's preflight and follows the trader in that market: scale 1.5%, at most 10 USDso a position and 15 in all, band 0.5%, floor 3 USDso, tank 2 STT |
+| `tank <stt> [role]` | the follower (`UI_FOLLOWER`, or `FOLLOWER`) adds STT to its gas tank |
+| `pairs <follower> <trader> <fromBlock> [toBlock]` | every move of the trader since `fromBlock`, the hub's handler run in its block and what it did for the follower: a copy, a refusal with its reason, or nothing (no key) |
+
+Transactions are printed with their block and position and kept in `out/outside.json`; the recorded ones are in
+`proof/sources.json`. Follow the review the follower paid for across both chains with `npm run risk adopt <request tx>`.
 
 ## Demo leader bot
 

@@ -57,6 +57,8 @@ export const CHAINS: Record<ChainName, { id: number; name: string; rpc: string; 
 };
 
 export const HUB: string = hidekiDeployment.hub;
+/** Written by `npm run uptime`. */
+const UPTIME = "e2e/proof/uptime.json";
 /** The deterministic CREATE2 deployer forge uses for libraries. */
 const CREATE2_DEPLOYER = "0x4e59b44847b379578588920cA78FbF26c0B4956C";
 
@@ -450,6 +452,8 @@ export type Section =
   | "reviews"
   | "mcp"
   | "landing"
+  | "outside"
+  | "uptime"
   | "other";
 
 export interface LedgerRow extends TxSpec {
@@ -492,6 +496,46 @@ export interface SourceContract {
   readBack?: boolean;
   expect?: Expect;
 }
+/** What `npm run uptime` read about the demo leader's followers (e2e/proof/uptime.json). */
+export interface UptimeSummary {
+  about: string;
+  leader: string;
+  sourceId: string;
+  fromBlock: number;
+  asOfBlock: number;
+  fromTime: string;
+  asOfTime: string;
+  moves: { transactions: number; positionUpdates: number };
+  handlerRuns: { total: number; withCopy: number; refusedOnly: number; nothing: number };
+  handlerCopies: { total: number; inLeadersBlock: number; notInLeadersBlock: number; byFollower: Record<string, number> };
+  directCopies: number;
+  refusals: Record<string, number>;
+  deferred: number;
+  groupDeferred: number;
+  tankCharged: Record<string, string>;
+  /** Handler copies, each with the leader's move in its block: rows the ledger re-checks as same-block pairs. */
+  samples: { label: string; move: { hash: Hex; block: number; index: number }; copy: { hash: Hex; block: number; index: number; follower: string } }[];
+}
+
+/** The uptime file's sample copies as same-block pairs: the move and the hub's handler transaction in its block. */
+export function uptimeRows(u: UptimeSummary): LedgerRow[] {
+  return u.samples.flatMap((s, i) => {
+    const pair = `uptime-${i + 1}`;
+    const base = { section: "uptime" as const, run: "uptime", pair, chain: "hideki" as const, source: "e2e/proof/uptime.json" };
+    return [
+      { ...base, id: `${pair}-move`, role: "move" as const, hash: s.move.hash, label: s.label, expect: { block: s.move.block, index: s.move.index } },
+      {
+        ...base,
+        id: `${pair}-copy`,
+        role: "copy" as const,
+        hash: s.copy.hash,
+        label: "the hub's handler",
+        expect: { block: s.copy.block, index: s.copy.index, from: HUB, method: "onEvent", events: [{ name: "Copied", args: { follower: s.copy.follower, sourceId: u.sourceId } }] },
+      },
+    ];
+  });
+}
+
 export interface Sources {
   about: string;
   runs: Record<string, string>;
@@ -692,6 +736,7 @@ export function buildRows(sources: Sources, sweep = true): LedgerRow[] {
   }
   const landing = resolve(ROOT, "app/content/proof.ts");
   if (existsSync(landing)) rows.push(...landingRows(readFileSync(landing, "utf8")));
+  if (existsSync(resolve(ROOT, UPTIME))) rows.push(...uptimeRows(readJson<UptimeSummary>(UPTIME)));
   const known = new Set(rows.map((r) => `${r.chain}:${r.hash.toLowerCase()}`));
   for (const rel of citingFiles())
     for (const { chain, hash } of linkedTxs(readFileSync(resolve(ROOT, rel), "utf8"))) {
@@ -1018,6 +1063,7 @@ export async function runLedger(options: RunOptions = {}): Promise<number> {
     reviews,
     gas,
     context: { runs: sources.runs, markets: sources.markets, wallets, hub: HUB, exampleNonce: sources.guard.exampleNonce },
+    uptime: sweep && existsSync(resolve(ROOT, UPTIME)) ? readJson<UptimeSummary>(UPTIME) : undefined,
   };
   const { renderProof } = await import("./proof-render.ts");
   const out = options.out ?? resolve(ROOT, "docs/PROOF.md");

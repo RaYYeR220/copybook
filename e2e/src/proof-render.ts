@@ -12,6 +12,7 @@ import {
   type PairResult,
   type ReviewResult,
   type Section,
+  type UptimeSummary,
 } from "./proof-ledger.ts";
 
 export interface ProofContext {
@@ -32,6 +33,8 @@ export interface ProofInput {
   reviews: ReviewResult[];
   gas: GasResult[];
   context: ProofContext;
+  /** `npm run uptime`'s numbers for the demo leader's followers (e2e/proof/uptime.json). */
+  uptime?: UptimeSummary;
 }
 
 // ---------------------------------------------------------------- formatting
@@ -201,7 +204,7 @@ function pairMark(p: PairResult): string {
 // ---------------------------------------------------------------- the document
 
 export function renderProof(input: ProofInput): string {
-  const { rows, pairs, contracts, reviews, gas, context: ctx } = input;
+  const { rows, pairs, contracts, reviews, gas, context: ctx, uptime } = input;
   const d = makeDescribe(ctx);
   const out: string[] = [];
   const shown = new Set<string>();
@@ -218,6 +221,7 @@ export function renderProof(input: ProofInput): string {
   }
   const n = (o: Outcome) => [...perTx.values()].filter((x) => x === o).length;
   const pairsOk = pairs.filter((p) => p.outcome === "verified").length;
+  const sectionRowsAll = (s: Section) => rows.some((r) => r.section === s);
 
   out.push("# Proof ledger", "");
   out.push(
@@ -229,7 +233,7 @@ export function renderProof(input: ProofInput): string {
   if (contracts.length) summary.push(`${contracts.filter((c) => c.outcome === "verified").length} of ${contracts.length} contracts check out.`);
   out.push(summary.join(" "), "");
   out.push(
-    "Testnet only: Hideki (chain 50383; its explorer is the Tokyo explorer) and Shannon (chain 50312) are Somnia testnets, and STT and USDso have no market value. A wallet shown with a role (demo leader, demo follower, …) is one of Copybook's own (`demoWallets` in `deployments/hideki.json`); the traders in the review table are dreamDEX traders the AI guard reviewed.",
+    `Testnet only: Hideki (chain 50383; its explorer is the Tokyo explorer) and Shannon (chain 50312) are Somnia testnets, and STT and USDso have no market value. A wallet shown with a role (demo leader, demo follower, …) is one of Copybook's own (\`demoWallets\` in \`deployments/hideki.json\`); the traders in the review table are dreamDEX traders the AI guard reviewed${sectionRowsAll("outside") ? ", and the trader in [Copying a trader we don't control](#copying-a-trader-we-dont-control) is a dreamDEX account we do not control" : ""}.`,
     "",
     "**What a ✓ means.** The transaction is on the chain named and succeeded, and everything recorded for it matches the chain: its block and position in the block, sender, target, the function it called and the arguments listed, its gas, and the events Copybook's contracts emitted in it, as far as the row records them. A same-block pair also needs the copy in the move's block, after the move, sent by the hub. A transaction the RPC could not return after retries is marked unverified, never ✓.",
     "",
@@ -332,7 +336,13 @@ export function renderProof(input: ProofInput): string {
     out.push(
       "When a source's position changes, Somnia's validators run the hub's reactive handler inside the same block, and the handler places the copy in the follower's own dreamDEX account. Each row is a move and the hub's handler transaction for it.",
       "",
-      `**${pairsOk} of ${pairs.length} pairs in this ledger** (this table and the pairs under Refusals, Theses and AI guard) have the copy in the move's block, after it, sent by the hub.`,
+      `**${pairsOk} of ${pairs.length} pairs in this ledger** (this table and the pairs under ${[
+        pairs.some((p) => p.section === "uptime") ? "Live since the bot started" : "",
+        pairs.some((p) => p.section === "outside") ? "Copying a trader we don't control" : "",
+        "Refusals, Theses and AI guard",
+      ]
+        .filter(Boolean)
+        .join(", ")}) have the copy in the move's block, after it, sent by the hub.`,
       "",
     );
     pairTable(pairsIn("same-block"), "same-block", true);
@@ -341,6 +351,41 @@ export function renderProof(input: ProofInput): string {
       out.push("Setup for the residue pairs:", "");
       stepTable(setup);
     }
+  }
+
+  // ---- the demo leader's followers since the bot started
+  if (uptime) {
+    const u = uptime;
+    const stt = (wei: string) => units(wei, 18, 2);
+    const reasons = Object.entries(u.refusals);
+    out.push("## Live since the bot started", "");
+    out.push(
+      `\`npm run uptime\` (in \`e2e/\`) read every move of the demo leader ${d.who(u.leader)} and the hub's log from Hideki block ${int(u.fromBlock)} (${utc(u.fromTime)}, the demo-leader bot's first trade) to block ${int(u.asOfBlock)} (${utc(u.asOfTime)}). A move is a transaction that emitted dreamDEX's \`PositionUpdated\` for the leader; a handler run is a transaction the hub sent to the leader's group relay in the move's block, after the move. These are that run's numbers, kept in \`e2e/proof/uptime.json\`; this ledger re-checks the sample pairs below, not every copy.`,
+      "",
+      "| | |",
+      "|---|---|",
+      `| The leader's moves | ${int(u.moves.transactions)} transactions, ${int(u.moves.positionUpdates)} \`PositionUpdated\` events |`,
+      `| Handler runs in the moves' blocks | ${int(u.handlerRuns.total)}: ${int(u.handlerRuns.withCopy)} with a copy, ${int(u.handlerRuns.refusedOnly)} with refusals only, ${int(u.handlerRuns.nothing)} that copied and refused nothing |`,
+      `| Handler copies | **${int(u.handlerCopies.total)}, ${int(u.handlerCopies.inLeadersBlock)} in the leader's block**${u.handlerCopies.notInLeadersBlock ? `, ${int(u.handlerCopies.notInLeadersBlock)} not` : ""} |`,
+      `| Handler copies by follower | ${Object.entries(u.handlerCopies.byFollower).map(([f, n]) => `${d.who(f)}: ${int(n)}`).join(", ") || "none"} |`,
+      `| Refusals by reason | ${reasons.length ? reasons.map(([r, n]) => `\`${r}\` ${int(n)}`).join(", ") : "none"} |`,
+      `| \`Deferred\`, \`GroupDeferred\` | ${int(u.deferred)}, ${int(u.groupDeferred)} |`,
+      `| Copies sent directly (\`catchUp\`, \`follow\`, \`unfollow\`), not by the handler | ${int(u.directCopies)} |`,
+      `| Charged to the followers' tanks in these runs | ${Object.entries(u.tankCharged).map(([f, w]) => `${d.who(f)}: ${stt(w)} STT`).join(", ") || "none"} |`,
+      "",
+    );
+    pairTable(pairsIn("uptime"), "uptime");
+  }
+
+  // ---- a source we do not control
+  if (sectionRows("outside").length) {
+    out.push("## Copying a trader we don't control", "");
+    out.push(
+      `${ctx.runs.outside ? `${ctx.runs.outside}. ` : ""}The trader is a dreamDEX account Copybook does not control: it signed nothing, does not know it is followed, and every move below is its own. The follower is ours (\`demoWallets\`), so this is a source we do not control, not an outside user. Each pair is one of the trader's moves and the hub's handler transaction in its block, with what it did for our follower: a copy, or a refusal with its reason. The review of the trader that the follower paid for is in [every review](#every-review).`,
+      "",
+    );
+    stepTable(sectionRows("outside").filter((r) => !r.pair));
+    pairTable(pairsIn("outside"), "outside");
   }
 
   // ---- refusals

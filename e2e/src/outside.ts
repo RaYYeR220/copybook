@@ -3,17 +3,19 @@
 // moves in the move's block.
 //
 //   npm run outside -- stats <trader>                    the trader's position changes over the last 24 h (indexer, no key)
-//   COPYBOOK_ENV=<keys> npm run outside -- fund <stt> <usdso>
-//                                                        the hub owner sends the follower STT and spot USDso
+//   COPYBOOK_ENV=<keys> npm run outside -- fund <stt> <usdso> [to]
+//                                                        the hub owner sends STT and spot USDso to the follower (or to
+//                                                        `to`, an address: the demo leader's gas is topped up this way)
 //   COPYBOOK_ENV=<keys> npm run outside -- follow <trader> <pool> <usdso>
 //                                                        the follower's margin deposit, guard on, operator approval, a
 //                                                        review of the trader paid at the gate's fee, then the follow
-//   COPYBOOK_ENV=<keys> npm run outside -- tank <stt>     the follower adds STT to its gas tank
+//   COPYBOOK_ENV=<keys> npm run outside -- tank <stt> [role]
+//                                                        the follower (UI_FOLLOWER, or FOLLOWER) adds STT to its gas tank
 //   npm run outside -- pairs <follower> <trader> <fromBlock> [toBlock]
 //                                                        every move of the trader since fromBlock, with the hub's handler
 //                                                        run in its block and what it did for the follower (no key)
 //
-// COPYBOOK_ENV needs HUB_OWNER_PK for `fund` and UI_FOLLOWER_PK for `follow` and `tank`; it may name both files
+// COPYBOOK_ENV needs HUB_OWNER_PK for `fund` and UI_FOLLOWER_PK for `follow` and `tank`; it may name several files
 // (see src/env.ts). Every transaction is printed with its block and position and kept in out/outside.json.
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -75,7 +77,7 @@ function track(label: string, r: TransactionReceipt, events: CopybookEvent[] = [
 }
 
 const follower = () => account("UI_FOLLOWER").address;
-const client = (signer?: "UI_FOLLOWER") =>
+const client = (signer?: "UI_FOLLOWER" | "FOLLOWER") =>
   createCopybook({ publicClient: pub as never, walletClient: signer ? (wallet(signer) as never) : undefined, deployments });
 
 // ---------------------------------------------------------------- stats (read-only)
@@ -120,21 +122,24 @@ async function stats(trader: Address) {
 
 // ---------------------------------------------------------------- fund (hub owner)
 
-async function fund(stt: string, usdso: string) {
+async function fund(stt: string, usdso: string, toArg?: string) {
   const owner = wallet("HUB_OWNER");
-  const to = follower();
-  console.log(`owner ${owner.account.address} → follower ${to}: ${stt} STT, ${usdso} USDso`);
+  const to = toArg ? getAddress(toArg) : follower();
+  const role = deployments.demoWallets.find((w) => getAddress(w.address) === to)?.role ?? "not one of ours";
+  if (role === "not one of ours") throw new Error(`${to} is not in deployments/hideki.json demoWallets`);
+  console.log(`owner ${owner.account.address} → ${role} ${to}: ${stt} STT, ${usdso} USDso`);
+  console.log(`  ${role} before: ${formatEther(await pub.getBalance({ address: to }))} STT`);
   console.log(`  owner before: ${formatEther(await pub.getBalance({ address: owner.account.address }))} STT`);
   if (Number(stt) > 0) {
     const h = await owner.sendTransaction({ to, value: parseEther(stt), gas: 1_000_000n });
-    track(`owner → follower ${stt} STT`, await pub.waitForTransactionReceipt({ hash: h }));
+    track(`owner → ${role} ${stt} STT`, await pub.waitForTransactionReceipt({ hash: h }));
   }
   if (Number(usdso) > 0) {
     const est = await pub.estimateContractGas({ address: USDSO, abi: erc20, functionName: "transfer", args: [to, parseEther(usdso)], account: owner.account });
     const h = await owner.writeContract({ address: USDSO, abi: erc20, functionName: "transfer", args: [to, parseEther(usdso)], gas: (est * 3n) / 2n });
-    track(`owner → follower ${usdso} USDso`, await pub.waitForTransactionReceipt({ hash: h }));
+    track(`owner → ${role} ${usdso} USDso`, await pub.waitForTransactionReceipt({ hash: h }));
   }
-  console.log(`  owner after: ${formatEther(await pub.getBalance({ address: owner.account.address }))} STT`);
+  console.log(`  owner after: ${formatEther(await pub.getBalance({ address: owner.account.address }))} STT; ${role} after: ${formatEther(await pub.getBalance({ address: to }))} STT`);
 }
 
 // ---------------------------------------------------------------- follow (the follower)
@@ -171,11 +176,13 @@ async function follow(trader: Address, pool: Address, usdso: string) {
   console.log(`  margin bank ${MARGIN_BANK}; equity now ${formatEther(await cb.accountEquity(me))} USDso; tank ${formatEther(await cb.tankOf(me))} STT`);
 }
 
-async function tank(stt: string) {
-  const cb = client("UI_FOLLOWER");
+async function tank(stt: string, role: "UI_FOLLOWER" | "FOLLOWER") {
+  const cb = client(role);
+  const me = account(role).address;
+  console.log(`  ${me}: tank ${formatEther(await cb.tankOf(me))} STT, wallet ${formatEther(await pub.getBalance({ address: me }))} STT`);
   const r = await (await cb.fundTank(parseEther(stt))).wait();
-  track(`fundTank ${stt} STT`, r.receipt, r.events);
-  console.log(`  tank now ${formatEther(await cb.tankOf(follower()))} STT`);
+  track(`${me} fundTank ${stt} STT`, r.receipt, r.events);
+  console.log(`  tank now ${formatEther(await cb.tankOf(me))} STT, wallet ${formatEther(await pub.getBalance({ address: me }))} STT`);
 }
 
 // ---------------------------------------------------------------- pairs (read-only)
@@ -251,20 +258,21 @@ async function pairs(who: Address, trader: Address, fromBlock: bigint, toBlock?:
 // ---------------------------------------------------------------- main
 
 const [cmd, ...args] = process.argv.slice(2);
-const usage = "steps: stats <trader> | fund <stt> <usdso> | follow <trader> <pool> <usdso> | tank <stt> | pairs <follower> <trader> <fromBlock> [toBlock]";
+const usage = "steps: stats <trader> | fund <stt> <usdso> [to] | follow <trader> <pool> <usdso> | tank <stt> [role] | pairs <follower> <trader> <fromBlock> [toBlock]";
 try {
   switch (cmd) {
     case "stats":
       await stats(getAddress(args[0]));
       break;
     case "fund":
-      await fund(args[0], args[1] ?? "0");
+      await fund(args[0], args[1] ?? "0", args[2]);
       break;
     case "follow":
       await follow(getAddress(args[0]), getAddress(args[1]), args[2] ?? "10");
       break;
     case "tank":
-      await tank(args[0]);
+      if (args[1] && args[1] !== "UI_FOLLOWER" && args[1] !== "FOLLOWER") throw new Error("tank: role is UI_FOLLOWER or FOLLOWER");
+      await tank(args[0], (args[1] as "UI_FOLLOWER" | "FOLLOWER" | undefined) ?? "UI_FOLLOWER");
       break;
     case "pairs":
       await pairs(getAddress(args[0]), getAddress(args[1]), BigInt(args[2]), args[3] ? BigInt(args[3]) : undefined);

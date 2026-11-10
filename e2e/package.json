@@ -16,6 +16,7 @@
     "eval:v4": "tsx src/eval-v4.ts",
     "eval:test": "tsx --test ../eval/rubric.test.ts",
     "proof": "tsx src/proof-ledger.ts",
+    "uptime": "tsx src/uptime.ts",
     "test": "tsx --test test/proof-ledger.test.ts test/leader-bot.test.ts"
   },
   "dependencies": {

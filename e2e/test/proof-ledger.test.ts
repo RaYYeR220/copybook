@@ -15,8 +15,10 @@ import {
   headingAnchors,
   httpRpc,
   runLedger,
+  uptimeRows,
   verifyTx,
   type Expect,
+  type UptimeSummary,
   type Sources,
   type RpcClient,
   type Verification,
@@ -409,6 +411,63 @@ describe("renderProof", () => {
     assert.match(md, /\*\*FAILED\*\*: reverted/);
     assert.match(md, /unverified \(RPC\)/);
     assert.match(md, new RegExp(`${CHAINS.hideki.explorerTx}${MOVE}`));
+  });
+});
+
+describe("uptime", () => {
+  const SOURCE = "0x6744c2cdbcc5b0f6ad21719c8964204a5ffadf668d2b84479c9b14c029b0a40f";
+  const summary: UptimeSummary = {
+    about: "",
+    leader: LEADER,
+    sourceId: SOURCE,
+    fromBlock: 35977000,
+    asOfBlock: 35978000,
+    fromTime: "2026-10-29T05:00:00.000Z",
+    asOfTime: "2026-10-29T06:00:00.000Z",
+    moves: { transactions: 3, positionUpdates: 4 },
+    handlerRuns: { total: 4, withCopy: 2, refusedOnly: 1, nothing: 1 },
+    handlerCopies: { total: 2, inLeadersBlock: 2, notInLeadersBlock: 0, byFollower: { [FOLLOWER]: 2 } },
+    directCopies: 1,
+    refusals: { RiskGate: 1 },
+    deferred: 0,
+    groupDeferred: 0,
+    tankCharged: { [FOLLOWER]: "25600000000000000" },
+    samples: [{ label: "a copy", move: { hash: MOVE, block: 35977607, index: 4 }, copy: { hash: COPY, block: 35977607, index: 7, follower: FOLLOWER } }],
+  };
+
+  it("re-checks each sample as a same-block pair: the move, then the hub's handler with the follower's Copied", async () => {
+    const rows = uptimeRows(summary);
+    assert.deepEqual(rows.map((r) => [r.id, r.pair, r.role, r.section]), [
+      ["uptime-1-move", "uptime-1", "move", "uptime"],
+      ["uptime-1-copy", "uptime-1", "copy", "uptime"],
+    ]);
+    const move = await verifyTx(fixtureRpc(), rows[0], fast);
+    const copy = await verifyTx(fixtureRpc(), rows[1], fast);
+    assert.equal(move.outcome, "verified", move.reason);
+    assert.equal(copy.outcome, "verified", copy.reason);
+    assert.deepEqual(checkPair(move.facts!, copy.facts!, HUB), []);
+    const wrong = await verifyTx(fixtureRpc(), uptimeRows({ ...summary, samples: [{ ...summary.samples[0], copy: { ...summary.samples[0].copy, follower: LEADER } }] })[1], fast);
+    assert.equal(wrong.outcome, "failed");
+  });
+
+  it("renders the numbers with the blocks they were read at", () => {
+    const md = renderProof({
+      generatedAt: "2026-10-29T12:00:00.000Z",
+      heads: { hideki: 36200000, shannon: 527000000 },
+      rows: [],
+      pairs: [],
+      contracts: [],
+      reviews: [],
+      gas: [],
+      context: { runs: {}, markets: {}, wallets: { [FOLLOWER.toLowerCase()]: "demo follower", [LEADER.toLowerCase()]: "demo leader" }, hub: HUB },
+      uptime: summary,
+    });
+    assert.match(md, /## Live since the bot started/);
+    assert.match(md, /from Hideki block 35,977,000 \(2026-10-29 05:00 UTC, the demo-leader bot's first trade\) to block 35,978,000/);
+    assert.match(md, /\*\*2, 2 in the leader's block\*\*/);
+    assert.match(md, /4: 2 with a copy, 1 with refusals only, 1 that copied and refused nothing/);
+    assert.match(md, /`RiskGate` 1/);
+    assert.match(md, /demo follower 0xDe52…eaAB: 0.03 STT/);
   });
 });
 

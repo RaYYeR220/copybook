@@ -24,8 +24,8 @@ What Copybook does not do: [docs/LIMITS.md](docs/LIMITS.md).
    [the move](https://explorer.testnet.somnia.network/tokyo/tx/0x6eb14100e9fd35cde32d1e72f35bd49796fae3792e47e649ac7714e86b719306),
    [the copy](https://explorer.testnet.somnia.network/tokyo/tx/0x9af7c988c855301d498b0dbda053f6eda8198875eff45be46d7d50325b7cc755);
    every move of that trader since we followed it: [PROOF](docs/PROOF.md#copying-a-trader-we-dont-control).
-2. Read the top of [docs/PROOF.md](docs/PROOF.md): 519 of 519 cited transactions verified on chain, 40 of 40
-   same-block pairs, 9 of 9 contracts, as of Hideki block 46,681,223 (2026-11-10).
+2. Read the top of [docs/PROOF.md](docs/PROOF.md): 521 of 521 cited transactions verified on chain, 41 of 41
+   same-block pairs, 9 of 9 contracts, as of Hideki block 46,790,011 (2026-11-10).
 3. Skim [docs/LIMITS.md](docs/LIMITS.md).
 
 ## 1. MVP potential (2 minutes)
@@ -78,7 +78,7 @@ block, position, sender, target, function, gas and events checked.
 
 | What | Where |
 | --- | --- |
-| Copies sent by the hub into followers' accounts, in the source's block | [40 same-block pairs](docs/PROOF.md#same-block-copies) |
+| Copies sent by the hub into followers' accounts, in the source's block | [41 same-block pairs](docs/PROOF.md#same-block-copies) |
 | Every move of the demo leader since its bot started, read from the chain: handler runs, copies and whether each landed in the leader's block, refusals by reason | [Live since the bot started](docs/PROOF.md#live-since-the-bot-started) |
 | A trader we don't control: our demo follower follows a dreamDEX account Copybook asked nothing of, and each of its moves is handled in the move's own block: copied, refused, or too small to send | [Copying a trader we don't control](docs/PROOF.md#copying-a-trader-we-dont-control) |
 | The app run: approval, guard off, follow, `catchUp`, a live copy, top-up, unfollow with flatten, withdraw, revoke, all sent from the app's pages | [In the app](docs/PROOF.md#in-the-app) |

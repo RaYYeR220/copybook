@@ -1,8 +1,8 @@
 # Proof ledger
 
-Every transaction Copybook's documents cite, read back from the chain. `npm run proof` (in `e2e/`) wrote this file at **Hideki block 46,681,223** and **Shannon block 537,476,570**, 2026-11-10 14:49 UTC.
+Every transaction Copybook's documents cite, read back from the chain. `npm run proof` (in `e2e/`) wrote this file at **Hideki block 46,790,011** and **Shannon block 537,585,522**, 2026-11-10 17:51 UTC.
 
-**519 transactions checked: 519 verified, 0 failed, 0 unverified.** 40 of 40 same-block pairs check out. 9 of 9 contracts check out.
+**521 transactions checked: 521 verified, 0 failed, 0 unverified.** 41 of 41 same-block pairs check out. 9 of 9 contracts check out.
 
 Testnet only: Hideki (chain 50383; its explorer is the Tokyo explorer) and Shannon (chain 50312) are Somnia testnets, and STT and USDso have no market value. A wallet shown with a role (demo leader, demo follower, …) is one of Copybook's own (`demoWallets` in `deployments/hideki.json`); the traders in the review table are dreamDEX traders the AI guard reviewed, and the trader in [Copying a trader we don't control](#copying-a-trader-we-dont-control) is a dreamDEX account we do not control.
 
@@ -13,6 +13,7 @@ Testnet only: Hideki (chain 50383; its explorer is the Tokyo explorer) and Shann
 - `e2e`: The end-to-end run against the current hub (`npm run live`), 2026-10-28
 - `risk`: The risk module's runs (`npm run risk`), 2026-10-28, recorded in deployments/risk.json
 - `app`: A run through the web app's pages (a preview deployment) and the MCP server, 2026-10-29
+- `video`: The demo video's live shot, 2026-10-29: a move by the demo-leader bot, recorded on the demo follower's dashboard (`/me`) in the production app; the README's GIF is cut from it
 - `outside`: A demo follower of ours following dreamDEX trader 0xD3Ec…E619 on ETH since 2026-11-10, set up with `npm run outside` (in e2e/). It copies 1.5% of the trader's size. For moves 1–11 its cap was 10 USDso a position, a little above the venue's minimum order of 0.004 ETH, so the copy held 0.0047 or 0.0048 ETH (whole 0.0001 ETH lots, as the mark moved) while the trader's scaled size was above the cap: a move that left it there asked for less than one lot more and was refused as `BelowMinimum`, and the copy changed only when the trader's position crossed zero. From block 46,658,759 the cap is 20 USDso a position and 25 in all (`npm run outside -- caps 20 25`), which holds 1.5% of the trader's usual 0.54 ETH short (about 0.0081 ETH) uncapped, so its swings between about 0.54 and 0.11 ETH short are copied too (move 15)
 - `refresh`: Top-ups on 2026-11-10 so the demo runs last through 2026-11-25
 - `uptime`: `npm run uptime` (in e2e/) on 2026-11-10: the demo leader's moves and the hub's handler runs since the demo-leader bot's first trade (e2e/proof/uptime.json)
@@ -48,7 +49,7 @@ Testnet only: Hideki (chain 50383; its explorer is the Tokyo explorer) and Shann
 
 When a source's position changes, Somnia's validators run the hub's reactive handler inside the same block, and the handler places the copy in the follower's own dreamDEX account. Each row is a move and the hub's handler transaction for it.
 
-**40 of 40 pairs in this ledger** (this table and the pairs under Live since the bot started, Copying a trader we don't control, Refusals, Theses and AI guard) have the copy in the move's block, after it, sent by the hub.
+**41 of 41 pairs in this ledger** (this table and the pairs under Live since the bot started, Copying a trader we don't control, Refusals, Theses and AI guard) have the copy in the move's block, after it, sent by the hub.
 
 | # | Run | The move | Block | Move · position | Copy · position | What the copy did | Check |
 |---|---|---|---|---|---|---|---|
@@ -68,6 +69,7 @@ When a source's position changes, Somnia's validators run the hub's reactive han
 | 14 | e2e | <a id="e2e-16"></a>After two minutes idle: the leader closes | 35,027,212 | [0x1aafd545…ce48](https://explorer.testnet.somnia.network/tokyo/tx/0x1aafd5456d899f377a80fe044b03b618c3362834f7da76ed1d0be65e7090ce48) · #0 | [0x49f0b44a…9b67](https://explorer.testnet.somnia.network/tokyo/tx/0x49f0b44a2152acf9384b49b7889df7115137edd8dcc6cd45b0fd2132f9a39b67) · #2 | copied BTC 0.0005 → 0 · tank charged 0.0109 STT | ✓ |
 | 15 | e2e | <a id="e2e-noop"></a>The leader sells 0.0005 BTC while the follower is already flat | 35,026,907 | [0xdcc29d22…b69c](https://explorer.testnet.somnia.network/tokyo/tx/0xdcc29d22f1d14258275123aea82d29cf03067f01fb06e9ad7638a6280ddab69c) · #4 | [0x4f04dbfb…c1b0](https://explorer.testnet.somnia.network/tokyo/tx/0x4f04dbfb5cd4f6741fe1d7a15cff1569d220fb4ed7f69f2da6b7ec3632abc1b0) · #5 | nothing to copy | ✓ |
 | 16 | app | <a id="app-live"></a>The leader buys 0.00013 BTC while the follower's dashboard is open | 35,977,607 | [0x020ad2ec…17c6](https://explorer.testnet.somnia.network/tokyo/tx/0x020ad2ecfc395d95691ec72ab275e61a7a8d50ead2978b249773eba2d98a17c6) · #4 | [0x9b950e40…9e3c](https://explorer.testnet.somnia.network/tokyo/tx/0x9b950e40fe79338890174ef0e9d4ed7cc2bf5733e6d1df04b049f74b916e9e3c) · #7 | demo follower 0x7d73…1932: **refused** BTC: `RiskGate` · tank charged 0.0016 STT; demo follower 0xDe52…eaAB: copied BTC 0.00015 → 0.00028 · tank charged 0.0128 STT | ✓ |
+| 17 | video | <a id="video-live"></a>The leader opens 0.00013 BTC while the demo video records the follower's dashboard | 36,461,558 | [0x841aa2cd…9e98](https://explorer.testnet.somnia.network/tokyo/tx/0x841aa2cd35c5680f2688d114ae63bbb8c3b0c7154651f6618fd349c6d7699e98) · #2 | [0xae608608…1328](https://explorer.testnet.somnia.network/tokyo/tx/0xae608608a741e494bd084818d0a84b82b2b432725dca379a272828f47f4b1328) · #4 | copied BTC 0 → 0.00013 · tank charged 0.0103 STT | ✓ |
 
 Setup for the residue pairs:
 

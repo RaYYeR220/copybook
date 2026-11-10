@@ -5,6 +5,7 @@
     "e2e": "The end-to-end run against the current hub (`npm run live`), 2026-10-28",
     "risk": "The risk module's runs (`npm run risk`), 2026-10-28, recorded in deployments/risk.json",
     "app": "A run through the web app's pages (a preview deployment) and the MCP server, 2026-10-29",
+    "video": "The demo video's live shot, 2026-10-29: a move by the demo-leader bot, recorded on the demo follower's dashboard (`/me`) in the production app; the README's GIF is cut from it",
     "outside": "A demo follower of ours following dreamDEX trader 0xD3Ec…E619 on ETH since 2026-11-10, set up with `npm run outside` (in e2e/). It copies 1.5% of the trader's size. For moves 1–11 its cap was 10 USDso a position, a little above the venue's minimum order of 0.004 ETH, so the copy held 0.0047 or 0.0048 ETH (whole 0.0001 ETH lots, as the mark moved) while the trader's scaled size was above the cap: a move that left it there asked for less than one lot more and was refused as `BelowMinimum`, and the copy changed only when the trader's position crossed zero. From block 46,658,759 the cap is 20 USDso a position and 25 in all (`npm run outside -- caps 20 25`), which holds 1.5% of the trader's usual 0.54 ETH short (about 0.0081 ETH) uncapped, so its swings between about 0.54 and 0.11 ETH short are copied too (move 15)",
     "refresh": "Top-ups on 2026-11-10 so the demo runs last through 2026-11-25",
     "uptime": "`npm run uptime` (in e2e/) on 2026-11-10: the demo leader's moves and the hub's handler runs since the demo-leader bot's first trade (e2e/proof/uptime.json)"
@@ -1188,6 +1189,64 @@
             "name": "TankCharged",
             "args": {
               "follower": "0xDe52dd7f81F67D2124ae0fBd8567f405cFAEeaAB"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "video-live-move",
+      "section": "same-block",
+      "run": "video",
+      "pair": "video-live",
+      "role": "move",
+      "label": "The leader opens 0.00013 BTC while the demo video records the follower's dashboard",
+      "hash": "0x841aa2cd35c5680f2688d114ae63bbb8c3b0c7154651f6618fd349c6d7699e98",
+      "expect": {
+        "block": 36461558,
+        "index": 2,
+        "gasUsed": 1469263,
+        "from": "0xa1d0cb85c869e534fe1e0c22af3b238301157b5d",
+        "to": "0x4181dd08E73BbCdd1Ba3E615A18f6abD941b94C0",
+        "method": "placeOrder",
+        "args": {
+          "isBid": true,
+          "quantity": "13000"
+        }
+      }
+    },
+    {
+      "chain": "hideki",
+      "id": "video-live-copy",
+      "section": "same-block",
+      "run": "video",
+      "pair": "video-live",
+      "role": "copy",
+      "label": "the hub's handler",
+      "hash": "0xae608608a741e494bd084818d0a84b82b2b432725dca379a272828f47f4b1328",
+      "expect": {
+        "block": 36461558,
+        "index": 4,
+        "gasUsed": 1708407,
+        "from": "0xdf73bbbb6517b712bbed9bfae6253a5e1fcde154",
+        "to": "0xEFf35D485c4559D9f44e5138B38Cd93052f2E7BF",
+        "method": "onEvent",
+        "events": [
+          {
+            "name": "Copied",
+            "args": {
+              "follower": "0x7d736A88978e94E60494Ff91C49Ba838EDfb1932",
+              "pool": "0x4181dd08E73BbCdd1Ba3E615A18f6abD941b94C0",
+              "fromSize": "0",
+              "toSize": "13000"
+            }
+          },
+          {
+            "name": "TankCharged",
+            "args": {
+              "follower": "0x7d736A88978e94E60494Ff91C49Ba838EDfb1932",
+              "amount": "10259874000000000"
             }
           }
         ]

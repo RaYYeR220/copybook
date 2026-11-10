@@ -64,7 +64,7 @@ What the handler guarantees, and where it is shown:
   (`CopybookHub.onSourceEvent`).
 - **Only the hub's own subscription drives a group.** `onSourceEvent` requires the caller to be the group's relay and
   `tx.origin` to be the hub, which Somnia sets for the subscription owner. Each recorded pair's copy is sent by the hub
-  ([40 of 40](PROOF.md#same-block-copies)).
+  ([41 of 41](PROOF.md#same-block-copies)).
 - **Exits are never gated.** No cap, tank, pause or AI verdict holds back a close. Each member runs in two
   self-calls, its exits first, then its increases, so a failing increase cannot take a reduction with it
   (`contracts/test/HubFollow.t.sol::test_reductionIgnoresTankAndCaps`, `::test_reductionGoesThroughWhilePaused`,

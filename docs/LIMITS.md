@@ -65,7 +65,7 @@ exit ([row](PROOF.md#guard-exit)).
 
 - **Same block is the rule, not a guarantee.** A copy is placed in the source's block when Reactivity delivers the
   event and the handler's gas covers the follower. A follower it cannot cover is deferred and synced by `catchUp`, which is
-  not a same-block copy and is never labelled one. All 40 recorded pairs are same-block
+  not a same-block copy and is never labelled one. All 41 recorded pairs are same-block
   ([PROOF](PROOF.md#same-block-copies)). The hub's whole event log through Hideki block 36,282,657 (read from
   `/api/history` on 2026-10-29) holds no `Deferred` or `GroupDeferred`, and neither do the demo leader's 709 handler runs from its bot's first trade
   to block 46,570,615 ([live](PROOF.md#live-since-the-bot-started)), so the deferral path is shown by tests only
